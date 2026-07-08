@@ -51,7 +51,7 @@ class CategoryCache:
     def get(self, item_name: str) -> str | None:
         """Retrieves a category for a normalized item name."""
         normalized = item_name.strip().lower()
-        return self.data.get(normalized)
+        return str(self.data.get(normalized)) if self.data.get(normalized) is not None else None
 
     def set(self, item_name: str, category: str):
         """Stores a category for an item name."""

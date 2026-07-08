@@ -8,7 +8,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 
 class CSRFMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app, exempt_path_prefixes: list = None):
+    def __init__(self, app, exempt_path_prefixes: list[str] | None = None):
         super().__init__(app)
         self.exempt_path_prefixes = exempt_path_prefixes or ["/static", "/uploads", "/favicon.ico"]
 
@@ -110,7 +110,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.limit = limit
         self.window_seconds = window_seconds
         self.max_clients = max_clients
-        self.requests = {}  # ip_address -> list of timestamps
+        self.requests: dict[str, list[float]] = {}  # ip_address -> list of timestamps
 
     async def dispatch(self, request: Request, call_next):
         path = request.url.path

@@ -12,7 +12,7 @@ from app.models import Category, Item, Receipt, ReceiptItem, Store
 router = APIRouter()
 
 
-def _get_receipt_data(db: Session, receipt_id: int = None):
+def _get_receipt_data(db: Session, receipt_id: int | None = None):
     """Fetch receipt data as a flat list of dictionaries for pandas"""
     query = (
         db.query(

@@ -88,7 +88,7 @@ exclude = [
 
 # ---------------------------------------------------------------------------
 # Temporary ratchet overrides — remove each module line once it is clean.
-# (Step 1 of mypy backlog clearance — see TODO_MYPY.md)
+# (See TODO_MYPY.md for the full backlog clearance plan — Steps 3 & 4)
 # ---------------------------------------------------------------------------
 [[tool.mypy.overrides]]
 module = [
@@ -96,23 +96,16 @@ module = [
     "app.api.analytics_bi_injection",
     "app.api.analytics_fragments",
     "app.api.bulk",
-    "app.api.export",
     "app.api.items",
     "app.api.pages",
     "app.api.receipts",
     "app.api.receipts_fragments",
     "app.api.receipts_review",
-    "app.api.settings_router",
-    "app.api.templates",
     "app.api.trends",
     "app.api.trends_nutrition",
     "app.api.xray",
-    "app.main",
-    "app.middleware",
-    "app.services.category_cache",
     "app.services.external_product",
     "app.services.fdc_service",
-    "app.services.folder_watch",
     "app.services.item_matcher",
     "app.services.model_manager",
     "app.services.ocr",

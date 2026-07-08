@@ -8,6 +8,7 @@ Also provides:
 import json
 import logging
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -40,10 +41,10 @@ FEATURE_FLAGS_PATH = (
 # ---------------------------------------------------------------------------
 
 
-def _load_ocr_filters() -> dict:
+def _load_ocr_filters() -> dict[str, Any]:
     try:
         with open(OCR_FILTERS_PATH) as f:
-            return json.load(f)
+            return dict(json.load(f))
     except Exception:
         return {"skip_keywords": [], "junk_filters": []}
 
@@ -53,10 +54,10 @@ def _save_ocr_filters(data: dict) -> None:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 
-def _load_feature_flags() -> dict:
+def _load_feature_flags() -> dict[str, Any]:
     try:
         with open(FEATURE_FLAGS_PATH) as f:
-            return json.load(f)
+            return dict(json.load(f))
     except Exception:
         return {"usda_lookup_enabled": True}
 
