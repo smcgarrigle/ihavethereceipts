@@ -4,6 +4,7 @@ import json
 import logging
 import os
 from pathlib import Path
+from typing import Any
 
 from dotenv import load_dotenv
 from google import genai
@@ -40,13 +41,13 @@ class ModelManager:
         else:
             self.client = genai.Client(api_key=self.api_key)
 
-    def get_cached_models(self) -> dict | None:
+    def get_cached_models(self) -> dict[str, Any] | None:
         """Read models from disk if cache is valid."""
         if not self.CACHE_FILE.exists():
             return None
 
         try:
-            data = json.loads(self.CACHE_FILE.read_text())
+            data = dict(json.loads(self.CACHE_FILE.read_text()))
             last_updated = datetime.datetime.fromisoformat(data["last_updated"])
 
             # Check expiry
@@ -158,7 +159,7 @@ class ModelManager:
         else:
             logger.warning("No models found via API. Keeping existing cache if any.")
 
-    def get_best_model(self, fallback="gemini-flash") -> str:
+    def get_best_model(self, fallback: str = "gemini-flash") -> str:
         """Get the best available model. Updates cache synchronously if missing."""
         if not self.CACHE_FILE.exists():
             logger.info("Cache missing in get_best_model. Fetching dynamically...")
@@ -170,8 +171,8 @@ class ModelManager:
             return fallback
 
         try:
-            data = json.loads(self.CACHE_FILE.read_text())
-            return data.get("best_model", fallback)
+            data = dict(json.loads(self.CACHE_FILE.read_text()))
+            return str(data.get("best_model", fallback))
         except Exception:
             return fallback
 

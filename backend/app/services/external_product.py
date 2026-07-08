@@ -76,7 +76,7 @@ class OpenFoodFactsService:
             try:
                 with urllib.request.urlopen(req, timeout=15) as response:
                     if response.status == 200:
-                        return json.loads(response.read().decode("utf-8"))
+                        return dict(json.loads(response.read().decode("utf-8")))
             except Exception as e:
                 logger.warning(f"Attempt {attempt + 1} failed: {e}")
                 if attempt < retries:
@@ -178,15 +178,19 @@ class OpenFoodFactsService:
             results = cls.search_product(db_item.name)
             if results:
                 # Use fuzzy matching to find the best result
-                scored_results = []
+                scored_results: list[dict[str, Any]] = []
                 for res in results:
                     full_name = f"{res['brand']} {res['product_name']}".strip()
                     score = fuzz.token_sort_ratio(db_item.name.lower(), full_name.lower())
                     scored_results.append({"score": score, "product": res})
 
-                scored_results.sort(key=lambda x: x["score"], reverse=True)
-                if scored_results[0]["score"] >= 80:
-                    enriched_data = scored_results[0]["product"]
+                scored_results.sort(key=lambda x: float(str(x["score"])), reverse=True)
+                if float(str(scored_results[0]["score"])) >= 80:
+                    enriched_data = (
+                        dict(scored_results[0]["product"])
+                        if isinstance(scored_results[0]["product"], dict)
+                        else None
+                    )
 
         if not enriched_data:
             return False

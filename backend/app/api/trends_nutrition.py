@@ -258,7 +258,9 @@ def get_macronutrient_calories_data(time_range: str, db: Session):
     results = _get_raw_nutrition_data(time_range, db)
     from collections import defaultdict
 
-    weekly_calories = defaultdict(lambda: {"fat": 0.0, "sugar": 0.0, "protein": 0.0})
+    weekly_calories: defaultdict[str, dict[str, float]] = defaultdict(
+        lambda: {"fat": 0.0, "sugar": 0.0, "protein": 0.0}
+    )
     all_weeks = set()
 
     for r in results:
@@ -311,7 +313,9 @@ def get_nutrition_multiples_data(time_range: str, db: Session):
     results = _get_raw_nutrition_data(time_range, db)
     from collections import defaultdict
 
-    weekly_totals = defaultdict(lambda: {"fat": 0.0, "sugar": 0.0, "protein": 0.0, "sodium": 0.0})
+    weekly_totals: defaultdict[str, dict[str, float]] = defaultdict(
+        lambda: {"fat": 0.0, "sugar": 0.0, "protein": 0.0, "sodium": 0.0}
+    )
     all_weeks = set()
 
     for r in results:
@@ -445,9 +449,9 @@ def get_nutrition_trends(
     results = _get_raw_nutrition_data(time_range, db)
 
     # Intermediate storage: {week: {item_name: total_value}}
-    data_map = defaultdict(lambda: defaultdict(float))
+    data_map: defaultdict[str, defaultdict[str, float]] = defaultdict(lambda: defaultdict(float))
     all_weeks = set()
-    item_totals = defaultdict(float)  # To find top items overall
+    item_totals: defaultdict[str, float] = defaultdict(float)  # To find top items overall
 
     is_sodium = nutrient_type == "sodium"
 
@@ -522,5 +526,3 @@ def get_nutrition_trends(
         )
 
     return {"labels": sorted_weeks, "datasets": datasets, "unit": "mg" if is_sodium else "g"}
-
-

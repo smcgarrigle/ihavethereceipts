@@ -32,7 +32,9 @@ def bulk_upload_receipts(files: list[UploadFile] = File(...), db: Session = Depe
         db.commit()
         db.refresh(store)
 
-    results = []
+    from typing import Any
+
+    results: list[dict[str, Any]] = []
 
     for file in files:
         # Validate file type
@@ -42,7 +44,7 @@ def bulk_upload_receipts(files: list[UploadFile] = File(...), db: Session = Depe
             continue
 
         # Generate unique filename
-        file_ext = Path(file.filename).suffix
+        file_ext = Path(file.filename or "").suffix
         unique_filename = f"{uuid.uuid4()}{file_ext}"
         file_path = UPLOAD_DIR / unique_filename
 
@@ -103,7 +105,7 @@ def get_bulk_queue_status(db: Session = Depends(get_db)):
 
     stats = db.query(Receipt.status, func.count(Receipt.id)).group_by(Receipt.status).all()
 
-    status_map = dict(stats)
+    status_map: dict[str, int] = {str(k): int(v) for k, v in stats}
     pending = status_map.get("pending", 0) + status_map.get("processing", 0)
 
     # Check if the queue is paused
@@ -231,7 +233,7 @@ def get_active_queue_items(db: Session = Depends(get_db)):
                 {f'<span class="text-xs text-red-500/80 max-w-xs truncate font-medium">{r.error_message}</span>' if r.status == "failed" else ""}
 
                 <div class="text-right">
-                    <p class="text-[10px] font-bold text-gray-500 mb-1">{r.created_at.strftime("%H:%M:%S")}</p>
+                    <p class="text-[10px] font-bold text-gray-500 mb-1">{r.created_at.strftime("%H:%M:%S") if r.created_at else ""}</p>
                     {'''<a href="/receipts/''' + str(r.id) + '''/review" class="text-[10px] font-black text-blue-400 hover:text-blue-300 uppercase tracking-widest no-underline">Review</a>''' if r.status == "completed" else ""}
                 </div>
             </div>

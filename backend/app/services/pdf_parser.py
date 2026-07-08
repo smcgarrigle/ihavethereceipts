@@ -60,7 +60,7 @@ def parse_pdf_receipt(pdf_path: str) -> dict[str, Any] | None:
             logger.info(f"Probable scanned PDF (no text found): {pdf_path}")
             return None
 
-        result = {
+        result: dict[str, Any] = {
             "order_number": None,
             "purchase_date": None,
             "total_amount": 0.0,
@@ -233,8 +233,8 @@ def parse_pdf_receipt(pdf_path: str) -> dict[str, Any] | None:
                 result["total_amount"] = float(m_total.group(1))
 
             lines = full_text.split("\n")
-            current_name_parts = []
-            raw_items = []
+            current_name_parts: list[str] = []
+            raw_items: list[dict[str, Any]] = []
 
             skip_keywords, junk_filters = _load_ocr_filters()
 
@@ -322,7 +322,7 @@ def parse_pdf_receipt(pdf_path: str) -> dict[str, Any] | None:
                     current_name_parts.append(line)
 
             # Filter out garbage items with absurdly long names (recommendation sections)
-            result["items"] = [item for item in raw_items if len(item.get("name", "")) <= 150]
+            result["items"] = [item for item in raw_items if len(str(item.get("name", ""))) <= 150]
 
         # Final check: if we found an order number, call it a win
         if result["order_number"]:

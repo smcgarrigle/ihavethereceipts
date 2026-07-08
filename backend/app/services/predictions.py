@@ -59,7 +59,9 @@ def get_item_cadences(db: Session) -> list[dict[str, Any]]:
     now = time.monotonic()
     is_testing = os.getenv("TESTING") == "1"
     if not is_testing and _cadence_cache["data"] is not None and now < _cadence_cache["expires_at"]:
-        return _cadence_cache["data"]  # type: ignore[return-value]
+        from typing import cast
+
+        return cast(list[dict[str, Any]], _cadence_cache["data"])
 
     today = date.today()
 
@@ -79,7 +81,7 @@ def get_item_cadences(db: Session) -> list[dict[str, Any]]:
     # Group purchase dates and store prices by item_id
     item_data: dict[int, dict[str, Any]] = {}
     for ri in all_ri:
-        if not ri.item or not ri.receipt or not ri.receipt.purchase_date:
+        if not ri.item or not ri.item_id or not ri.receipt or not ri.receipt.purchase_date:
             continue
 
         item_id = ri.item_id
@@ -97,7 +99,7 @@ def get_item_cadences(db: Session) -> list[dict[str, Any]]:
 
         # Track per-store pricing (use the line-item effective price)
         store_name = ri.receipt.store.name if ri.receipt.store else "Unknown"
-        effective_price = ri.price * (ri.quantity or 1)
+        effective_price = float(ri.price or 0.0) * float(ri.quantity or 1.0)
         if store_name not in item_data[item_id]["store_prices"]:
             item_data[item_id]["store_prices"][store_name] = []
         item_data[item_id]["store_prices"][store_name].append((effective_price, purchase_date))

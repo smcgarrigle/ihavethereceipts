@@ -1,3 +1,5 @@
+from typing import Any
+
 from rapidfuzz import fuzz
 from sqlalchemy.orm import Session
 
@@ -21,7 +23,7 @@ def find_similar_items(
     threshold: int = 80,
     limit: int = 5,
     existing_items: list[Item] | None = None,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """
     Find items similar to the given name using rapidfuzz
 
@@ -44,17 +46,17 @@ def find_similar_items(
         all_items = db.query(Item).all()
 
     # Calculate similarity scores
-    matches = []
+    matches: list[dict[str, Any]] = []
     for item in all_items:
         # Using token_sort_ratio as it handles word reordering well
         # (e.g. "Green Onions" vs "Onions Green")
-        score = fuzz.token_sort_ratio(normalized_search, item.normalized_name)
+        score = fuzz.token_sort_ratio(normalized_search, str(item.normalized_name))
 
         if score >= threshold:
             matches.append({"item": item, "score": score})
 
     # Sort by score descending
-    matches.sort(key=lambda x: x["score"], reverse=True)
+    matches.sort(key=lambda x: float(str(x["score"])), reverse=True)
 
     return matches[:limit]
 
@@ -73,28 +75,28 @@ def get_best_match(
     )
 
     if matches:
-        return matches[0]["item"]
+        return matches[0]["item"] if isinstance(matches[0]["item"], Item) else None
 
     return None
 
 
-def find_duplicate_items(db: Session, threshold: int = 85) -> list[dict]:
+def find_duplicate_items(db: Session, threshold: int = 85) -> list[dict[str, Any]]:
     """
     Find all potential duplicate items in the database
     """
     all_items = db.query(Item).all()
-    duplicates = []
+    duplicates: list[dict[str, Any]] = []
 
     # Compare each item with every other item
     for i, item1 in enumerate(all_items):
         for item2 in all_items[i + 1 :]:
-            score = fuzz.token_sort_ratio(item1.normalized_name, item2.normalized_name)
+            score = fuzz.token_sort_ratio(str(item1.normalized_name), str(item2.normalized_name))
 
             if score >= threshold:
                 duplicates.append({"item1": item1, "item2": item2, "score": score})
 
     # Sort by score descending
-    duplicates.sort(key=lambda x: x["score"], reverse=True)
+    duplicates.sort(key=lambda x: float(str(x["score"])), reverse=True)
 
     return duplicates
 
@@ -104,7 +106,7 @@ def find_merge_candidates(
     item_id: int,
     db: Session,
     existing_items: list[Item] | None = None,
-) -> list:
+) -> list[dict[str, Any]]:
     """Find existing items that might be duplicates of the given item"""
 
     # Use provided items or fetch from DB
@@ -114,12 +116,12 @@ def find_merge_candidates(
     else:
         all_items = db.query(Item).filter(Item.id != item_id).all()
 
-    candidates = []
+    candidates: list[dict[str, Any]] = []
     normalized_search = normalize_item_name(item_name)
 
     for existing_item in all_items:
         # Calculate similarity using rapidfuzz token_sort_ratio
-        score = fuzz.token_sort_ratio(normalized_search, existing_item.normalized_name)
+        score = fuzz.token_sort_ratio(normalized_search, str(existing_item.normalized_name))
 
         # If 80%+ similar (score is 0-100)
         if score >= 80:
@@ -132,6 +134,6 @@ def find_merge_candidates(
             )
 
     # Sort by similarity (highest first)
-    candidates.sort(key=lambda x: x["similarity"], reverse=True)
+    candidates.sort(key=lambda x: float(str(x["similarity"])), reverse=True)
 
     return candidates

@@ -83,8 +83,8 @@ def populate_demo_data(db: Session) -> bool:
             ("Organic Avocados", "Produce", 4.0, 1.25, "each", None),
             ("Sourdough Bread", "Bakery", 1.0, 4.99, "each", None),
         ]
-        for name, cat, qty, price, unit_type, weight in items_1:
-            item = get_or_create_item(name, cat)
+        for name, cat_name, qty, price, unit_type, weight in items_1:
+            item = get_or_create_item(name, cat_name)
             ri = ReceiptItem(
                 receipt_id=tjs_receipt.id,
                 item_id=item.id,
@@ -118,8 +118,8 @@ def populate_demo_data(db: Session) -> bool:
             ("Organic Bananas", "Produce", 1.2, 2.49, "lb", 1.2),
             ("Boneless Chicken Breast", "Meat", 1.0, 9.99, "each", None),
         ]
-        for name, cat, qty, price, unit_type, weight in items_2:
-            item = get_or_create_item(name, cat)
+        for name, cat_name, qty, price, unit_type, weight in items_2:
+            item = get_or_create_item(name, cat_name)
             ri = ReceiptItem(
                 receipt_id=safeway_receipt.id,
                 item_id=item.id,
@@ -154,8 +154,8 @@ def populate_demo_data(db: Session) -> bool:
             ("Paper Towels", "Household", 1.0, 29.99, "each", None),
             ("Sourdough Bread", "Bakery", 1.0, 4.49, "each", None),
         ]
-        for name, cat, qty, price, unit_type, weight in items_3:
-            item = get_or_create_item(name, cat)
+        for name, cat_name, qty, price, unit_type, weight in items_3:
+            item = get_or_create_item(name, cat_name)
             ri = ReceiptItem(
                 receipt_id=costco_receipt.id,
                 item_id=item.id,

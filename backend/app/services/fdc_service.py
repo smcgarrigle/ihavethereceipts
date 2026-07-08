@@ -15,7 +15,7 @@ FDC_BASE_URL = "https://api.nal.usda.gov/fdc/v1"
 
 
 class FDCService:
-    def __init__(self, api_key: str = FDC_API_KEY):
+    def __init__(self, api_key: str | None = FDC_API_KEY):
         self.api_key = api_key
         self.session = requests.Session()
 
@@ -69,7 +69,7 @@ class FDCService:
         return q
 
     def search_items(
-        self, query: str, data_type: list[str] = None, page_size: int = 10
+        self, query: str, data_type: list[str] | None = None, page_size: int = 10
     ) -> list[dict[str, Any]]:
         """Search for items in USDA FDC."""
         if data_type is None:
@@ -95,7 +95,7 @@ class FDCService:
             response = self.session.post(url, params=params, json=payload, timeout=10)
             response.raise_for_status()
             data = response.json()
-            return data.get("foods", [])
+            return list(data.get("foods", []))
         except Exception as e:
             logger.error(f"Error searching FDC for '{query}': {e}")
             return []
@@ -111,7 +111,7 @@ class FDCService:
         try:
             response = self.session.get(url, params=params, timeout=10)
             response.raise_for_status()
-            return response.json()
+            return dict(response.json())
         except Exception as e:
             logger.error(f"Error fetching FDC details for {fdc_id}: {e}")
             return None
@@ -123,7 +123,7 @@ class FDCService:
         if not items:
             return None
 
-        scored_items = []
+        scored_items: list[dict[str, Any]] = []
         for item in items:
             description = item.get("description", "")
             brand = item.get("brandOwner", item.get("brandName", ""))
@@ -140,11 +140,11 @@ class FDCService:
 
             scored_items.append({"score": final_score, "item": item})
 
-        scored_items.sort(key=lambda x: x["score"], reverse=True)
+        scored_items.sort(key=lambda x: float(str(x["score"])), reverse=True)
         best = scored_items[0]
 
-        if best["score"] >= threshold:
-            return best["item"]
+        if float(str(best["score"])) >= threshold:
+            return dict(best["item"])
 
         return None
 

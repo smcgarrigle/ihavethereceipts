@@ -24,6 +24,7 @@ import os
 import threading
 import time
 from pathlib import Path
+from typing import Any
 
 from pydantic import BaseModel as _SchemaBase
 
@@ -47,7 +48,7 @@ CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 # Global usage cache to avoid redundant disk reads (Audit #20.125)
-_usage_cache = {"date": None, "count": 0}
+_usage_cache: dict[str, Any] = {"date": None, "count": 0}
 _usage_lock = threading.Lock()
 
 
@@ -59,13 +60,13 @@ def get_daily_usage() -> int:
 
             # Return cached value if matches today
             if _usage_cache["date"] == today:
-                return _usage_cache["count"]
+                return int(_usage_cache["count"])
 
             if not USAGE_TRACKER_FILE.exists():
                 return 0
 
             data = json.loads(USAGE_TRACKER_FILE.read_text())
-            count = data.get("count", 0) if data.get("date") == today else 0
+            count = int(data.get("count", 0)) if data.get("date") == today else 0
 
             # Update cache
             _usage_cache["date"] = today
@@ -525,7 +526,7 @@ def _process_local(image_paths: list[str], prompt_extra: str = "") -> dict:
     logger.info(f"[OCR] Target: {url}")
 
     # Build content list: text prompt + all images
-    content = [{"type": "text", "text": RECEIPT_PROMPT + prompt_extra}]
+    content: list[dict[str, Any]] = [{"type": "text", "text": RECEIPT_PROMPT + prompt_extra}]
 
     encode_start = time.time()
     logger.info(f"[OCR] Encoding {len(image_paths)} image(s) (with pre-processing)...")
@@ -585,7 +586,7 @@ def _process_local(image_paths: list[str], prompt_extra: str = "") -> dict:
 
 _gemini_client = None
 _gemini_model = None
-_fallback_models = []
+_fallback_models: list[str] = []
 
 
 def _init_gemini():
@@ -660,6 +661,9 @@ def _process_gemini(image_paths: list[str], prompt_extra: str = "") -> dict:
     def _generate_with_retry(model, contents):
         return _make_gemini_generate(model, contents)
 
+    if not _gemini_client:
+        return _error_result("Gemini client not initialized")
+
     # Upload images
     image_files = []
     for path in image_paths:
@@ -721,7 +725,7 @@ def _dispatch(image_paths: list[str], prompt_extra: str = "") -> dict:
             logger.info(f"[OCR] Cache hit! Using cached results for {file_hash}")
             cached_data = json.loads(cache_path.read_text())
             cached_data["cached"] = True
-            return cached_data
+            return dict(cached_data)
     except Exception as e:
         logger.warning(f"[OCR] Cache error (reading): {e}")
 
@@ -985,9 +989,9 @@ def process_receipt_task(receipt_id: int, image_path: str):
                 # Only fuzzy search if no exact match
                 if not exact_match:
                     for db_item in all_db_items:
-                        score = fuzz.token_sort_ratio(normalized, db_item.normalized_name)
+                        score = fuzz.token_sort_ratio(str(normalized), str(db_item.normalized_name))
                         if score > best_score:
-                            best_score = score
+                            best_score = int(score)
                             best_match = db_item
 
                 # Feature 2 & 3: Auto-merge & History Overrides
@@ -1118,11 +1122,12 @@ def process_receipt_task(receipt_id: int, image_path: str):
 
     except Exception as e:
         logger.error(f"Background task failed for receipt {receipt_id}: {e}")
-        try:
-            receipt.status = "failed"
-            receipt.error_message = f"System Error: {str(e)}"
-            db.commit()
-        except Exception:
-            pass
+        if receipt:
+            try:
+                receipt.status = "failed"
+                receipt.error_message = f"System Error: {str(e)}"
+                db.commit()
+            except Exception:
+                pass
     finally:
         db.close()
