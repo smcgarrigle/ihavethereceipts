@@ -30,11 +30,13 @@ if not is_testing:
                 f"Application startup aborted: {e}"
             ) from e
 
-    # Ensure DATABASE_URL exists
+    # Ensure DATABASE_URL exists. Always write an absolute path: a relative
+    # sqlite URL resolves against the caller's CWD, so scripts run from the
+    # wrong directory silently create empty stray databases.
     if not os.getenv("DATABASE_URL"):
         try:
             with open(env_path, "a") as f:
-                f.write("\nDATABASE_URL=sqlite:///./grocery.db\n")
+                f.write(f"\nDATABASE_URL=sqlite:///{BASE_DIR / 'grocery.db'}\n")
             load_dotenv(override=True)
         except Exception as e:
             raise RuntimeError(
