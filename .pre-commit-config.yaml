@@ -14,5 +14,11 @@ repos:
         args: [ --fix ]
       - id: ruff-format
 
-  # mypy is run manually (cd backend && uv run mypy .) until the pre-existing
-  # error backlog is cleared — a hook that always fails just teaches --no-verify.
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy (backend)
+        language: system
+        entry: bash -c 'cd backend && uv run mypy .'
+        pass_filenames: false
+        always_run: true
