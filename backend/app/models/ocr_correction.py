@@ -2,7 +2,8 @@
 
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
 
@@ -17,11 +18,17 @@ class OcrCorrection(Base):
 
     __tablename__ = "ocr_corrections"
 
-    id = Column(Integer, primary_key=True, index=True)
-    receipt_id = Column(Integer, ForeignKey("receipts.id"), nullable=False, index=True)
-    store_id = Column(Integer, ForeignKey("stores.id"), nullable=True, index=True)
-    field = Column(String, nullable=False, index=True)
-    item_context = Column(Text, nullable=True)  # item name, for field-level fixes
-    ai_value = Column(Text, nullable=True)
-    approved_value = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    receipt_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("receipts.id"), nullable=False, index=True
+    )
+    store_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("stores.id"), nullable=True, index=True
+    )
+    field: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    item_context: Mapped[str | None] = mapped_column(
+        Text, nullable=True
+    )  # item name, for field-level fixes
+    ai_value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    approved_value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)

@@ -18,7 +18,7 @@ from app.models import Category, Item, Receipt, ReceiptItem, Store
 router = APIRouter()
 
 
-from app.api.analytics import _get_analytics_exclusions, _get_top_items
+from app.api.analytics import _get_analytics_exclusions, _get_top_items  # noqa: E402
 
 
 @router.get("/tables/top-categories", response_class=HTMLResponse)
@@ -1002,5 +1002,3 @@ def get_category_store_drilldown(category_id: int, store_id: int, db: Session = 
         """
     html += "</tbody></table></div>"
     return html
-
-

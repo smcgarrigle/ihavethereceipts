@@ -184,7 +184,7 @@ def delete_category(category_id: int, db: Session = Depends(get_db)):
     if not category:
         raise HTTPException(status_code=404, detail="Category not found")
 
-    if category.name.lower() == "other":
+    if (category.name or "").lower() == "other":
         raise HTTPException(status_code=400, detail="Cannot delete the 'Other' category.")
 
     # Check if any items use this category

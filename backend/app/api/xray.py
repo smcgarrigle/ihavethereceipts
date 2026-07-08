@@ -15,7 +15,7 @@ from app.database import get_db
 from app.models import Item, Receipt, ReceiptItem, Store
 
 logger = logging.getLogger(__name__)
-from app.api.analytics import _get_analytics_exclusions
+from app.api.analytics import _get_analytics_exclusions  # noqa: E402
 
 router = APIRouter()
 

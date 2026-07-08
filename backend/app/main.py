@@ -41,7 +41,7 @@ def run_migrations() -> None:
     silently diverge from migration history on fresh environments.
     Set AUTO_MIGRATE=0 to manage migrations manually.
     """
-    from pathlib import Path
+    from pathlib import Path  # noqa: I001
 
     from alembic import command
     from alembic.config import Config as AlembicConfig

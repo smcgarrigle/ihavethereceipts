@@ -44,6 +44,7 @@ dev = [
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+exclude = ["scripts/", "scratch/", "alembic/versions/"]
 
 [tool.ruff.lint]
 select = [
@@ -65,6 +66,8 @@ ignore = [
 # main.py interleaves imports with wiring on purpose: load_dotenv() must run
 # before app.* imports read env vars, and middleware imports follow app creation.
 "app/main.py" = ["E402"]
+# alembic/env.py: alembic config setup must precede app model imports.
+"alembic/env.py" = ["E402"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["app"]
@@ -106,7 +109,6 @@ module = [
     "app.api.xray",
     "app.main",
     "app.middleware",
-    "app.models.item",
     "app.services.category_cache",
     "app.services.external_product",
     "app.services.fdc_service",

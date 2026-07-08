@@ -19,10 +19,10 @@ class DeleteConfirmation(BaseModel):
     confirmation: str = ""
 
 
-from app.api.templates import templates
-from app.database import get_db
-from app.models.exclusion import ExclusionRule
-from app.services import predictions as predictions_service
+from app.api.templates import templates  # noqa: E402
+from app.database import get_db  # noqa: E402
+from app.models.exclusion import ExclusionRule  # noqa: E402
+from app.services import predictions as predictions_service  # noqa: E402
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

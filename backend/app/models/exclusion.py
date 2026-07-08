@@ -2,7 +2,8 @@
 
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Integer, String
+from sqlalchemy import DateTime, Integer, String
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
 
@@ -16,8 +17,10 @@ class ExclusionRule(Base):
 
     __tablename__ = "exclusion_rules"
 
-    id = Column(Integer, primary_key=True, index=True)
-    scope = Column(String, nullable=False, index=True)  # 'analytics' | 'predictions'
-    pattern = Column(String, nullable=False)  # category name substring to match
-    reason = Column(String, nullable=True)  # optional user-facing note
-    created_at = Column(DateTime, default=datetime.utcnow)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    scope: Mapped[str] = mapped_column(
+        String, nullable=False, index=True
+    )  # 'analytics' | 'predictions'
+    pattern: Mapped[str] = mapped_column(String, nullable=False)  # category name substring to match
+    reason: Mapped[str | None] = mapped_column(String, nullable=True)  # optional user-facing note
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)
