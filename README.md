@@ -83,6 +83,7 @@ In this ensemble approach, different models specialize in specific tasks—from 
 
 ### Prerequisites
 - Python 3.11+
+- [uv](https://docs.astral.sh/uv/getting-started/installation/) (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
 - Google Gemini API Key **OR** a local model server ([LM Studio](https://lmstudio.ai/) or [Ollama](https://ollama.com/))
 
 ### Setup
@@ -92,9 +93,11 @@ In this ensemble approach, different models specialize in specific tasks—from 
     git clone https://github.com/yourusername/grocery-tracker.git
     cd grocery-tracker
     cp .env.example .env
-    # Edit .env with your GEMINI_API_KEY OR local model settings
-    # USE_LOCAL_MODEL=true
-    # LOCAL_MODEL_NAME=ibm/granite3.3-vision:2b
+    # Edit .env and pick an OCR backend:
+    #   OCR_BACKEND=gemini    + GEMINI_API_KEY=your_key        (cloud)
+    # or
+    #   OCR_BACKEND=local     + OCR_MODEL=granite3.3-vision:2b (LM Studio/Ollama)
+    #                         + OCR_BACKEND_URL=http://localhost:11434/v1
     ```
 
 2.  **Install & Run (Local SQLite)**:
@@ -223,7 +226,7 @@ ollama pull granite3.3-vision:2b   # or qwen2-vl
 git clone https://github.com/yourusername/grocery-tracker.git
 cd grocery-tracker
 cp .env.example .env
-# Edit .env — add your GEMINI_API_KEY or set USE_LOCAL_MODEL=true
+# Edit .env — add your GEMINI_API_KEY, or set OCR_BACKEND=local for LM Studio/Ollama
 ```
 
 ### 3. Install & Run

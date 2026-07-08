@@ -23,7 +23,7 @@ cd grocery-tracker
 
 # Copy and configure environment
 cp .env.example .env
-# Edit .env — add GEMINI_API_KEY or set USE_LOCAL_MODEL=true
+# Edit .env — add GEMINI_API_KEY, or set OCR_BACKEND=local for LM Studio/Ollama
 
 # Install runtime + dev tools
 cd backend

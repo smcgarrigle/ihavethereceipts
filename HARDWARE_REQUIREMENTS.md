@@ -65,7 +65,7 @@ The Pi makes HTTPS requests to Google's servers for all OCR work. No local AI co
 ```bash
 # .env
 GEMINI_API_KEY=your_key_here
-USE_LOCAL_MODEL=false
+OCR_BACKEND=gemini
 ```
 
 **RAM footprint at idle:** ~150–200MB — workable on 512MB, though PDF conversion (`pdf2image`) can spike usage. Stick to JPG/PNG receipt images on the Zero 2 W to avoid OOM.
@@ -76,9 +76,9 @@ Run LM Studio on your main PC or Mac, enable the local server, and point the Pi 
 
 ```bash
 # .env on the Pi — replace with your desktop's local IP
-LOCAL_MODEL_URL=http://192.168.1.42:1234
-USE_LOCAL_MODEL=true
-LOCAL_MODEL_NAME=ibm/granite-3.3-vision:2b   # or whichever model you have loaded
+OCR_BACKEND=local
+OCR_BACKEND_URL=http://192.168.1.42:1234/v1
+OCR_MODEL=ibm/granite-3.3-vision:2b   # or whichever model you have loaded
 ```
 
 The Pi sends the receipt image to your desktop for inference and receives the structured JSON response. The Pi itself does zero AI computation — it's just an HTTP client.
@@ -101,9 +101,9 @@ curl -fsSL https://ollama.com/install.sh | sh
 ollama pull granite3.3-vision:2b   # ~1.5GB download
 
 # .env on the Pi
-USE_LOCAL_MODEL=true
-LOCAL_MODEL_URL=http://127.0.0.1:11434
-LOCAL_MODEL_NAME=granite3.3-vision:2b
+OCR_BACKEND=local
+OCR_BACKEND_URL=http://127.0.0.1:11434/v1
+OCR_MODEL=granite3.3-vision:2b
 ```
 
 > [!WARNING]
@@ -150,4 +150,3 @@ uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
 Access the app from any device on your network at `http://<pi-ip-address>:8000`.
-
