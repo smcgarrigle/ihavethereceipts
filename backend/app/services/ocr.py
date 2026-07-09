@@ -1131,3 +1131,370 @@ def process_receipt_task(receipt_id: int, image_path: str):
                 pass
     finally:
         db.close()
+
+
+# ===========================================================================
+# TEXT-PASTE RECEIPT PROCESSING
+# ===========================================================================
+
+TEXT_PARSE_PROMPT = """You are given raw text copied from a grocery receipt or digital order confirmation.
+Parse it into the same structured JSON format.
+Output ONLY JSON. No markdown. No fences.
+
+Fields:
+- store_name: string
+- purchase_date: YYYY-MM-DD
+- total_amount: number
+- subtotal: number
+- tax: number
+- items: list of {name, base_price, final_price, quantity, weight, unit_type, unit_price, is_bulk, discounts: [{amount, description}], fees: [{amount, description, type}]}
+
+Rules:
+1. base_price = The price BEFORE any discounts/savings (often shown as "Regular Price").
+2. final_price = The price AFTER discounts. This is what the customer actually paid per line item.
+3. unit_price = final_price / quantity (the price per single unit).
+4. quantity = The number of units purchased (look for "Quantity: N" lines).
+5. If a "Regular Price" is shown and differs from the line price, record a discount: amount = regular_price - final_price, description = the savings description.
+6. Deposits/CRV = fees (type: "crv" or "deposit").
+7. is_bulk = true only when the price is determined by weight.
+8. CRITICAL: Extract EVERY single item. Do NOT skip or consolidate items.
+9. Item names should be clean product descriptions, not price or quantity text.
+
+Here is the receipt text:
+"""
+
+
+def _process_text_local(text: str, prompt_extra: str = "") -> dict:
+    """Send pasted receipt text to local LLM for structured extraction."""
+    client = _get_local_client()
+
+    try:
+        available = client.models.list()
+        if available and available.data:
+            model = available.data[0].id
+        else:
+            model = os.getenv("OCR_MODEL", "llava:7b")
+    except Exception:
+        model = os.getenv("OCR_MODEL", "llava:7b")
+
+    full_prompt = TEXT_PARSE_PROMPT + prompt_extra + "\n\n" + text
+    logger.info(f"[TEXT] Sending pasted receipt to local model: {model}")
+
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": full_prompt}],
+            temperature=0.3,
+            top_p=0.8,
+            max_tokens=16384,
+            presence_penalty=1.5,
+        )
+        raw = response.choices[0].message.content
+        logger.info("[TEXT] Local model response received")
+        data = _extract_json(raw)
+        data["ocr_model"] = model
+        return data
+    except Exception as e:
+        logger.error(f"[TEXT] Local AI error: {e}")
+        return _error_result(str(e))
+
+
+def _process_text_gemini(text: str, prompt_extra: str = "") -> dict:
+    """Send pasted receipt text to Gemini for structured extraction."""
+    _init_gemini()
+
+    if not _gemini_client:
+        return _error_result("Gemini client not initialized")
+
+    full_prompt = TEXT_PARSE_PROMPT + prompt_extra + "\n\n" + text
+
+    models_to_try = list(
+        dict.fromkeys([_gemini_model] + [m for m in _fallback_models if m != _gemini_model])
+    )
+
+    response = None
+    last_error: Exception | None = None
+    used_model = _gemini_model
+    for model in models_to_try:
+        logger.info(f"[TEXT] Attempting Gemini text parse with model: {model}")
+        try:
+            response = _make_gemini_generate(model, [full_prompt])
+            used_model = model
+            logger.info(f"✓ Gemini text parse success with: {model}")
+            break
+        except Exception as e:
+            logger.warning(f"✗ Gemini model {model} failed: {e}")
+            last_error = e
+
+    if response is None:
+        return _error_result(f"All Gemini models failed. Last: {last_error}")
+
+    try:
+        data = _extract_json(response.text)
+        data["ocr_model"] = used_model
+        return data
+    except json.JSONDecodeError as e:
+        logger.error(f"[TEXT] Gemini JSON parse error: {e}")
+        return _error_result("Failed to parse Gemini response as JSON")
+
+
+def process_text_receipt(text: str, prompt_extra: str = "") -> dict:
+    """Process pasted receipt text through the active AI backend."""
+    backend = get_backend()
+    increment_daily_usage()
+    logger.info(f"[TEXT] Processing pasted receipt ({len(text)} chars, backend={backend})")
+
+    if backend == "gemini":
+        result = _process_text_gemini(text, prompt_extra)
+    else:
+        result = _process_text_local(text, prompt_extra)
+
+    result["ocr_backend"] = backend
+    result["text_paste"] = True
+    return result
+
+
+def process_text_receipt_task(receipt_id: int, raw_text: str) -> None:
+    """
+    Background task: parse pasted receipt text via AI and update the database.
+    Mirrors process_receipt_task() but uses text input instead of image OCR.
+    """
+    from app.database import SessionLocal
+    from app.models import Receipt, Store
+
+    backend = get_backend()
+    logger.info(f"Background text-parse task started for receipt {receipt_id} (backend={backend})")
+    db = SessionLocal()
+    receipt: Receipt | None = None
+    try:
+        receipt = db.query(Receipt).filter(Receipt.id == receipt_id).first()
+        if not receipt:
+            logger.error(f"Receipt {receipt_id} not found in background task")
+            return
+
+        start_time = time.time()
+
+        # Few-shot feedback: recent human corrections
+        prompt_extra = ""
+        try:
+            from app.services.correction_service import get_correction_prompt
+
+            store_hint = receipt.store.name if receipt.store else None
+            prompt_extra = get_correction_prompt(db, store_hint)
+            if prompt_extra:
+                logger.info(
+                    f"Injecting learned corrections into text-parse prompt (store={store_hint})"
+                )
+        except Exception as e:
+            logger.warning(f"Could not build correction prompt: {e}")
+
+        try:
+            ocr_result = process_text_receipt(raw_text, prompt_extra)
+        except Exception as e:
+            logger.error(f"Text parse error for receipt {receipt_id}: {e}")
+            receipt.status = "failed"
+            receipt.error_message = str(e)
+            db.commit()
+            return
+
+        duration = time.time() - start_time
+        logger.info(f"Text parse finished for receipt {receipt_id} in {duration:.2f}s")
+
+        if ocr_result.get("error"):
+            receipt.status = "failed"
+            receipt.error_message = ocr_result["error"]
+            db.commit()
+            return
+
+        ocr_result["processing_time_seconds"] = round(duration, 2)
+
+        receipt.ocr_data = json.dumps(ocr_result)
+
+        if ocr_result.get("total_amount"):
+            receipt.total_amount = ocr_result["total_amount"]
+
+        if ocr_result.get("purchase_date"):
+            try:
+                receipt.purchase_date = datetime.datetime.strptime(
+                    ocr_result["purchase_date"], "%Y-%m-%d"
+                )
+            except Exception as e:
+                logger.warning(
+                    f"Failed to parse purchase_date '{ocr_result.get('purchase_date')}' "
+                    f"from text-parse results for receipt {receipt_id}: {e}"
+                )
+
+        if ocr_result.get("store_name"):
+            from app.services.store_utils import normalize_store_name
+
+            store_name = normalize_store_name(ocr_result["store_name"])
+            store = db.query(Store).filter(Store.name == store_name).first()
+            if not store:
+                store = Store(name=store_name)
+                db.add(store)
+                db.commit()
+                db.refresh(store)
+            receipt.store_id = store.id
+
+        if ocr_result.get("order_number"):
+            existing = (
+                db.query(Receipt)
+                .filter(
+                    Receipt.order_number == ocr_result["order_number"], Receipt.id != receipt.id
+                )
+                .first()
+            )
+            if existing:
+                logger.warning(
+                    f"Order number {ocr_result['order_number']} already exists on receipt {existing.id}. "
+                    f"Skipping order_number assignment for receipt {receipt_id}."
+                )
+            else:
+                receipt.order_number = ocr_result["order_number"]
+
+        # START ENRICHMENT: Local Match + AI Categorization (same as image pipeline)
+        try:
+            from rapidfuzz import fuzz
+
+            from app.models import Item, ReceiptItem
+            from app.services.category_tagger import categorize_items_batch
+            from app.services.item_matcher import normalize_item_name
+
+            all_db_items = db.query(Item).all()
+            unknown_items: list[dict[str, Any]] = []
+
+            for item in ocr_result.get("items", []):
+                item_name = item.get("name", "")
+                if not item_name:
+                    continue
+
+                normalized = normalize_item_name(item_name)
+                exact_match = next(
+                    (it for it in all_db_items if it.normalized_name == normalized), None
+                )
+
+                best_match = exact_match
+                best_score = 100 if exact_match else 0
+
+                if not exact_match:
+                    for db_item in all_db_items:
+                        score = fuzz.token_sort_ratio(str(normalized), str(db_item.normalized_name))
+                        if score > best_score:
+                            best_score = int(score)
+                            best_match = db_item
+
+                if best_match and best_score >= 95:
+                    if item["name"] != best_match.name:
+                        original_name = item["name"]
+                        item["original_ocr_name"] = original_name
+                        item["name"] = best_match.name
+                        item["auto_merged"] = True
+                        logger.info(
+                            f"✨ Auto-merged text item '{original_name}' -> '{best_match.name}' "
+                            f"(fuzzy score: {best_score})"
+                        )
+
+                    if best_match.category:
+                        item["category"] = best_match.category.name
+
+                    recent_entry = (
+                        db.query(ReceiptItem)
+                        .filter(ReceiptItem.item_id == best_match.id)
+                        .order_by(ReceiptItem.id.desc())
+                        .first()
+                    )
+
+                    if recent_entry and item.get("quantity", 1.0) == 1.0:
+                        applied_history = False
+                        if recent_entry.quantity and recent_entry.quantity != 1.0:
+                            item["quantity"] = recent_entry.quantity
+                            applied_history = True
+                        if recent_entry.weight:
+                            item["weight"] = recent_entry.weight
+                            applied_history = True
+                        if recent_entry.unit_type:
+                            item["unit_type"] = recent_entry.unit_type
+                            applied_history = True
+
+                        if applied_history:
+                            item["history_applied"] = True
+
+                elif best_match and best_score >= 80:
+                    item["suggestion"] = {"id": best_match.id, "name": best_match.name}
+
+                if not item.get("category"):
+                    unknown_items.append(item)
+
+            if unknown_items:
+                time.sleep(1)
+                names_to_categorize = [i["name"] for i in unknown_items]
+                try:
+                    category_map = categorize_items_batch(names_to_categorize)
+                    for i in unknown_items:
+                        i["category"] = category_map.get(i["name"], "Other")
+                except Exception as ce:
+                    logger.warning(
+                        f"Batch AI categorization failed: {ce}. Falling back to 'Other'."
+                    )
+                    for i in unknown_items:
+                        i["category"] = "Other"
+
+            # USDA enrichment
+            from app.services.fdc_service import fdc_service
+
+            for item in ocr_result.get("items", []):
+                if item.get("auto_merged"):
+                    continue
+                item_name = item.get("name", "")
+                if len(item_name) > 150:
+                    continue
+                try:
+                    fdc_data = fdc_service.enrich_item_data(item_name)
+                    if fdc_data:
+                        item["fdc_match"] = fdc_data
+                        if fdc_data.get("category") and (
+                            not item.get("category") or item.get("category") in ["Other", "General"]
+                        ):
+                            item["category"] = fdc_data["category"]
+                except Exception as e:
+                    logger.warning(f"FDC enrichment failed for item '{item_name}': {e}")
+
+            receipt.ocr_data = json.dumps(ocr_result)
+
+        except Exception as e:
+            logger.error(f"Post-parse taxonomy enrichment failed: {e}")
+        # END ENRICHMENT
+
+        # Duplicate Detection
+        from app.services.receipt_service import check_potential_duplicate
+
+        duplicate_info = check_potential_duplicate(db, receipt)
+        if duplicate_info:
+            if "order number" in duplicate_info["message"].lower():
+                logger.info(
+                    f"⚠ Aborting processing. Receipt {receipt_id} is an exact Order ID duplicate."
+                )
+                receipt.status = "duplicate"
+                receipt.error_message = duplicate_info["message"]
+                db.commit()
+                return
+
+            ocr_result["duplicate_warning"] = duplicate_info
+            receipt.ocr_data = json.dumps(ocr_result)
+            logger.info(f"⚠ Receipt {receipt_id} flagged as potential duplicate")
+
+        receipt.status = "completed"
+        db.commit()
+        logger.info(f"✓ Receipt {receipt_id} text-parse complete ({backend} backend)")
+
+    except Exception as e:
+        logger.error(f"Background text-parse task failed for receipt {receipt_id}: {e}")
+        if receipt:
+            try:
+                receipt.status = "failed"
+                receipt.error_message = f"System Error: {str(e)}"
+                db.commit()
+            except Exception:
+                pass
+    finally:
+        db.close()

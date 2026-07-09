@@ -30,7 +30,7 @@ from sqlalchemy.orm import Session
 from app.api.receipts_fragments import get_receipt_card
 from app.database import get_db
 from app.models import Receipt, ReceiptItem, Store
-from app.services.ocr import process_receipt_task
+from app.services.ocr import process_receipt_task, process_text_receipt_task
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -142,6 +142,64 @@ def upload_receipt(
             window.location.href = '/receipts/{receipt.id}/review';
         </script>
     """)
+
+
+class PasteReceiptRequest(BaseModel):
+    text: str
+
+
+@router.post("/paste")
+def paste_receipt_text(
+    request: PasteReceiptRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    """Create a receipt from pasted text and parse with AI in background."""
+
+    raw_text = request.text.strip()
+    if not raw_text or len(raw_text) < 20:
+        raise HTTPException(
+            status_code=400,
+            detail="Receipt text is too short. Please paste the full receipt.",
+        )
+
+    if len(raw_text) > 50_000:
+        raise HTTPException(
+            status_code=400,
+            detail="Text too long. Maximum 50,000 characters.",
+        )
+
+    # Get default store (will be updated by AI parsing)
+    store = db.query(Store).filter(Store.name == "Unknown Store").first()
+    if not store:
+        store = Store(name="Unknown Store")
+        db.add(store)
+        db.commit()
+        db.refresh(store)
+
+    # Create receipt with pending status
+    receipt = Receipt(
+        store_id=store.id,
+        image_path=None,
+        total_amount=0.0,
+        purchase_date=datetime.now(),
+        status="pending",
+        ocr_data=json.dumps(
+            {"items": [], "store_name": "Processing...", "total_amount": 0.0, "text_paste": True}
+        ),
+    )
+    db.add(receipt)
+    db.commit()
+    db.refresh(receipt)
+
+    # Process in background
+    background_tasks.add_task(process_text_receipt_task, receipt.id, raw_text)
+
+    return {
+        "success": True,
+        "receipt_id": receipt.id,
+        "message": "Receipt text submitted for analysis",
+    }
 
 
 class ManualReceiptRequest(BaseModel):
