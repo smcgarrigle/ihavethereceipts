@@ -85,9 +85,7 @@ def test_missed_and_hallucinated_items_recorded(client, db):
     assert "item_missed" in fields
     assert "item_hallucinated" in fields
     # Identical names must not be stored as a name correction
-    assert (
-        db.query(OcrCorrection).filter_by(receipt_id=receipt.id, field="name").count() == 0
-    )
+    assert db.query(OcrCorrection).filter_by(receipt_id=receipt.id, field="name").count() == 0
 
 
 def test_resave_is_idempotent(client, db):
@@ -101,9 +99,7 @@ def test_resave_is_idempotent(client, db):
 
 
 def test_correction_prompt_prefers_store_scope(client, db):
-    r1 = _seed_ai_receipt(
-        db, "Costco", [{"name": "ORG SPNCH", "final_price": 3.99, "quantity": 1}]
-    )
+    r1 = _seed_ai_receipt(db, "Costco", [{"name": "ORG SPNCH", "final_price": 3.99, "quantity": 1}])
     _save_review(client, r1.id, [_reviewed("Organic Spinach", 3.99)])
 
     block = get_correction_prompt(db, store_name="Costco")

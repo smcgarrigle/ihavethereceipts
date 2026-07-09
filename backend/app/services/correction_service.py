@@ -150,11 +150,17 @@ def get_correction_prompt(db: Session, store_name: str | None = None, limit: int
         ]
         for c in rows:
             if c.field == "name":
-                lines.append(f'- Extracted name "{c.ai_value}" was corrected to "{c.approved_value}".')
+                lines.append(
+                    f'- Extracted name "{c.ai_value}" was corrected to "{c.approved_value}".'
+                )
             elif c.field == "item_missed":
-                lines.append(f'- A "{c.approved_value}" line was missed entirely — do not skip items.')
+                lines.append(
+                    f'- A "{c.approved_value}" line was missed entirely — do not skip items.'
+                )
             elif c.field == "item_hallucinated":
-                lines.append(f'- "{c.ai_value}" was extracted but is not a purchased item — do not invent lines.')
+                lines.append(
+                    f'- "{c.ai_value}" was extracted but is not a purchased item — do not invent lines.'
+                )
             elif c.field in ("price", "quantity"):
                 lines.append(
                     f'- {c.field} for "{c.item_context}" was corrected from {c.ai_value} to {c.approved_value}.'

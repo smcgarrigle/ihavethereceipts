@@ -45,7 +45,6 @@ def get_trends_data(time_range: str = "year", db: Session = Depends(get_db)):
     # We need to join ReceiptItem -> Receipt -> Item -> Category
     # If category is None, we can label as 'Uncategorized'
 
-
     from app.models import Category
 
     query = (

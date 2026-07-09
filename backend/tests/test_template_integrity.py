@@ -12,7 +12,7 @@ def dummy_receipt(db):
     """Creates a dummy receipt for testing pages that require a receipt ID."""
     receipt = Receipt(
         total_amount=10.00,
-        status="pending",
+        status="completed",
         ocr_data=json.dumps({"items": [], "store_name": "Test Store"}),
     )
     db.add(receipt)

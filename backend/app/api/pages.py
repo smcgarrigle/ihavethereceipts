@@ -179,8 +179,7 @@ def review_receipt(request: Request, receipt_id: int, db: Session = Depends(get_
     if not receipt:
         raise HTTPException(status_code=404, detail="Receipt not found")
 
-    # Handle Processing Status (Only if it's an image-based receipt being processed)
-    if receipt.status in ["pending", "processing"] and receipt.image_path:
+    if receipt.status in ["pending", "processing"]:
         from app.core.config import settings
         from app.services.model_manager import model_manager
 

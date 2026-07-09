@@ -12,7 +12,11 @@ def test_review_receipt_valid(client, db):
     db.commit()
 
     receipt = Receipt(
-        store_id=store.id, purchase_date=datetime.now(), total_amount=10.0, ocr_data='{"items": []}'
+        store_id=store.id,
+        purchase_date=datetime.now(),
+        total_amount=10.0,
+        ocr_data='{"items": []}',
+        status="completed",
     )
     db.add(receipt)
     db.commit()
@@ -39,6 +43,7 @@ def test_review_receipt_missing_date(client, db):
         purchase_date=None,  # Missing date
         total_amount=10.0,
         ocr_data=None,
+        status="completed",
     )
     db.add(receipt)
     db.commit()
@@ -58,7 +63,11 @@ def test_review_receipt_bad_json(client, db):
     db.commit()
 
     receipt = Receipt(
-        store_id=store.id, purchase_date=datetime.now(), total_amount=10.0, ocr_data="INVALID JSON"
+        store_id=store.id,
+        purchase_date=datetime.now(),
+        total_amount=10.0,
+        ocr_data="INVALID JSON",
+        status="completed",
     )
     db.add(receipt)
     db.commit()
