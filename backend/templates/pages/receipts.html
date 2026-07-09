@@ -203,47 +203,28 @@
                         } else {
                             this.selectedStores.push(store);
                         }
-                        this.applyFilter();
+                        this.fetchReceipts();
                     },
 
                     clearFilter() {
                         this.selectedStores = [];
-                        this.applyFilter();
+                        this.fetchReceipts();
                     },
 
                     toggleSort() {
                         this.sort = this.sort === 'desc' ? 'asc' : 'desc';
-                        htmx.ajax('GET', `/api/receipts/list?sort=${this.sort}`, {
+                        this.fetchReceipts();
+                    },
+
+                    fetchReceipts() {
+                        let url = `/api/receipts/list?sort=${this.sort}`;
+                        if (this.selectedStores.length > 0) {
+                            url += `&stores=${encodeURIComponent(this.selectedStores.join(','))}`;
+                        }
+                        htmx.ajax('GET', url, {
                             target: '#receipts-container',
                             swap: 'innerHTML'
                         });
-                    },
-
-                    applyFilter() {
-                        const container = document.getElementById('receipts-container');
-                        if (!container) return;
-                        const rows = container.querySelectorAll('[data-store]');
-
-                        rows.forEach(row => {
-                            const store = row.getAttribute('data-store');
-                            if (this.selectedStores.length === 0 || this.selectedStores.includes(store)) {
-                                row.classList.remove('hidden');
-                            } else {
-                                row.classList.add('hidden');
-                            }
-                        });
-                    },
-
-                    init() {
-                        const self = this;
-                        // Listen on the container itself for htmx:afterSettle
-                        // which fires after HTMX has fully settled the swapped content
-                        const container = document.getElementById('receipts-container');
-                        if (container) {
-                            container.addEventListener('htmx:afterSettle', () => {
-                                self.applyFilter();
-                            });
-                        }
                     }
                 }
             }

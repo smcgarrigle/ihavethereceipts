@@ -254,10 +254,13 @@ def list_receipts(
     db: Session = Depends(get_db),
     sort: str = "desc",
     ids: str | None = None,
+    stores: str | None = None,
 ):
-    """List all receipts as HTML"""
+    """List all receipts as HTML, optionally filtered by store names."""
 
     from sqlalchemy.orm import joinedload
+
+    from app.models import Store
 
     query = db.query(Receipt).options(joinedload(Receipt.store), joinedload(Receipt.items))
 
@@ -269,6 +272,11 @@ def list_receipts(
         except ValueError:
             logger.warning(f"Invalid receipt ID list provided: {ids}")
             pass
+
+    if stores:
+        store_list = [s.strip() for s in stores.split(",") if s.strip()]
+        if store_list:
+            query = query.join(Store).filter(Store.name.in_(store_list))
 
     if sort == "asc":
         query = query.order_by(Receipt.purchase_date.asc(), Receipt.created_at.asc())
