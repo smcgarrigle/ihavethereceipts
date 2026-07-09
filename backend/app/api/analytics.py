@@ -708,18 +708,17 @@ def get_random_category_item_trends(db: Session = Depends(get_db)):
 
     # 1. Get categories that have at least 8 items with at least 2 purchases
     # We use a subquery to find suitable items first
-    suitable_items_subquery = (
+    suitable_items_query = (
         db.query(Item.id)
         .join(ReceiptItem, Item.id == ReceiptItem.item_id)
         .group_by(Item.id)
         .having(func.count(ReceiptItem.id) >= 2)
-        .subquery()
     )
 
     categories_with_data = (
         db.query(Category.id, Category.name)
         .join(Item, Category.id == Item.category_id)
-        .filter(Item.id.in_(suitable_items_subquery))
+        .filter(Item.id.in_(suitable_items_query))
         .filter(
             Category.name.notin_(
                 ["Excluded", "Other", "Fees & Taxes", "CRV (tax)", "Non-Alcoholic Beer"]
@@ -744,7 +743,7 @@ def get_random_category_item_trends(db: Session = Depends(get_db)):
             db.query(Item.id, Item.name)
             .join(ReceiptItem, Item.id == ReceiptItem.item_id)
             .filter(Item.category_id == cat_id)
-            .filter(Item.id.in_(suitable_items_subquery))
+            .filter(Item.id.in_(suitable_items_query))
             .group_by(Item.id, Item.name)
             .order_by(func.count(ReceiptItem.id).desc())
             .limit(6)

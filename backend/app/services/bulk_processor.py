@@ -88,10 +88,11 @@ class BulkProcessor:
                 if stuck_items:
                     db.commit()
 
-                # 1. Find the oldest pending receipt
+                # 1. Find the oldest pending receipt (only image-based ones)
                 receipt = (
                     db.query(Receipt)
                     .filter(Receipt.status == "pending")
+                    .filter(Receipt.image_path.isnot(None))
                     .order_by(Receipt.created_at.asc())
                     .first()
                 )
