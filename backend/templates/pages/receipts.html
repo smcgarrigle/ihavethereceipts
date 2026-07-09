@@ -213,7 +213,6 @@
 
                     toggleSort() {
                         this.sort = this.sort === 'desc' ? 'asc' : 'desc';
-                        // Trigger HTMX request with new sort param
                         htmx.ajax('GET', `/api/receipts/list?sort=${this.sort}`, {
                             target: '#receipts-container',
                             swap: 'innerHTML'
@@ -222,6 +221,7 @@
 
                     applyFilter() {
                         const container = document.getElementById('receipts-container');
+                        if (!container) return;
                         const rows = container.querySelectorAll('[data-store]');
 
                         rows.forEach(row => {
@@ -235,11 +235,15 @@
                     },
 
                     init() {
-                        document.body.addEventListener('htmx:afterSwap', (evt) => {
-                            if (evt.target.id === 'receipts-container') {
-                                this.applyFilter();
-                            }
-                        });
+                        const self = this;
+                        // Listen on the container itself for htmx:afterSettle
+                        // which fires after HTMX has fully settled the swapped content
+                        const container = document.getElementById('receipts-container');
+                        if (container) {
+                            container.addEventListener('htmx:afterSettle', () => {
+                                self.applyFilter();
+                            });
+                        }
                     }
                 }
             }
