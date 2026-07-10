@@ -53,7 +53,7 @@ cat << 'EOF'
                                              ..
 EOF
 echo "╔══════════════════════════════════════════╗"
-echo "║        Grocery Tracker – OCR Backend     ║"
+echo "║    I have the receipts – OCR Backend     ║"
 echo "╠══════════════════════════════════════════╣"
 echo "║  1) Local   – LM Studio (Port 1234)      ║"
 echo "║  2) Local   – Ollama    (Port 11434)     ║"
