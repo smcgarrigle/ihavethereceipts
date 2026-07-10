@@ -1,0 +1,22 @@
+{
+    "python.defaultInterpreterPath": "/home/mcgar/projects/grocery-tracker/backend/.venv/bin/python",
+    "python.analysis.extraPaths": [
+        "./backend"
+    ],
+    "python.terminal.activateEnvInSelectedTerminal": true,
+    "editor.formatOnSave": true,
+    "python.formatting.provider": "none",
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter",
+        "editor.formatOnSave": true
+    },
+    "pylint.args": [
+        "--max-line-length=120"
+    ],
+    "python.terminal.useEnvFile": true,
+    "python.testing.pytestArgs": [
+        "backend"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true
+}

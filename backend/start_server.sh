@@ -1,0 +1,129 @@
+#!/bin/bash
+# Ensure we are in the script's directory
+cd "$(dirname "$0")"
+
+# Load existing ../.env to read current default
+CURRENT_BACKEND=$(grep -E '^OCR_BACKEND=' ../.env 2>/dev/null | cut -d= -f2 | tr -d ' ' || echo "local")
+
+echo ""
+echo -e "\033[1;35m   ╔════════════════════════════════════════════╗\033[0m"
+echo -e "\033[1;35m   ║\033[0m                                            \033[1;35m║\033[0m"
+echo -e "\033[1;35m   ║\033[0m            \033[1;96m___\033[0m                             \033[1;35m║\033[0m"
+echo -e "\033[1;35m   ║\033[0m            \033[1;96m/\033[0m                               \033[1;35m║\033[0m"
+echo -e "\033[1;35m   ║\033[0m             \033[1;96m/\033[0m                              \033[1;35m║\033[0m"
+echo -e "\033[1;35m   ║\033[0m              \033[1;96m+_____________________+\033[0m       \033[1;35m║\033[0m"
+echo -e "\033[1;35m   ║\033[0m             \033[1;96m/\033[0m                     \033[1;96m/|\033[0m       \033[1;35m║\033[0m"
+echo -e "\033[1;35m   ║\033[0m            \033[1;96m/\033[0m                     \033[1;96m/\033[0m \033[1;96m|\033[0m       \033[1;35m║\033[0m"
+echo -e "\033[1;35m   ║\033[0m           \033[1;96m/\033[0m                     \033[1;96m/\033[0m  \033[1;96m|\033[0m       \033[1;35m║\033[0m"
+echo -e "\033[1;35m   ║\033[0m          \033[1;96m+\033[0m                     \033[1;96m+\033[0m   \033[1;96m|\033[0m       \033[1;35m║\033[0m"
+echo -e "\033[1;35m   ║\033[0m          \033[1;96m|\033[0m \033[0;37m\0134\033[0m    \033[0;37m\0134\033[0m    \033[0;37m\0134\033[0m    \033[0;37m\0134\033[0m    \033[1;96m|\033[0m   \033[1;96m+\033[0m       \033[1;35m║\033[0m"
+echo -e "\033[1;35m   ║\033[0m          \033[1;96m|\033[0;37m\0134\033[0m    \033[0;37m\0134\033[0m    \033[0;37m\0134\033[0m    \033[0;37m\0134\033[0m    \033[0;37m\0134\033[1;96m|\033[0m  \033[1;96m/\033[0m        \033[1;35m║\033[0m"
+echo -e "\033[1;35m   ║\033[0m          \033[1;96m|\033[0m    \033[0;37m\0134\033[0m    \033[0;37m\0134\033[0m    \033[0;37m\0134\033[0m    \033[0;37m\0134\033[0m \033[1;96m|\033[0m \033[1;96m/\033[0m         \033[1;35m║\033[0m"
+echo -e "\033[1;35m   ║\033[0m          \033[1;96m|\033[0m   \033[0;37m\0134\033[0m    \033[0;37m\0134\033[0m    \033[0;37m\0134\033[0m    \033[0;37m\0134\033[0m  \033[1;96m|/\033[0m          \033[1;35m║\033[0m"
+echo -e "\033[1;35m   ║\033[0m          \033[1;96m+_____________________+\033[0m           \033[1;35m║\033[0m"
+echo -e "\033[1;35m   ║\033[0m          \033[1;96m|\033[0m                     \033[1;96m|\033[0m           \033[1;35m║\033[0m"
+echo -e "\033[1;35m   ║\033[0m         \033[1;93m(o)\033[0m                   \033[1;93m(o)\033[0m          \033[1;35m║\033[0m"
+echo -e "\033[1;35m   ║\033[0m                                            \033[1;35m║\033[0m"
+echo -e "\033[1;35m   ║\033[0m\033[1;93m       G R O C E R Y   T R A C K E R        \033[0m\033[1;35m║\033[0m"
+echo -e "\033[1;35m   ║\033[0m                                            \033[1;35m║\033[0m"
+echo -e "\033[1;35m   ╚════════════════════════════════════════════╝\033[0m"
+echo "╔══════════════════════════════════════════╗"
+echo "║        Grocery Tracker – OCR Backend     ║"
+echo "╠══════════════════════════════════════════╣"
+echo "║  1) Local   – LM Studio (Port 1234)      ║"
+echo "║  2) Local   – Ollama    (Port 11434)     ║"
+echo "║  3) Cloud   – Google Gemini API          ║"
+echo "╚══════════════════════════════════════════╝"
+echo ""
+echo -n "  Choose backend [current: $CURRENT_BACKEND] (press Enter to keep): "
+read -r CHOICE
+
+case "$CHOICE" in
+  1)
+    NEW_BACKEND="local"
+    NEW_MODEL="qwen/qwen2.5-vl-7b"
+    NEW_URL="http://localhost:1234/v1"
+    ;;
+  2)
+    NEW_BACKEND="local"
+    NEW_MODEL="llama3.2-vision:11b"
+    NEW_URL="http://localhost:11434/v1"
+    ;;
+  3)
+    NEW_BACKEND="gemini"
+    NEW_MODEL="gemini-2.0-flash"
+    NEW_URL=""
+    ;;
+  "")
+    NEW_BACKEND="$CURRENT_BACKEND"
+    NEW_MODEL=$(grep -E '^OCR_MODEL=' ../.env 2>/dev/null | cut -d= -f2 || echo "llava:7b")
+    NEW_URL=$(grep -E '^OCR_BACKEND_URL=' ../.env 2>/dev/null | cut -d= -f2 || echo "http://localhost:1234/v1")
+    ;;
+  *)
+    echo "  Invalid choice — keeping current backend: $CURRENT_BACKEND"
+    NEW_BACKEND="$CURRENT_BACKEND"
+    NEW_MODEL=$(grep -E '^OCR_MODEL=' ../.env 2>/dev/null | cut -d= -f2 || echo "llava:7b")
+    NEW_URL=$(grep -E '^OCR_BACKEND_URL=' ../.env 2>/dev/null | cut -d= -f2 || echo "http://localhost:1234/v1")
+    ;;
+esac
+
+# Update ../.env
+if [ -f "../.env" ]; then
+  # Replace in place (macOS + Linux compatible)
+  sed "s/^OCR_BACKEND=.*/OCR_BACKEND=$NEW_BACKEND/" ../.env > ../.env.tmp && mv ../.env.tmp ../.env
+
+  if grep -q "^OCR_MODEL=" ../.env; then
+    sed "s|^OCR_MODEL=.*|OCR_MODEL=$NEW_MODEL|" ../.env > ../.env.tmp && mv ../.env.tmp ../.env
+  else
+    echo "OCR_MODEL=$NEW_MODEL" >> ../.env
+  fi
+
+  if [ -n "$NEW_URL" ]; then
+    if grep -q "^OCR_BACKEND_URL=" ../.env; then
+      sed "s|^OCR_BACKEND_URL=.*|OCR_BACKEND_URL=$NEW_URL|" ../.env > ../.env.tmp && mv ../.env.tmp ../.env
+    else
+      echo "OCR_BACKEND_URL=$NEW_URL" >> ../.env
+    fi
+  fi
+else
+  echo "OCR_BACKEND=$NEW_BACKEND" >> ../.env
+  echo "OCR_MODEL=$NEW_MODEL" >> ../.env
+  if [ -n "$NEW_URL" ]; then echo "OCR_BACKEND_URL=$NEW_URL" >> ../.env; fi
+fi
+
+echo ""
+echo "  ✓ OCR backend set to: $NEW_BACKEND ($NEW_MODEL)"
+echo ""
+
+if [ "$NEW_BACKEND" = "local" ]; then
+  while true; do
+    echo "  Checking if local OCR backend is running at $NEW_URL..."
+    if curl -s -f --max-time 3 "$NEW_URL/models" > /dev/null; then
+      echo "  ✓ Local backend is responding."
+      echo ""
+      break
+    else
+      echo -e "\033[1;31m  ✗ Local backend is NOT responding.\033[0m"
+      echo "  Please start LM Studio / Ollama, load a vision model, and ensure the local server is running."
+      echo -n "  Press Enter to check again, or type 'skip' to ignore: "
+      read -r CHECK_CHOICE
+      if [ "$CHECK_CHOICE" = "skip" ]; then
+        echo ""
+        break
+      fi
+      echo ""
+    fi
+  done
+fi
+
+echo "Starting server..."
+# Check for SSL certificates
+if [ -f "certs/server.crt" ] && [ -f "certs/server.key" ]; then
+    echo "  [SSL] Certificates detected. Starting in HTTPS mode..."
+    ./.venv/bin/python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 \
+        --ssl-certfile certs/server.crt \
+        --ssl-keyfile certs/server.key
+else
+    echo "  [HTTP] No certificates detected. Starting in standard mode."
+    ./.venv/bin/python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+fi

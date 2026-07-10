@@ -1,0 +1,235 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Categories - Grocery Price Tracker{% endblock %}
+
+{% block content %}
+<div class="space-y-6" x-data="{ showAddModal: false }" @keydown.escape.window="showAddModal = false">
+    <!-- Page Header -->
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-bold text-textBase">Categories</h1>
+            <p class="text-textMuted mt-1">Manage item categories and view spending by category</p>
+        </div>
+
+        <!-- Add Category Button -->
+        <button @click="showAddModal = true"
+            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center space-x-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            <span>Add Category</span>
+        </button>
+    </div>
+
+    <!-- Add Category Modal -->
+    <div x-show="showAddModal" x-cloak
+        class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+        @click.self="showAddModal = false" x-data="{ newCategoryName: '' }">
+        <div class="bg-bgCard rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 class="text-lg font-semibold text-textBase mb-4">Add New Category</h3>
+
+            <form @submit.prevent="
+                fetch('/api/categories/create', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': '{{ csrf_token(request) }}'
+                    },
+                    body: JSON.stringify({name: newCategoryName})
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        newCategoryName = '';
+                        showAddModal = false;
+                        location.reload();
+                    }
+                })
+                .catch(err => alert('Error: ' + err))
+            ">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-textMuted mb-2">
+                        Category Name
+                    </label>
+                    <input type="text" x-model="newCategoryName" required placeholder="e.g., Snacks, Pet Food"
+                        class="w-full px-3 py-2 border border-borderInput rounded-lg bg-bgInput text-textBase focus:ring-2 focus:ring-blue-500" />
+                </div>
+
+                <div class="flex space-x-2">
+                    <button type="submit" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                        Create
+                    </button>
+                    <button type="button" @click="showAddModal = false; newCategoryName = ''"
+                        class="flex-1 px-4 py-2 bg-bgHover text-textMuted rounded-lg hover:bg-bgHover">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Categories List -->
+    <div class="bg-bgCard rounded-lg shadow dark:shadow-gray-900/50">
+        <div class="p-6 border-b border-borderDefault">
+            <h2 class="text-lg font-semibold text-textBase">All Categories</h2>
+        </div>
+
+        <div class="p-6" hx-get="/api/categories/list" hx-trigger="load" hx-target="this" hx-swap="innerHTML">
+            <!-- Loading state -->
+            <div class="text-center py-8">
+                <div class="animate-pulse">
+                    <div class="h-4 bg-bgSkeleton rounded w-3/4 mx-auto mb-4"></div>
+                    <div class="h-4 bg-bgSkeleton rounded w-1/2 mx-auto"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Function to show price history chart
+    async function showPriceHistory(elementOrId, itemName) {
+        let itemId = elementOrId;
+        if (elementOrId && typeof elementOrId === 'object' && elementOrId.getAttribute) {
+            itemId = elementOrId.getAttribute('data-item-id');
+            itemName = elementOrId.getAttribute('data-item-name');
+        }
+        const response = await fetch(`/api/analytics/price-trends/${itemId}`);
+        const data = await response.json();
+
+        // Detect dark mode
+        const isDark = document.documentElement.classList.contains('dark');
+
+        // Create modal
+        const modal = document.createElement('div');
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+        modal.innerHTML = `
+        <div class="bg-bgCard rounded-lg p-6 max-w-2xl w-full mx-4">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-textBase">${itemName} - Price History</h3>
+                <button onclick="this.closest('.fixed').remove()" class="text-textMuted hover:text-textBase text-2xl">✕</button>
+            </div>
+            <div class="relative h-80 w-full">
+                <canvas id="priceHistoryChart"></canvas>
+            </div>
+        </div>
+    `;
+
+        document.body.appendChild(modal);
+
+        // Create chart
+        const ctx = document.getElementById('priceHistoryChart');
+
+        // Process data for Stacked Bar Chart
+        const stores = [...new Set(data.map(d => d.store))];
+
+        const purchasesByStore = {};
+        stores.forEach(store => {
+            purchasesByStore[store] = data.filter(d => d.store === store);
+        });
+
+        const maxPurchases = Math.max(...Object.values(purchasesByStore).map(p => p.length));
+
+        const datasets = [];
+        const colors = [
+            '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#6366f1', '#14b8a6'
+        ];
+
+        for (let i = 0; i < maxPurchases; i++) {
+            const datasetData = stores.map(store => {
+                const purchase = purchasesByStore[store][i];
+                return purchase ? purchase.price : 0;
+            });
+
+            datasets.push({
+                label: `Purchase ${i + 1}`,
+                data: datasetData,
+                backgroundColor: colors[i % colors.length],
+                stack: 'Stack 0',
+                meta: stores.map(store => purchasesByStore[store][i]),
+            });
+        }
+
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: stores,
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function (context) {
+                                const raw = context.raw;
+                                if (raw === 0) return null;
+
+                                const meta = context.dataset.meta[context.dataIndex];
+                                if (meta) {
+                                    return `$${raw.toFixed(2)} (${meta.date})`;
+                                }
+                                return `$${raw.toFixed(2)}`;
+                            }
+                        }
+                    },
+                    title: {
+                        display: true,
+                        text: 'Price History by Store (Oldest at Bottom)',
+                        color: isDark ? '#fff' : '#111'
+                    }
+                },
+                scales: {
+                    y: {
+                        stacked: true,
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Unit Price ($)',
+                            color: isDark ? '#9ca3af' : '#6b7280'
+                        },
+                        ticks: {
+                            color: isDark ? '#9ca3af' : '#6b7280'
+                        },
+                        grid: {
+                            color: isDark ? '#374151' : '#e5e7eb'
+                        }
+                    },
+                    x: {
+                        stacked: true,
+                        ticks: {
+                            color: isDark ? '#9ca3af' : '#6b7280'
+                        },
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        });
+
+        // Close on outside click
+        // Close on outside click
+        modal.addEventListener('click', function (e) {
+            if (e.target === modal) {
+                modal.remove();
+            }
+        });
+
+        // Close on escape key
+        const escapeHandler = function (e) {
+            if (e.key === 'Escape') {
+                modal.remove();
+                document.removeEventListener('keydown', escapeHandler);
+            }
+        };
+        document.addEventListener('keydown', escapeHandler);
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,121 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Environment
+.env
+.env.local
+backend/.env
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# ============================================================
+# LOCAL DATA — Personal receipt files, uploads, databases
+# ============================================================
+*.db
+*.db-shm
+*.db-wal
+data/uploads/*
+data/processed/*
+!data/uploads/.gitkeep
+!data/processed/.gitkeep
+data/GroceryReceiptsPDFs/
+data/known_models.json
+data/category_cache.json
+data/ocr_cache/
+data/*.json
+backend/data/uploads/*
+backend/data/*.json
+backend/data/ocr_cache/
+backend/static/uploads/
+
+# ============================================================
+# SCRATCH & TEMPORARY WORKING FILES
+# (personal dev artifacts — kept locally, not for public repo)
+# ============================================================
+scratch/
+site/
+temp_crop.png
+backend/temp_crop.png
+usda_report_output.txt
+backend/usda_report_output.txt
+reprocess_pdfs.py
+backend/reprocess_pdfs.py
+
+# ============================================================
+# ONE-OFF MAINTENANCE SCRIPTS
+# (personal data migration scripts — archived locally)
+# ============================================================
+backend/scripts/archive/
+
+# ============================================================
+# INTERNAL DOCUMENTATION
+# (personal audit logs, planning drafts, internal reports)
+# ============================================================
+backend/scripts/deleted_receipts_log.md
+backend/scripts/output.txt
+
+# ============================================================
+# LOGS & PROCESS FILES
+# ============================================================
+*.log
+server.log
+backend/*.log
+backend/uvicorn_log.txt
+backend/uvicorn_pid.txt
+backend/server_test.log
+
+# ============================================================
+# TAILSCALE & CERTS
+# ============================================================
+backend/certs/
+backend/certs/*
+
+# Agent instruction files (optional — remove to make public)
+# .agent/
+# skill.md
+
+# ============================================================
+# LOCAL-ONLY DIRECTORIES
+# (personal tools, scratch areas, workspace files)
+# ============================================================
+/tools/
+/scripts/
+static/uploads/
+backend/scratch/
+backend/certs.disabled/
+grocery-tracker.code-workspace
+*.code-workspace
+
+# Personal data files in root data/
+"data/Order placed*.pdf"
+data/*.pdf
+
+
+# Miscellaneous generated reports
+backend/static/*_report.html
+backend/static/other_categories.html
+"User Receipt Upload Workflow*.png"
+*.workflow.png
+
+# Database-recovery and bulk-import artifacts (kept locally, never committed)
+/recover.sql
+data/*.zip
+*Zone.Identifier
+
+# Claude Code personal settings
+.claude/settings.local.json
+
+# Standalone Tailwind CLI binary (fetched by scripts/build_css.sh)
+backend/tools/

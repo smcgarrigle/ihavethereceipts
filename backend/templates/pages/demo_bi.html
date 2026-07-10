@@ -1,0 +1,364 @@
+{% extends "layouts/base.html" %}
+{% block title %}Budget × Nutrition BI — Demo{% endblock %}
+
+{% block content %}
+<div class="space-y-10">
+
+  <!-- Header -->
+  <div class="flex items-start justify-between gap-4 flex-wrap">
+    <div>
+      <p class="text-xs font-mono font-bold text-indigo-500 uppercase tracking-widest mb-1">Demo · Synthetic Data</p>
+      <h1 class="text-3xl font-bold text-textBase">Budget &amp; Nutrition Intelligence</h1>
+      <p class="text-textMuted mt-1 text-sm">Where your money goes — and what it buys you nutritionally.</p>
+    </div>
+    <div class="flex items-center gap-2 text-xs text-textMuted bg-bgCard border border-borderDefault rounded-xl px-4 py-2">
+      <span class="w-2 h-2 rounded-full bg-amber-400 inline-block"></span>
+      Demo mode — replace with live API data to ship
+    </div>
+  </div>
+
+  <!-- KPI Row -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4" id="kpi-row">
+    <div class="bg-bgCard border border-borderDefault rounded-2xl p-5">
+      <p class="text-xs font-mono uppercase tracking-wider text-textSubtle">Monthly Spend</p>
+      <p class="text-3xl font-bold text-textBase mt-1">$487<span class="text-lg font-normal text-textMuted">.32</span></p>
+      <p class="text-xs text-emerald-500 mt-1">↓ 6.2% vs last month</p>
+    </div>
+    <div class="bg-bgCard border border-borderDefault rounded-2xl p-5">
+      <p class="text-xs font-mono uppercase tracking-wider text-textSubtle">Avg $/Day</p>
+      <p class="text-3xl font-bold text-textBase mt-1">$16<span class="text-lg font-normal text-textMuted">.24</span></p>
+      <p class="text-xs text-textMuted mt-1">Budget: $18.00/day</p>
+    </div>
+    <div class="bg-bgCard border border-borderDefault rounded-2xl p-5">
+      <p class="text-xs font-mono uppercase tracking-wider text-textSubtle">Best Protein Value</p>
+      <p class="text-3xl font-bold text-emerald-500 mt-1">$0.08<span class="text-sm font-normal text-textMuted">/g</span></p>
+      <p class="text-xs text-textMuted mt-1">Eggs · Costco</p>
+    </div>
+    <div class="bg-bgCard border border-borderDefault rounded-2xl p-5">
+      <p class="text-xs font-mono uppercase tracking-wider text-textSubtle">Nutrition Score</p>
+      <p class="text-3xl font-bold text-indigo-400 mt-1">74<span class="text-lg font-normal text-textMuted">/100</span></p>
+      <p class="text-xs text-amber-500 mt-1">↑ 3 pts — protein improving</p>
+    </div>
+  </div>
+
+  <!-- Row 1: Dollar-Weighted Macro Breakdown + Protein ROI -->
+  <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+
+    <!-- Dollar-Weighted Macro Breakdown (3/5) -->
+    <div class="lg:col-span-3 bg-bgCard border border-borderDefault rounded-2xl p-6">
+      <h2 class="text-xs font-mono font-bold uppercase tracking-widest text-textSubtle mb-1">WHERE YOUR DOLLAR GOES — BY NUTRITIONAL PROFILE</h2>
+      <p class="text-sm text-textMuted mb-5">Of your <strong class="text-textBase">$487</strong> this month, this is how much went to each macro-dominant food group.</p>
+
+      <!-- Stacked bar -->
+      <div class="mb-6">
+        <div class="flex h-8 w-full rounded-lg overflow-hidden text-[11px] font-bold text-white">
+          <div class="flex items-center justify-center bg-emerald-500" style="width:18%">Protein<br>18%</div>
+          <div class="flex items-center justify-center bg-amber-500" style="width:29%">Carbs<br>29%</div>
+          <div class="flex items-center justify-center bg-blue-500" style="width:16%">Fat<br>16%</div>
+          <div class="flex items-center justify-center bg-purple-500" style="width:21%">Mixed<br>21%</div>
+          <div class="flex items-center justify-center bg-bgSkeleton text-textMuted" style="width:16%">Other<br>16%</div>
+        </div>
+      </div>
+
+      <!-- Detail rows -->
+      <div class="space-y-3">
+        <div id="macro-rows"></div>
+      </div>
+
+      <p class="text-[10px] text-textSubtle mt-4">"Macro-dominant" = the macro providing &gt;40% of a food's calories. Mixed = no single macro &gt;40%.</p>
+    </div>
+
+    <!-- Protein ROI Ranking (2/5) -->
+    <div class="lg:col-span-2 bg-bgCard border border-borderDefault rounded-2xl p-6">
+      <h2 class="text-xs font-mono font-bold uppercase tracking-widest text-textSubtle mb-1">PROTEIN ROI</h2>
+      <p class="text-sm text-textMuted mb-5">Cost per gram of protein. Lower = better value.</p>
+      <div id="protein-roi-bars" class="space-y-2.5"></div>
+      <div class="mt-4 pt-3 border-t border-borderDefault">
+        <p class="text-[10px] text-textSubtle">Reference line (red) = $0.20/g protein — a reasonable budget target.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 2: Weekly Spend + Protein Dual-Axis -->
+  <div class="bg-bgCard border border-borderDefault rounded-2xl p-6">
+    <div class="flex items-start justify-between gap-4 flex-wrap mb-6">
+      <div>
+        <h2 class="text-xs font-mono font-bold uppercase tracking-widest text-textSubtle mb-1">SPEND vs PROTEIN INTAKE — 12-WEEK TREND</h2>
+        <p class="text-sm text-textMuted">Does spending more actually buy more protein? The gap reveals inefficiency.</p>
+      </div>
+      <div class="flex items-center gap-4 text-xs text-textMuted">
+        <span class="flex items-center gap-1.5"><span class="inline-block w-6 h-0.5 bg-indigo-500 rounded"></span>Weekly Spend ($)</span>
+        <span class="flex items-center gap-1.5"><span class="inline-block w-6 h-0.5 bg-emerald-500 rounded border-dashed"></span>Protein (g)</span>
+      </div>
+    </div>
+    <div class="h-[260px] relative"><canvas id="dual-axis-chart"></canvas></div>
+  </div>
+
+  <!-- Row 3: Category Efficiency Table + Basket Composition -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+    <!-- Efficiency Table (2/3) -->
+    <div class="lg:col-span-2 bg-bgCard border border-borderDefault rounded-2xl p-6 overflow-x-auto">
+      <h2 class="text-xs font-mono font-bold uppercase tracking-widest text-textSubtle mb-1">CATEGORY EFFICIENCY MATRIX</h2>
+      <p class="text-sm text-textMuted mb-4">$/g protein · $/g carbs · $/kcal · monthly spend. Cells are thermally coded.</p>
+      <table class="w-full text-xs">
+        <thead>
+          <tr class="text-left border-b border-borderDefault">
+            <th class="pb-2 font-semibold text-textMuted pr-4">Category</th>
+            <th class="pb-2 font-semibold text-textMuted text-right pr-3">$/g protein</th>
+            <th class="pb-2 font-semibold text-textMuted text-right pr-3">$/g carbs</th>
+            <th class="pb-2 font-semibold text-textMuted text-right pr-3">$/kcal</th>
+            <th class="pb-2 font-semibold text-textMuted text-right">Mo. spend</th>
+          </tr>
+        </thead>
+        <tbody id="efficiency-table" class="divide-y divide-borderDefault"></tbody>
+      </table>
+    </div>
+
+    <!-- Basket Composition Donut (1/3) -->
+    <div class="bg-bgCard border border-borderDefault rounded-2xl p-6">
+      <h2 class="text-xs font-mono font-bold uppercase tracking-widest text-textSubtle mb-1">BASKET COMPOSITION</h2>
+      <p class="text-sm text-textMuted mb-4">Spend share by category this month.</p>
+      <div class="h-[200px] relative"><canvas id="basket-chart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Row 4: Small Multiples — 4 Nutrient Sparklines per Store -->
+  <div class="bg-bgCard border border-borderDefault rounded-2xl p-6">
+    <h2 class="text-xs font-mono font-bold uppercase tracking-widest text-textSubtle mb-1">NUTRITION SMALL MULTIPLES — BY STORE</h2>
+    <p class="text-sm text-textMuted mb-6">Weekly nutrient intake from each store's purchases. Spot which store drives your macros.</p>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-8" id="small-multiples"></div>
+  </div>
+
+
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const IS_DARK = document.documentElement.classList.contains('dark');
+const GRID = IS_DARK ? 'rgba(75,85,99,0.25)' : 'rgba(209,213,219,0.5)';
+const TICK = IS_DARK ? '#6b7280' : '#9ca3af';
+
+// ── Synthetic Data ──────────────────────────────────────────
+const MACRO_BREAKDOWN = [
+  { label: 'Protein-dominant foods', color: '#10b981', pct: 18, spend: 87.72, examples: 'Eggs, Greek Yogurt, Chicken' },
+  { label: 'Carb-dominant foods',    color: '#f59e0b', pct: 29, spend: 141.32, examples: 'Bread, Rice, Pasta, Fruit' },
+  { label: 'Fat-dominant foods',     color: '#3b82f6', pct: 16, spend: 77.97, examples: 'Cheese, Nuts, Olive Oil' },
+  { label: 'Mixed macro foods',      color: '#8b5cf6', pct: 21, spend: 102.34, examples: 'Avocado, Whole Milk, Salmon' },
+  { label: 'Non-nutritive / Other',  color: '#6b7280', pct: 16, spend: 77.97, examples: 'Coffee, Spices, Paper Goods' },
+];
+
+const PROTEIN_ROI = [
+  { name: 'Eggs (Costco)',         cpp: 0.08 },
+  { name: 'Chicken Breast',        cpp: 0.11 },
+  { name: 'Greek Yogurt',          cpp: 0.13 },
+  { name: 'Canned Tuna',           cpp: 0.14 },
+  { name: 'Black Beans',           cpp: 0.15 },
+  { name: 'Whole Milk',            cpp: 0.22 },
+  { name: 'Salmon (WF)',           cpp: 0.29 },
+  { name: 'Cheese (Sharp Cheddar)',cpp: 0.34 },
+  { name: 'Protein Bar (iHerb)',   cpp: 0.41 },
+];
+
+const WEEKS = ['W1','W2','W3','W4','W5','W6','W7','W8','W9','W10','W11','W12'];
+const SPEND_WEEKLY  = [98,112,87,145,93,108,121,89,134,97,115,103];
+const PROTEIN_WEEKLY= [310,295,340,260,380,315,290,405,270,350,320,295];
+
+const CATEGORIES = [
+  { name: 'Dairy & Eggs',    cpp: 0.13, cpc: 0.02, cpcal: 0.006, spend: 82 },
+  { name: 'Meat & Seafood',  cpp: 0.20, cpc: 0.08, cpcal: 0.008, spend: 95 },
+  { name: 'Produce',         cpp: 0.55, cpc: 0.03, cpcal: 0.018, spend: 68 },
+  { name: 'Grains & Bakery', cpp: 0.80, cpc: 0.01, cpcal: 0.003, spend: 54 },
+  { name: 'Snacks',          cpp: 0.45, cpc: 0.04, cpcal: 0.009, spend: 41 },
+  { name: 'Beverages',       cpp: 1.20, cpc: 0.06, cpcal: 0.014, spend: 37 },
+  { name: 'Supplements',     cpp: 0.35, cpc: null,  cpcal: 0.040, spend: 62 },
+  { name: 'Pantry',          cpp: 0.90, cpc: 0.02, cpcal: 0.005, spend: 48 },
+];
+
+const BASKET_LABELS  = CATEGORIES.map(c => c.name);
+const BASKET_SPEND   = CATEGORIES.map(c => c.spend);
+const BASKET_COLORS  = ['#6366f1','#10b981','#f59e0b','#3b82f6','#ef4444','#8b5cf6','#14b8a6','#f97316'];
+
+const STORES = [
+  { name: 'Whole Foods',  protein:[42,38,51,35,48,40,36,53,39,44,41,38], fat:[55,60,48,65,52,58,62,46,61,54,57,59] },
+  { name: 'Costco',       protein:[85,90,78,95,88,82,91,76,93,87,84,89], fat:[72,68,80,65,75,70,67,82,64,74,71,69] },
+  { name: 'Amazon Fresh', protein:[28,32,25,35,30,27,33,24,36,29,31,26], fat:[35,38,32,40,36,34,39,31,41,37,35,33] },
+  { name: 'iHerb',        protein:[18,15,21,14,19,17,16,22,13,20,18,15], fat:[10,12,9,13,11,10,12,8,14,11,10,12]  },
+];
+
+
+
+// ── Render Macro Breakdown Rows ──────────────────────────────
+function renderMacroRows() {
+  const el = document.getElementById('macro-rows');
+  MACRO_BREAKDOWN.forEach(m => {
+    const row = document.createElement('div');
+    row.className = 'flex items-center gap-3';
+    row.innerHTML = `
+      <div class="w-3 h-3 rounded-sm flex-shrink-0" style="background:${m.color}"></div>
+      <div class="flex-1 min-w-0">
+        <div class="flex justify-between items-baseline mb-0.5">
+          <span class="text-xs font-semibold text-textBase">${m.label}</span>
+          <span class="text-xs font-mono text-textMuted ml-2 flex-shrink-0">$${m.spend.toFixed(2)} · ${m.pct}%</span>
+        </div>
+        <div class="w-full bg-bgSkeleton h-1.5 rounded-full overflow-hidden">
+          <div class="h-1.5 rounded-full" style="width:${m.pct*3.33}%;background:${m.color}"></div>
+        </div>
+        <p class="text-[10px] text-textSubtle mt-0.5">${m.examples}</p>
+      </div>`;
+    el.appendChild(row);
+  });
+}
+
+// ── Render Protein ROI Bars ──────────────────────────────────
+function renderProteinROI() {
+  const el = document.getElementById('protein-roi-bars');
+  const max = Math.max(...PROTEIN_ROI.map(r => r.cpp));
+  const REF = 0.20;
+  PROTEIN_ROI.forEach(r => {
+    const pct = (r.cpp / max) * 100;
+    const refPct = (REF / max) * 100;
+    const good = r.cpp <= REF;
+    const div = document.createElement('div');
+    div.innerHTML = `
+      <div class="flex justify-between items-baseline mb-0.5">
+        <span class="text-xs text-textBase">${r.name}</span>
+        <span class="text-xs font-mono ${good ? 'text-emerald-500' : 'text-red-400'}">$${r.cpp.toFixed(2)}/g</span>
+      </div>
+      <div class="relative h-2 bg-bgSkeleton rounded-full overflow-visible">
+        <div class="h-2 rounded-full ${good ? 'bg-emerald-500' : 'bg-red-400'}" style="width:${pct}%"></div>
+        <div class="absolute top-[-2px] bottom-[-2px] w-[2px] bg-red-600 z-10 rounded" style="left:${refPct}%"></div>
+      </div>`;
+    el.appendChild(div);
+  });
+}
+
+// ── Dual-Axis Chart ──────────────────────────────────────────
+function renderDualAxis() {
+  const ctx = document.getElementById('dual-axis-chart').getContext('2d');
+  new Chart(ctx, {
+    data: {
+      labels: WEEKS,
+      datasets: [
+        {
+          type: 'bar',
+          label: 'Weekly Spend ($)',
+          data: SPEND_WEEKLY,
+          backgroundColor: 'rgba(99,102,241,0.25)',
+          borderColor: '#6366f1',
+          borderWidth: 1.5,
+          borderRadius: 3,
+          yAxisID: 'ySpend',
+        },
+        {
+          type: 'line',
+          label: 'Protein Purchased (g)',
+          data: PROTEIN_WEEKLY,
+          borderColor: '#10b981',
+          backgroundColor: 'rgba(16,185,129,0.05)',
+          borderWidth: 2,
+          pointRadius: 3,
+          pointBackgroundColor: '#10b981',
+          tension: 0.3,
+          fill: true,
+          yAxisID: 'yProtein',
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: TICK, font: { size: 10 } } },
+        ySpend:   { position: 'left',  grid: { color: GRID }, ticks: { color: '#6366f1', font: { size: 10 }, callback: v => '$'+v }, title: { display: true, text: 'Spend ($)', color: '#6366f1', font: { size: 10 } } },
+        yProtein: { position: 'right', grid: { display: false }, ticks: { color: '#10b981', font: { size: 10 }, callback: v => v+'g' }, title: { display: true, text: 'Protein (g)', color: '#10b981', font: { size: 10 } } },
+      },
+      plugins: { legend: { labels: { color: TICK, font: { size: 10 }, usePointStyle: true } } }
+    }
+  });
+}
+
+// ── Efficiency Table ─────────────────────────────────────────
+function heatColor(val, lo, hi) {
+  // lo = green (good/cheap), hi = red (expensive)
+  const t = Math.min(1, Math.max(0, (val - lo) / (hi - lo)));
+  const r = Math.round(16 + t * (239 - 16));
+  const g = Math.round(185 - t * (185 - 68));
+  const b = Math.round(129 - t * (129 - 68));
+  return `rgba(${r},${g},${b},0.18)`;
+}
+function renderEfficiencyTable() {
+  const tbody = document.getElementById('efficiency-table');
+  CATEGORIES.forEach(c => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="py-2 pr-4 font-medium text-textBase">${c.name}</td>
+      <td class="py-2 pr-3 text-right font-mono rounded" style="background:${heatColor(c.cpp,0.08,1.2)}">$${c.cpp.toFixed(2)}</td>
+      <td class="py-2 pr-3 text-right font-mono rounded" style="background:${c.cpc ? heatColor(c.cpc,0.01,0.08) : 'transparent'}">${c.cpc ? '$'+c.cpc.toFixed(2) : '—'}</td>
+      <td class="py-2 pr-3 text-right font-mono rounded" style="background:${heatColor(c.cpcal,0.003,0.04)}">$${c.cpcal.toFixed(3)}</td>
+      <td class="py-2 text-right font-mono text-textBase">$${c.spend}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+// ── Basket Donut ─────────────────────────────────────────────
+function renderBasket() {
+  const ctx = document.getElementById('basket-chart').getContext('2d');
+  new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels: BASKET_LABELS, datasets: [{ data: BASKET_SPEND, backgroundColor: BASKET_COLORS, borderWidth: 0, hoverOffset: 4 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '68%',
+      plugins: { legend: { position: 'bottom', labels: { color: TICK, font: { size: 9 }, usePointStyle: true, boxWidth: 6, padding: 8 } } }
+    }
+  });
+}
+
+// ── Small Multiples ──────────────────────────────────────────
+function renderSmallMultiples() {
+  const container = document.getElementById('small-multiples');
+  STORES.forEach(s => {
+    const col = document.createElement('div');
+    col.className = 'space-y-1';
+    col.innerHTML = `
+      <div class="flex justify-between items-baseline">
+        <span class="text-xs font-bold text-textBase">${s.name}</span>
+        <span class="text-[9px] font-mono text-textSubtle uppercase">g/week</span>
+      </div>
+      <div class="h-14 w-full"><canvas id="sm-${s.name.replace(/\s+/g,'-')}"></canvas></div>
+      <div class="flex gap-3 text-[9px] text-textSubtle">
+        <span><span class="text-emerald-500">●</span> Protein</span>
+        <span><span class="text-amber-500">●</span> Fat</span>
+      </div>`;
+    container.appendChild(col);
+    const ctx = document.getElementById(`sm-${s.name.replace(/\s+/g,'-')}`).getContext('2d');
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: WEEKS,
+        datasets: [
+          { data: s.protein, borderColor: '#10b981', borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: false },
+          { data: s.fat,     borderColor: '#f59e0b', borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: false },
+        ]
+      },
+      options: { responsive: true, maintainAspectRatio: false, scales: { x: { display: false }, y: { display: false } }, plugins: { legend: { display: false }, tooltip: { enabled: false } } }
+    });
+  });
+}
+
+
+
+// ── Boot ─────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  renderMacroRows();
+  renderProteinROI();
+  renderDualAxis();
+  renderEfficiencyTable();
+  renderBasket();
+  renderSmallMultiples();
+
+});
+</script>
+{% endblock %}

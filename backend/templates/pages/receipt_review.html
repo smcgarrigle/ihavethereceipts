@@ -1,0 +1,579 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Review Receipt - Grocery Price Tracker{% endblock %}
+
+{% block content %}
+
+<!-- DEBUG INFO -->
+<!-- <div class="bg-red-100 p-4 mb-4">
+    <p>DEBUG: Receipt ID = {{ receipt_id }}</p>
+    <p>DEBUG: OCR Data Keys = {{ ocr_data.keys() }}</p>
+    <p>DEBUG: Items Count = {{ ocr_data.get('items', [])|length }}</p>
+    <p>DEBUG: Store = {{ ocr_data.get('store_name', 'N/A') }}</p>
+</div> -->
+<!-- END DEBUG -->
+
+<script id="ocr-data" type="application/json">
+{{ ocr_data|tojson|safe }}
+</script>
+<script id="detection-alert" type="application/json">
+{{ detection_alert|tojson|safe if detection_alert else 'null' }}
+</script>
+<script id="categories-data" type="application/json">
+{{ categories | map(attribute='name') | list | tojson | safe }}
+</script>
+
+<!-- Validation Warning Modal -->
+<div x-data="{
+    open: false,
+    type: '',
+    message: '',
+    async deleteReceipt() {
+        if (!confirm('Are you sure you want to delete this receipt?')) return;
+        try {
+            const response = await fetch('/api/receipts/{{ receipt_id }}', {
+                method: 'DELETE',
+                headers: { 'X-CSRF-Token': '{{ csrf_token(request) }}' }
+            });
+            if (response.ok) {
+                window.location.href = '/receipts';
+            } else {
+                alert('Error deleting receipt');
+            }
+        } catch (error) {
+            console.error('Delete error:', error);
+            alert('Error deleting receipt');
+        }
+    }
+}" x-init="
+        const alert = JSON.parse(document.getElementById('detection-alert').textContent);
+        if (alert) {
+            type = alert.type;
+            message = alert.message;
+            open = true;
+        }
+     " @keydown.escape.window="open = false" x-show="open" x-trap="open" x-cloak class="fixed inset-0 z-50 overflow-y-auto"
+    aria-labelledby="modal-title" role="dialog" aria-modal="true">
+
+    <div class="fixed inset-0 bg-bgOverlay transition-opacity"></div>
+
+    <div class="flex min-h-screen items-center justify-center p-4 text-center sm:p-0">
+        <div
+            class="relative transform overflow-hidden rounded-lg bg-bgCard text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
+
+            <div class="bg-bgCard px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+                <div class="sm:flex sm:items-start">
+                    <div
+                        class="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                        <svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                        </svg>
+                    </div>
+                    <div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left">
+                        <h3 class="text-base font-semibold leading-6 text-textBase" id="modal-title">
+                            <span x-text="type === 'duplicate' ? 'Potential Duplicate' : (type === 'ocr_failed' ? 'OCR Failed' : (type === 'total_mismatch' ? 'Total Mismatch' : 'Missing Total'))"></span>
+                        </h3>
+                        <div class="mt-2">
+                            <p class="text-sm text-textMuted" x-text="message"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-bgHover px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+                <button type="button"
+                    class="inline-flex w-full justify-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 sm:ml-3 sm:w-auto"
+                    @click="deleteReceipt()">
+                    Delete Receipt
+                </button>
+                <button type="button"
+                    class="mt-3 inline-flex w-full justify-center rounded-md bg-bgInput px-3 py-2 text-sm font-semibold text-textBase shadow-sm ring-1 ring-inset ring-borderInput hover:bg-bgHover sm:mt-0 sm:w-auto"
+                    @click="open = false">
+                    <span x-text="type === 'ocr_failed' ? 'Enter Manually' : 'Keep Receipt'"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="max-w-5xl mx-auto space-y-6" x-data="receiptReview(getReviewConfig())">
+
+
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+            <h1 class="text-3xl font-bold text-textBase flex items-center gap-3">
+                Review Receipt
+                {% if ocr_data.get('ocr_backend') %}
+                <span class="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10 dark:bg-blue-900/30 dark:text-blue-300 dark:ring-blue-400/20" title="OCR Backend used">
+                    <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                    Processed via {{ ocr_data.get('ocr_backend')|title }}{% if ocr_data.get('ocr_model') %} ({{ ocr_data.get('ocr_model') }}){% endif %}
+                </span>
+                {% endif %}
+            </h1>
+            <p class="text-textMuted mt-1">Verify items and adjust discounts/fees before saving</p>
+        </div>
+        <div class="flex w-full md:w-auto space-x-2 sm:space-x-3">
+            {% if ocr_data.get('image_filename') %}
+            <button @click="$dispatch('open-review-image')"
+                class="flex-1 md:flex-none justify-center px-2 sm:px-4 py-2 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded-lg hover:bg-indigo-200 dark:hover:bg-indigo-900/50 flex items-center space-x-1 sm:space-x-2">
+                <svg class="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2-2v12a2 2 0 002 2z" />
+                </svg>
+                <span class="text-xs sm:text-base font-medium">Original</span>
+            </button>
+            {% endif %}
+            <button @click="window.location.href='/receipts'"
+                class="flex-1 md:flex-none justify-center px-2 sm:px-4 py-2 bg-bgHover text-textMuted rounded-lg hover:bg-bgHover text-xs sm:text-base font-medium flex items-center">
+                Cancel
+            </button>
+            <button @click="saveItems()"
+                class="flex-[1.5] md:flex-none justify-center px-2 sm:px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center space-x-1 sm:space-x-2">
+                <span class="text-xs sm:text-base font-medium whitespace-nowrap">Save Items</span>
+                <svg class="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Receipt Info -->
+    <div class="bg-bgCard rounded-lg shadow dark:shadow-gray-900/50 p-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- Edit Store Name -->
+            <div>
+                <label for="review-store-name" class="block text-sm font-medium text-textMuted mb-1">Store Name</label>
+                <div class="flex space-x-2">
+                    <input id="review-store-name" type="text" x-model="storeName"
+                        class="w-full h-10 rounded-md border-borderInput bg-bgInput text-textBase shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                </div>
+            </div>
+
+            <!-- Edit Purchase Date -->
+            <div>
+                <label for="review-purchase-date" class="block text-sm font-medium text-textMuted mb-1">Date</label>
+                <div class="flex space-x-2">
+                    <input id="review-purchase-date" type="date" x-model="purchaseDate"
+                        class="w-full h-10 rounded-md border-borderInput bg-bgInput text-textBase shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                </div>
+            </div>
+
+            <!-- Total (Read-only) & Save Metadata Button -->
+            <div class="flex items-end gap-3">
+                <div class="flex-1">
+                    <label class="block text-sm font-medium text-textMuted mb-1">Total</label>
+                    <div class="relative rounded-md shadow-sm">
+                        <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                            <span class="text-gray-500 text-lg font-bold">$</span>
+                        </div>
+                        <input type="text" inputmode="decimal" x-model="ocrTotal"
+                            @blur="ocrTotal = parseFloat(ocrTotal).toFixed(2)"
+                            class="block w-full h-10 rounded-md border-borderInput bg-bgInput text-textBase pl-7 focus:border-blue-500 focus:ring-blue-500 text-lg font-bold">
+                    </div>
+                </div>
+                <button @click="saveMetadata()"
+                    class="h-10 px-4 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 text-sm font-medium transition whitespace-nowrap"
+                    x-text="metadataSaved ? '✓ Saved' : 'Save Details'">
+                    Save Details
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Items List -->
+    <div class="bg-bgCard rounded-lg shadow dark:shadow-gray-900/50">
+        <div class="flex justify-between items-center p-6 border-b border-borderDefault">
+            <h2 class="text-lg font-semibold text-textBase">Items (<span x-text="items.length"></span>)
+            </h2>
+            <div class="flex items-center gap-2">
+                <button @click="toggleAllExpanded()" type="button"
+                    class="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-700 flex items-center gap-1 transition">
+                    <span x-text="allExpanded ? 'Collapse All' : 'Expand All'"></span>
+                </button>
+                <button @click="addItem()" type="button"
+                    class="px-3 py-1.5 text-sm bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded hover:bg-green-200 dark:hover:bg-green-900/50 flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                    </svg>
+                    Add Item
+                </button>
+            </div>
+        </div>
+
+        <div class="divide-y divide-gray-200 dark:divide-gray-700">
+            {% macro item_editor_row(array_name) %}
+                <div class="p-6">
+                    <!-- Item Header -->
+                    <!-- Item Header with Inputs -->
+                    <div class="space-y-4 mb-4">
+                        <!-- Name Row -->
+                        <div class="flex justify-between items-start">
+                            <div class="flex-1">
+                                <div class="flex items-center mb-1">
+                                    <label class="block text-xs font-medium text-textMuted">Item Name</label>
+                                    <!-- Read-only category badge removed in favor of editable dropdown below -->
+                                    <template x-if="item.auto_merged">
+                                        <span class="ml-2 inline-flex items-center rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10 dark:bg-blue-900/30 dark:text-blue-300 dark:ring-blue-400/20" title="Automatically merged with a high-confidence matching item">✨ Auto-merged</span>
+                                    </template>
+                                    <template x-if="item.history_applied">
+                                        <span class="ml-2 inline-flex items-center rounded-md bg-purple-50 px-1.5 py-0.5 text-[10px] font-medium text-purple-700 ring-1 ring-inset ring-purple-700/10 dark:bg-purple-900/30 dark:text-purple-300 dark:ring-purple-400/20" title="Applied your historical quantity/volume overrides">📘 History applied</span>
+                                    </template>
+                                    <template x-if="item.fdc_match">
+                                        <span class="ml-2 inline-flex items-center rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 ring-1 ring-inset ring-indigo-700/10 dark:bg-indigo-900/30 dark:text-indigo-300 dark:ring-indigo-400/20"
+                                              :title="'USDA Match: ' + item.fdc_match.description + (item.fdc_match.brand ? ' (' + item.fdc_match.brand + ')' : '')">✨ USDA Match</span>
+                                    </template>
+                                </div>
+                                <input type="text" x-model="item.name"
+                                    class="text-lg font-semibold bg-transparent border-b-2 border-transparent hover:border-blue-400 dark:hover:border-blue-500 focus:border-blue-600 dark:focus:border-blue-400 outline-none text-textBase w-full"
+                                    placeholder="Item name" />
+                                <template x-if="item.original_ocr_name">
+                                    <p class="text-[10px] text-textSubtle mt-0.5" x-text="'Scanned as: ' + item.original_ocr_name"></p>
+                                </template>
+
+                                <!-- fuzzy match suggestion -->
+                                <template x-if="item.suggestion">
+                                    <div class="mt-1 text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                                        <span>Did you mean: <strong class="cursor-pointer hover:underline"
+                                                @click="item.name = item.suggestion.name; item.suggestion = null"
+                                                x-text="item.suggestion.name"></strong>?</span>
+                                        <button @click="item.suggestion = null"
+                                            class="text-textSubtle hover:text-textBase text-sm">✕</button>
+                                    </div>
+                                </template>
+                            </div>
+                            <button @click="{{ array_name }}.splice(index, 1); updateCrvTotal()"
+                                class="ml-4 text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <!-- Details Row: Qty | Base Price | Category | Weight | Unit | Unit Price -->
+                        <div class="grid grid-cols-2 md:grid-cols-6 gap-4">
+                            <!-- Category Dropdown -->
+                            <div>
+                                <label class="block text-xs font-medium text-textMuted mb-1">Category</label>
+                                <select x-model="item.category"
+                                    class="w-full rounded-md border-borderInput bg-bgInput text-textBase shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                    <option value="">- Uncategorized -</option>
+                                    <template x-if="item.category && !categories.includes(item.category) && item.category !== 'Other'">
+                                        <option :value="item.category" x-text="item.category + ' (New)'"></option>
+                                    </template>
+                                    {% for cat in categories %}
+                                    <option value="{{ cat.name }}">{{ cat.name }}</option>
+                                    {% endfor %}
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+
+                            <!-- Quantity -->
+                            <div>
+                                <label
+                                    class="block text-xs font-medium text-textMuted mb-1">Qty</label>
+                                <input type="text" inputmode="decimal" x-model="item.quantity"
+                                    @input="onQtyChange(item)"
+                                    class="w-full rounded-md border-borderInput bg-bgInput text-textBase shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                            </div>
+
+                            <!-- Base Price (Total Line Price) -->
+                            <div>
+                                <label class="block text-xs font-medium text-textMuted mb-1">Total Line Price ($)</label>
+                                <input type="text" inputmode="decimal" x-model="item.final_price"
+                                    @input="onTotalChange(item)"
+                                    @blur="fmt2(item, 'final_price')"
+                                    class="w-full rounded-md border-borderInput bg-bgInput text-textBase shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                            </div>
+
+                            <!-- Weight -->
+                            <div>
+                                <label
+                                    class="block text-xs font-medium text-textMuted mb-1">Weight/Vol</label>
+                                <input type="text" inputmode="decimal" x-model="item.weight"
+                                    @input="onWeightChange(item); updateBasePrice(item)"
+                                    class="w-full rounded-md border-borderInput bg-bgInput text-textBase shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                            </div>
+
+                            <!-- Unit Type -->
+                            <div>
+                                <label
+                                    class="block text-xs font-medium text-textMuted mb-1">Unit</label>
+                                <select x-model="item.unit_type" @change="onUnitDropdownChange(item)"
+                                    class="w-full rounded-md border-borderInput bg-bgInput text-textBase shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                    <option value="">-</option>
+                                    <option value="lb">lb</option>
+                                    <option value="oz">oz</option>
+                                    <option value="g">g</option>
+                                    <option value="kg">kg</option>
+                                    <option value="mg">mg</option>
+                                    <option value="fl oz">fl oz</option>
+                                    <option value="gal">gal</option>
+                                    <option value="l">l</option>
+                                    <option value="ml">ml</option>
+                                    <option value="cl">cl</option>
+                                    <option value="each">each</option>
+                                </select>
+                            </div>
+
+                            <!-- Unit Price -->
+                            <div>
+                                <div class="flex justify-between items-center mb-1">
+                                    <label class="block text-xs font-medium text-textMuted">
+                                        Price Per <span x-text="item.is_bulk ? (item.unit_type || 'unit') : 'Unit'"></span> ($)
+                                    </label>
+                                    <button @click="togglePricingMode(item)" type="button"
+                                            class="text-[10px] px-1 rounded border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                                            :class="item.is_bulk ? 'bg-blue-100 dark:bg-blue-900/40 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300' : 'bg-bgSkeleton border-borderInput text-textSubtle'"
+                                            :title="item.is_bulk ? 'Switch to Price Per Item' : 'Switch to Price Per Weight'">
+                                        <span x-text="item.is_bulk ? '⚖️' : '🏷️'"></span>
+                                    </button>
+                                </div>
+                                <input type="text" inputmode="decimal" x-model="item.unit_price"
+                                    @input="onUnitPriceChange(item)"
+                                    @blur="fmt2(item, 'unit_price')"
+                                    class="w-full rounded-md border-borderInput bg-bgInput text-textBase shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Accordion Toggle -->
+                    <div @click="item.detailsExpanded = !item.detailsExpanded"
+                         class="w-full h-2.5 mt-2 rounded bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 cursor-pointer flex items-center justify-center transition-colors"
+                         title="Toggle advanced details (Discounts, Fees, Original Price)">
+                        <svg class="w-4 h-4 text-gray-400 dark:text-gray-500 transform transition-transform"
+                             :class="item.detailsExpanded ? 'rotate-180' : ''"
+                             fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </div>
+
+                    <!-- Expandable Details Section -->
+                    <div x-show="item.detailsExpanded" x-collapse class="mt-4 pt-4 border-t border-borderDefault">
+                        <!-- Discounts Header -->
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="text-sm font-medium text-textMuted">Discounts</label>
+                        <button @click="item.discounts.push({amount: 0, description: ''})"
+                            class="text-xs px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded hover:bg-green-200 dark:hover:bg-green-900/50">
+                            + Add Discount
+                        </button>
+                    </div>
+                    <div class="space-y-2">
+                        <template x-for="(discount, dIndex) in item.discounts" :key="dIndex">
+                            <div class="flex items-center gap-2 w-full">
+                                <input type="text" inputmode="decimal" x-model="discount.amount"
+                                    @input="updateBasePrice(item)" placeholder="Amount"
+                                    class="w-20 sm:w-28 px-3 py-1 text-sm border border-borderInput rounded-lg bg-bgInput text-textBase flex-shrink-0" />
+                                <input type="text" x-model="discount.description"
+                                    placeholder="Description (e.g., Coupon)"
+                                    class="flex-1 min-w-0 px-3 py-1 text-sm border border-borderInput rounded-lg bg-bgInput text-textBase" />
+                                <button @click="item.discounts.splice(dIndex, 1); updateBasePrice(item)"
+                                    class="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 flex-shrink-0">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </template>
+                    </div>
+
+                <!-- Fees Section -->
+                <div class="mb-3">
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="text-sm font-medium text-textMuted">Fees (CRV, Deposits,
+                            etc.)</label>
+                        <button @click="item.fees.push({amount: 0, description: '', type: 'other'})"
+                            class="text-xs px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded hover:bg-orange-200 dark:hover:bg-orange-900/50">
+                            + Add Fee
+                        </button>
+                    </div>
+                    <div class="space-y-2">
+                        <template x-for="(fee, fIndex) in item.fees" :key="fIndex">
+                            <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full">
+                                <div class="flex gap-2 w-full sm:w-auto flex-shrink-0">
+                                    <input type="text" inputmode="decimal" x-model="fee.amount"
+                                        @input="updateBasePrice(item)" placeholder="Amount"
+                                        class="w-1/2 sm:w-24 px-3 py-1 text-sm border border-borderInput rounded-lg bg-bgInput text-textBase" />
+                                    <select x-model="fee.type"
+                                        class="w-1/2 sm:w-28 px-3 py-1 text-sm border border-borderInput rounded-lg bg-bgInput text-textBase">
+                                        <option value="crv">CRV</option>
+                                        <option value="deposit">Deposit</option>
+                                        <option value="tax">Tax</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                </div>
+                                <div class="flex items-center gap-2 w-full sm:w-auto sm:flex-1">
+                                    <input type="text" x-model="fee.description" placeholder="Description"
+                                        class="flex-1 min-w-0 px-3 py-1 text-sm border border-borderInput rounded-lg bg-bgInput text-textBase" />
+                                    <button @click="item.fees.splice(fIndex, 1); updateBasePrice(item)"
+                                        class="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 flex-shrink-0">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- Final Price / Original Price Summary -->
+                <div class="mt-4 flex items-end space-x-4">
+                    <div>
+                        <label class="block text-xs font-medium text-textMuted mb-1">Original Price ($)</label>
+                        <input type="text" readonly :value="parseFloat(item.base_price || 0).toFixed(2)"
+                            class="w-32 rounded-md border-borderInput bg-bgSkeleton text-textSubtle shadow-sm text-sm font-semibold cursor-not-allowed">
+                    </div>
+                    <div class="pb-2 text-xs text-textMuted">
+                        Calculation: $<span x-text="parseFloat(item.final_price || 0).toFixed(2)"></span>
+                        <template x-if="calculateDiscounts(item) > 0">
+                            <span>+ $<span x-text="calculateDiscounts(item).toFixed(2)"></span></span>
+                        </template>
+                    </div>
+                </div>
+                </div>
+            </div>
+            {% endmacro %}
+
+            <template x-for="(item, index) in items" :key="'item-'+index">
+                {{ item_editor_row('items') }}
+            </template>
+        </div>
+
+        <!-- Bottom Add Item Bar (for long lists) -->
+        <div x-show="items.length > 8" class="flex justify-end items-center p-4 border-t border-borderDefault bg-bgHover">
+            <button @click="addItem()" type="button"
+                class="px-3 py-1.5 text-sm bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded hover:bg-green-200 dark:hover:bg-green-900/50 flex items-center gap-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Add Item
+            </button>
+        </div>
+
+        <!-- CRV Grouping Section -->
+        <div x-show="crv_items.length > 0" class="border-t border-borderDefault bg-bgHover">
+            <div @click="crvExpanded = !crvExpanded" class="p-6 cursor-pointer flex justify-between items-center hover:bg-bgHover transition-colors">
+                <div>
+                    <h3 class="text-lg font-semibold text-textBase flex items-center gap-2">
+                        <span>♻️</span> CRV Fees (<span x-text="crv_items.length"></span> items)
+                    </h3>
+                    <p class="text-sm text-textMuted mt-1">Total: $<span x-text="crvTotal.toFixed(2)"></span></p>
+                </div>
+                <div class="text-textSubtle">
+                    <svg class="w-6 h-6 transform transition-transform" :class="crvExpanded ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </div>
+            </div>
+
+            <div x-show="crvExpanded" x-collapse class="divide-y divide-gray-200 dark:divide-gray-700 border-t border-borderDefault bg-bgCard">
+                <template x-for="(item, index) in crv_items" :key="'crv-'+index">
+                    {{ item_editor_row('crv_items') }}
+                </template>
+            </div>
+        </div>
+    </div>
+
+<!-- Save Button (Bottom) -->
+<div class="flex w-full md:w-auto md:justify-end space-x-3 pb-8">
+    <button @click="window.location.href='/receipts'"
+        class="flex-1 md:flex-none justify-center px-4 py-2 bg-bgHover text-textMuted rounded-lg hover:bg-bgHover">
+        Cancel
+    </button>
+    <button @click="saveItems()"
+        class="flex-[1.5] md:flex-none justify-center px-4 md:px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center space-x-2">
+        <span class="whitespace-nowrap">Save All Items</span>
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+        </svg>
+    </button>
+</div>
+</div>
+
+    <!-- Technical Details (Original Document Path) -->
+    <div class="mt-8 bg-bgCard rounded-xl shadow border border-borderDefault p-6" x-data="{ showRaw: false }">
+        <div class="flex justify-between items-center cursor-pointer" @click="showRaw = !showRaw">
+            <h3 class="text-base font-semibold text-textBase flex items-center">
+                <svg class="w-5 h-5 text-textSubtle mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                Original Document Details
+            </h3>
+            <svg class="w-5 h-5 text-textSubtle transform transition-transform duration-200" :class="{'rotate-180': showRaw}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+        </div>
+
+        <div x-show="showRaw" x-collapse class="mt-4 border-t border-borderDefault pt-4">
+            <p class="text-sm text-textMuted mb-2">The original document associated with this receipt processing job:</p>
+            <div class="bg-gray-900 rounded-lg p-3 overflow-x-auto custom-scrollbar">
+                <code class="text-xs font-mono text-green-400 break-all">{{ receipt.image_path if receipt and receipt.image_path else 'No document linked' }}</code>
+            </div>
+        </div>
+    </div>
+
+</div>
+<!-- Image Viewer Modal -->
+<div x-data="{ open: false }" @open-review-image.window="open = true" @keydown.escape.window="open = false"
+    x-show="open" x-trap="open" x-cloak class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="review-image-modal-title" role="dialog"
+    aria-modal="true">
+
+    <div x-show="open" class="fixed inset-0 bg-bgOverlay transition-opacity" @click="open = false"></div>
+
+    <div class="flex min-h-screen items-center justify-center p-4 text-center sm:p-0">
+        <div x-show="open"
+            class="relative transform overflow-hidden rounded-lg bg-bgCard text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-2xl">
+
+            <div class="bg-bgCard px-4 pb-4 pt-5 sm:p-6">
+                <h3 class="text-base font-semibold leading-6 text-textBase mb-4" id="review-image-modal-title">Original Receipt</h3>
+
+                {% if not file_status.exists %}
+                <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-8 text-center">
+                    <div class="w-16 h-16 bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                    </div>
+                    <h4 class="text-lg font-bold text-amber-900 dark:text-amber-200 mb-2">Receipt File Not Found</h4>
+                    <p class="text-amber-700 dark:text-amber-400 text-sm max-w-md mx-auto">
+                        The original file <code class="bg-amber-100 dark:bg-amber-900/60 px-1.5 py-0.5 rounded font-mono">{{ file_status.filename }}</code>
+                        could not be located on the server. It may have been moved, renamed, or archived.
+                    </p>
+                    <p class="mt-4 text-xs text-amber-600/60 dark:text-amber-500/40">
+                        You can still review and save the extracted items below.
+                    </p>
+                </div>
+                {% else %}
+                <div class="flex justify-center bg-bgSkeleton rounded-lg p-2">
+                    {% set filename = file_status.filename %}
+                    {% if filename and filename.lower().endswith('.pdf') %}
+                    <embed src="/api/receipts/{{ receipt_id }}/file" type="application/pdf" class="w-full h-[70vh] rounded">
+                    {% else %}
+                    <img src="/api/receipts/{{ receipt_id }}/file" onerror="this.src='/static/placeholder-receipt.png'"
+                        class="max-h-[70vh] object-contain rounded">
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+            <div class="bg-bgHover px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+                <button type="button"
+                    class="mt-3 inline-flex w-full justify-center rounded-md bg-bgInput px-3 py-2 text-sm font-semibold text-textBase shadow-sm ring-1 ring-inset ring-borderInput hover:bg-bgHover sm:mt-0 sm:w-auto"
+                    @click="open = false">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/receipt_review.js"></script>
+<script>
+    function getReviewConfig() {
+        return {
+            receiptId: '{{ receipt_id }}',
+            csrfToken: '{{ csrf_token(request) }}'
+        };
+    }
+</script>
+{% endblock %}

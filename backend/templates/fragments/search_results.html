@@ -1,0 +1,80 @@
+{% if results %}
+<div id="search-dropdown"
+     class="absolute top-full left-0 right-0 mt-1 z-50 rounded-xl border border-borderDefault bg-bgCard shadow-2xl overflow-hidden"
+     x-data @click.outside="$dispatch('search-close')">
+
+    <ul class="divide-y divide-borderDefault max-h-96 overflow-y-auto">
+        {% for r in results %}
+        {% set item = r.item %}
+        <li>
+            <a href="/items/{{ item.id }}/insights"
+               class="flex items-center gap-3 px-4 py-3 hover:bg-bgMain transition-colors group">
+                <div class="flex-shrink-0 w-9 h-9 rounded-lg bg-indigo-500/15 flex items-center justify-center text-indigo-400 text-base">
+                    {% if item.category and item.category.name %}
+                        {% set cat = item.category.name | lower %}
+                        {% if 'produce' in cat or 'fruit' in cat or 'veg' in cat %}🥦
+                        {% elif 'dairy' in cat %}🥛
+                        {% elif 'meat' in cat or 'seafood' in cat or 'fish' in cat %}🥩
+                        {% elif 'snack' in cat or 'chip' in cat %}🍿
+                        {% elif 'bev' in cat or 'drink' in cat %}🥤
+                        {% elif 'bread' in cat or 'bak' in cat %}🍞
+                        {% else %}🛒
+                        {% endif %}
+                    {% else %}🛒{% endif %}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-textBase truncate group-hover:text-indigo-400 transition-colors">
+                        {{ item.name }}
+                    </p>
+                    <div class="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                        {% if item.category %}
+                        <span class="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400">{{ item.category.name }}</span>
+                        {% endif %}
+                        {% if r.last_store %}
+                        <span class="text-xs text-textMuted">·</span>
+                        <span class="text-xs text-textMuted truncate max-w-[120px]">{{ r.last_store }}</span>
+                        {% endif %}
+                        {% if r.last_price is not none %}
+                        <span class="text-xs text-textMuted">·</span>
+                        <span class="text-xs font-medium text-emerald-400">${{ "%.2f"|format(r.last_price) }}</span>
+                        {% endif %}
+                        {% if r.last_date %}
+                        <span class="text-xs text-textMuted">·</span>
+                        <span class="text-xs text-textMuted">
+                            {% set d = r.last_date %}
+                            {% if d is string %}{{ d[:10] }}{% else %}{{ d.strftime('%b %-d') }}{% endif %}
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+                <svg class="w-4 h-4 text-textMuted opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                     fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+
+    <!-- Footer: count + view all link -->
+    <div class="px-4 py-2.5 border-t border-borderDefault bg-bgMain flex items-center justify-between">
+        <p class="text-xs text-textMuted">
+            {{ results|length }} result{% if results|length != 1 %}s{% endif %} for
+            <span class="font-medium text-textBase">"{{ query }}"</span>
+        </p>
+        <a href="/search?q={{ query | urlencode }}"
+           class="text-xs font-medium text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1">
+            View all
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+        </a>
+    </div>
+</div>
+{% else %}
+<div id="search-dropdown"
+     class="absolute top-full left-0 right-0 mt-1 z-50 rounded-xl border border-borderDefault bg-bgCard shadow-2xl p-4 text-center"
+     x-data @click.outside="$dispatch('search-close')">
+    <p class="text-sm text-textMuted">No items found for <span class="font-medium text-textBase">"{{ query }}"</span></p>
+</div>
+{% endif %}

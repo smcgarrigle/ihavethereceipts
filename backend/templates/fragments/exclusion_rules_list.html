@@ -1,0 +1,23 @@
+{% for rule in rules %}
+<li id="rule-{{ rule.id }}"
+    class="flex items-center justify-between gap-3 px-4 py-2.5 rounded-lg bg-bgMain border border-borderDefault">
+    <div class="flex-1 min-w-0">
+        <span class="text-sm font-mono text-textBase">{{ rule.pattern }}</span>
+        {% if rule.reason %}
+        <span class="ml-2 text-xs text-textMuted">— {{ rule.reason }}</span>
+        {% endif %}
+    </div>
+    <button hx-delete="/settings/exclusions/rules/{{ rule.id }}"
+            hx-target="#{{ scope }}-rules-list"
+            hx-swap="innerHTML"
+            hx-confirm="Remove this exclusion rule?"
+            class="flex-shrink-0 p-1.5 rounded-lg text-textMuted hover:text-red-400 hover:bg-red-500/10 transition-colors"
+            title="Remove rule">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+    </button>
+</li>
+{% else %}
+<li class="px-4 py-3 text-sm text-textMuted italic">No exclusion rules defined.</li>
+{% endfor %}

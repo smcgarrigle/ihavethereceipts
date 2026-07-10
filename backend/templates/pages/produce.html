@@ -1,0 +1,189 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Quick Produce Entry - Grocery Tracker{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6" x-data="produceEntryApp()">
+    <!-- Header -->
+    <div class="flex justify-between items-end">
+        <div>
+            <h1 class="text-3xl font-bold text-textBase flex items-center">
+                <span class="mr-3">🥗</span> OPEN PRODUCE MODE
+            </h1>
+            <p class="text-textMuted mt-1">Speed-entry for Farmer's Markets & bulk hauls.</p>
+        </div>
+        <div class="text-right">
+            <span class="text-[10px] font-mono text-textSubtle uppercase tracking-widest">Single Screen // Bulk Save</span>
+        </div>
+    </div>
+
+    <!-- Main Entry Card -->
+    <div class="bg-bgCard rounded-xl shadow-xl border border-borderDefault overflow-hidden">
+        <!-- Receipt Metdata -->
+        <div class="p-6 bg-bgMain/50 border-b border-borderDefault grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-xs font-bold text-textSubtle uppercase mb-1">Store / Source</label>
+                <input type="text" x-model="storeName" placeholder="e.g. Farmer's Market"
+                       class="w-full bg-bgCard border-borderInput rounded-lg focus:ring-blue-500 focus:border-blue-500 text-sm dark:text-white">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-textSubtle uppercase mb-1">Purchase Date</label>
+                <input type="date" x-model="purchaseDate"
+                       class="w-full bg-bgCard border-borderInput rounded-lg focus:ring-blue-500 focus:border-blue-500 text-sm dark:text-white">
+            </div>
+        </div>
+
+        <!-- Items Table -->
+        <div class="p-0 overflow-x-auto">
+            <table class="w-full text-sm text-left border-collapse">
+                <thead class="text-xs text-textSubtle uppercase bg-bgSkeleton/80">
+                    <tr>
+                        <th class="px-6 py-3 font-black">#</th>
+                        <th class="px-6 py-3 font-black">Item Name</th>
+                        <th class="px-6 py-3 font-black text-center">Weight (lb)</th>
+                        <th class="px-6 py-3 font-black text-right">Total Price</th>
+                        <th class="px-6 py-3"></th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                    <template x-for="(item, index) in items" :key="index">
+                        <tr class="hover:bg-bgHover/30 transition">
+                            <td class="px-6 py-4 text-textSubtle font-mono" x-text="index + 1"></td>
+                            <td class="px-6 py-4">
+                                <input type="text" x-model="item.name" placeholder="Apples, Basil, etc."
+                                       @keydown.enter.prevent="addRowIfLast(index)"
+                                       class="w-full bg-transparent border-0 focus:ring-0 focus:outline-none font-medium dark:text-white placeholder-gray-600">
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                <input type="number" step="0.01" x-model.number="item.weight" placeholder="0.00"
+                                       class="w-20 bg-transparent border-0 focus:ring-0 focus:outline-none text-center font-mono dark:text-blue-400">
+                            </td>
+                            <td class="px-6 py-4 text-right">
+                                <div class="flex items-center justify-end">
+                                    <span class="text-textSubtle mr-1">$</span>
+                                    <input type="number" step="0.01" x-model.number="item.price" placeholder="0.00"
+                                           @keydown.enter.prevent="onPriceEnter(index)"
+                                           class="w-24 bg-transparent border-0 focus:ring-0 focus:outline-none text-right font-mono font-bold dark:text-green-400">
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 text-right">
+                                <button @click="removeItem(index)" class="text-gray-400 hover:text-red-500 transition">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                </button>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Add Row Button -->
+        <div class="p-4 bg-bgMain/30 flex justify-center">
+            <button @click="addItem()" class="text-xs uppercase font-black text-blue-600 hover:text-blue-500 flex items-center transition">
+                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                Add Row (or press Enter)
+            </button>
+        </div>
+
+        <!-- Footer / Save -->
+        <div class="p-6 bg-bgCard border-t border-borderDefault flex justify-between items-center">
+            <div class="text-sm font-bold text-textBase uppercase font-mono">
+                TOTAL HAUL: <span class="text-green-500 ml-2" x-text="'$' + calculateTotal().toFixed(2)"></span>
+            </div>
+            <div class="flex space-x-3">
+                <button @click="window.history.back()" class="px-4 py-2 text-sm font-medium text-textSubtle hover:text-textBase transition">Cancel</button>
+                <button @click="saveHaul()"
+                        :disabled="items.length === 0 || !storeName || saving"
+                        class="px-8 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center">
+                    <span x-show="!saving">SAVE HAUL</span>
+                    <span x-show="saving">SAVING...</span>
+                    <svg x-show="saving" class="animate-spin ml-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function produceEntryApp() {
+    return {
+        storeName: 'Farmer\'s Market',
+        purchaseDate: new Date().toISOString().split('T')[0],
+        items: [{name: '', weight: null, price: null}],
+        saving: false,
+
+        addItem() {
+            this.items.push({name: '', weight: null, price: null});
+            // Focus new row name input next tick
+            this.$nextTick(() => {
+                const inputs = document.querySelectorAll('input[placeholder="Apples, Basil, etc."]');
+                inputs[inputs.length - 1].focus();
+            });
+        },
+
+        removeItem(index) {
+            this.items.splice(index, 1);
+            if (this.items.length === 0) this.addItem();
+        },
+
+        onPriceEnter(index) {
+            if (index === this.items.length - 1) {
+                // Last row, add new
+                this.addItem();
+            } else {
+                // Jump to next row weight
+                const weights = document.querySelectorAll('input[placeholder="0.00"]');
+                // Note: each row has 2 inputs with placeholder 0.00 (weight, price)
+                // index*2 is weight, index*2 + 1 is price
+                // Next weight is (index+1)*2
+                weights[(index + 1) * 2].focus();
+            }
+        },
+
+        addRowIfLast(index) {
+            // If enter is pressed on name, jump to weight
+            const weights = document.querySelectorAll('input[placeholder="0.00"]');
+            weights[index * 2].focus();
+        },
+
+        calculateTotal() {
+            return this.items.reduce((sum, item) => sum + (item.price || 0), 0);
+        },
+
+        async saveHaul() {
+            // Filter out empty rows
+            const validItems = this.items.filter(i => i.name.trim() !== '' && i.weight > 0 && i.price > 0);
+            if (validItems.length === 0) return alert('Add at least one valid item.');
+
+            this.saving = true;
+            try {
+                const response = await fetch('/api/receipts/produce', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content
+                    },
+                    body: JSON.stringify({
+                        store_name: this.storeName,
+                        purchase_date: this.purchaseDate,
+                        items: validItems
+                    })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    window.location.href = '/receipts';
+                } else {
+                    alert('Error saving haul.');
+                }
+            } catch (error) {
+                console.error(error);
+                alert('Connection failure.');
+            } finally {
+                this.saving = false;
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

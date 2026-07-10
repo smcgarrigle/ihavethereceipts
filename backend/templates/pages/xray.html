@@ -1,0 +1,563 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Receipt X-Ray — Grocery Tracker{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Tufte-inspired: maximize data-ink ratio */
+    .xray-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-default);
+        border-radius: 1rem;
+        padding: 1.5rem;
+    }
+    .xray-title {
+        font-size: 0.65rem;
+        font-weight: 800;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        margin-bottom: 1rem;
+    }
+    .xray-subtitle {
+        font-size: 0.7rem;
+        color: var(--text-subtle);
+        margin-top: -0.5rem;
+        margin-bottom: 1rem;
+        font-style: italic;
+    }
+    /* Horizontal bar charts — pure CSS */
+    .hbar {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.35rem;
+    }
+    .hbar-label {
+        flex: 0 0 160px;
+        text-align: right;
+        font-size: 0.7rem;
+        font-weight: 600;
+        color: var(--text-base);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .hbar-track {
+        flex: 1;
+        height: 14px;
+        background: var(--bg-skeleton);
+        border-radius: 2px;
+        overflow: hidden;
+        position: relative;
+    }
+    .hbar-fill {
+        height: 100%;
+        border-radius: 2px;
+        transition: width 0.8s cubic-bezier(0.23, 1, 0.32, 1);
+    }
+    .hbar-val {
+        flex: 0 0 55px;
+        text-align: right;
+        font-size: 0.65rem;
+        font-family: 'Inter', monospace;
+        font-weight: 700;
+        color: var(--text-muted);
+    }
+    /* Range bars for volatility */
+    .range-bar {
+        position: relative;
+        height: 14px;
+        background: var(--bg-skeleton);
+        border-radius: 2px;
+    }
+    .range-bar-inner {
+        position: absolute;
+        height: 100%;
+        border-radius: 2px;
+        transition: all 0.8s cubic-bezier(0.23, 1, 0.32, 1);
+    }
+    .range-bar-dot {
+        position: absolute;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--text-base);
+        border: 1px solid var(--bg-card);
+        z-index: 2;
+    }
+    /* Day-of-week rhythm */
+    .rhythm-col {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.25rem;
+        flex: 1;
+    }
+    .rhythm-bar {
+        width: 100%;
+        max-width: 48px;
+        border-radius: 3px 3px 0 0;
+        transition: height 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+        position: relative;
+        min-height: 4px;
+    }
+    .rhythm-label {
+        font-size: 0.6rem;
+        font-weight: 700;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    .rhythm-value {
+        font-size: 0.6rem;
+        font-weight: 700;
+        font-family: 'Inter', monospace;
+        color: var(--text-base);
+    }
+    /* Complexity scatter dots */
+    .dot-chart {
+        position: relative;
+        height: 200px;
+        border-bottom: 1px solid var(--border-light);
+        border-left: 1px solid var(--border-light);
+    }
+    .dot-chart-dot {
+        position: absolute;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        transition: all 0.4s ease;
+        cursor: pointer;
+        opacity: 0.7;
+    }
+    .dot-chart-dot:hover {
+        opacity: 1;
+        transform: scale(1.8);
+        z-index: 10;
+    }
+    /* DNA stacked bars */
+    .dna-row {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
+    }
+    .dna-store {
+        flex: 0 0 120px;
+        text-align: right;
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: var(--text-base);
+    }
+    .dna-stack {
+        flex: 1;
+        display: flex;
+        height: 22px;
+        border-radius: 3px;
+        overflow: hidden;
+    }
+    .dna-segment {
+        height: 100%;
+        transition: width 0.8s cubic-bezier(0.23, 1, 0.32, 1);
+        position: relative;
+        cursor: pointer;
+    }
+    .dna-segment:hover::after {
+        content: attr(data-tooltip);
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--bg-overlay);
+        color: var(--text-base);
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.6rem;
+        white-space: nowrap;
+        z-index: 20;
+        pointer-events: none;
+        border: 1px solid var(--border-default);
+    }
+    /* Stat pill */
+    .stat-pill {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 0.75rem 1rem;
+    }
+    .stat-pill-value {
+        font-size: 1.5rem;
+        font-weight: 900;
+        color: var(--text-base);
+        font-family: 'Inter', monospace;
+        line-height: 1;
+    }
+    .stat-pill-label {
+        font-size: 0.55rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.15em;
+        color: var(--text-subtle);
+        margin-top: 0.25rem;
+    }
+    @media (max-width: 640px) {
+        .hbar-label { flex: 0 0 100px; font-size: 0.6rem; }
+        .hbar-val { flex: 0 0 45px; }
+        .dna-store { flex: 0 0 80px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div x-data="xrayDashboard()" x-init="fetchData()" class="space-y-6 pb-12">
+
+    <!-- Page Header -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+            <h1 class="text-3xl font-black text-textBase flex items-center gap-3 tracking-tight">
+                <span class="text-2xl">🔬</span> Receipt X-Ray
+            </h1>
+            <p class="text-sm text-textMuted mt-1">Decoding the hidden stories inside your grocery data</p>
+        </div>
+    </div>
+
+    <!-- Loading State -->
+    <template x-if="loading">
+        <div class="flex items-center justify-center py-20">
+            <div class="animate-pulse text-textMuted text-sm">Scanning receipt data…</div>
+        </div>
+    </template>
+
+    <template x-if="!loading && data">
+
+        <div class="space-y-6">
+
+        <!-- Summary Banner -->
+        <div class="xray-card flex flex-wrap justify-around gap-2">
+            <div class="stat-pill">
+                <span class="stat-pill-value" x-text="data.summary.total_receipts"></span>
+                <span class="stat-pill-label">Receipts</span>
+            </div>
+            <div class="stat-pill">
+                <span class="stat-pill-value" x-text="'$' + Number(data.summary.total_spend).toLocaleString()"></span>
+                <span class="stat-pill-label">Total Tracked</span>
+            </div>
+            <div class="stat-pill">
+                <span class="stat-pill-value" x-text="'$' + data.summary.avg_basket"></span>
+                <span class="stat-pill-label">Avg Basket</span>
+            </div>
+            <div class="stat-pill">
+                <span class="stat-pill-value" x-text="data.summary.total_items.toLocaleString()"></span>
+                <span class="stat-pill-label">Unique Items</span>
+            </div>
+            <div class="stat-pill">
+                <span class="stat-pill-value" x-text="data.summary.total_stores"></span>
+                <span class="stat-pill-label">Stores</span>
+            </div>
+        </div>
+
+        <!-- Row 1: Volatility + Store DNA -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+            <!-- 1. Price Volatility Radar -->
+            <div class="xray-card">
+                <div class="xray-title">① Price Volatility Radar</div>
+                <div class="xray-subtitle">Items with the widest price swings — are you overpaying sometimes?</div>
+
+                <template x-for="(item, i) in data.price_volatility" :key="i">
+                    <div class="hbar" style="margin-bottom: 0.5rem;">
+                        <div class="hbar-label" x-text="item.name" :title="item.name"></div>
+                        <div class="hbar-track" style="position:relative">
+                            <!-- Range bar showing min→max spread -->
+                            <div class="range-bar-inner"
+                                 :style="`left: ${(item.min / (data.price_volatility[0]?.max || 1)) * 100}%;
+                                          width: ${(item.spread / (data.price_volatility[0]?.max || 1)) * 100}%;
+                                          background: ${getVolatilityColor(item.spread_pct)};`">
+                            </div>
+                            <!-- Average price dot -->
+                            <div class="range-bar-dot"
+                                 :style="`left: ${(item.avg / (data.price_volatility[0]?.max || 1)) * 100}%`"
+                                 :title="'Avg: $' + item.avg">
+                            </div>
+                        </div>
+                        <div class="hbar-val">
+                            <span :style="`color: ${getVolatilityColor(item.spread_pct)}`"
+                                  x-text="'±' + item.spread_pct + '%'"></span>
+                        </div>
+                    </div>
+                </template>
+
+                <div class="mt-3 text-[0.6rem] text-textSubtle flex items-center gap-2">
+                    <span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span> Stable
+                    <span class="inline-block w-2 h-2 rounded-full bg-amber-500 ml-2"></span> Moderate
+                    <span class="inline-block w-2 h-2 rounded-full bg-red-500 ml-2"></span> Volatile
+                    <span class="inline-block w-1.5 h-1.5 rounded-full bg-textBase ml-3 border border-bgCard"></span> Avg price
+                </div>
+            </div>
+
+            <!-- 2. Store DNA Fingerprint -->
+            <div class="xray-card">
+                <div class="xray-title">② Store DNA Fingerprint</div>
+                <div class="xray-subtitle">Category spending signature by store — what does each store mean to you?</div>
+
+                <template x-for="(store, i) in data.store_dna" :key="i">
+                    <div class="dna-row">
+                        <div class="dna-store" x-text="store.store"></div>
+                        <div class="dna-stack">
+                            <template x-for="(seg, j) in store.breakdown" :key="j">
+                                <div class="dna-segment"
+                                     :style="`width: ${seg.pct}%; background: ${getCategoryColor(seg.category)};`"
+                                     :data-tooltip="seg.category + ' · $' + seg.spend + ' (' + seg.pct + '%)'">
+                                </div>
+                            </template>
+                        </div>
+                        <div class="text-[0.6rem] text-textSubtle font-mono w-16 text-right" x-text="'$' + store.total"></div>
+                    </div>
+                </template>
+
+                <!-- Legend -->
+                <div class="mt-4 flex flex-wrap gap-x-3 gap-y-1">
+                    <template x-for="cat in allCategories" :key="cat">
+                        <div class="flex items-center gap-1">
+                            <span class="inline-block w-2 h-2 rounded-sm" :style="`background: ${getCategoryColor(cat)}`"></span>
+                            <span class="text-[0.55rem] text-textSubtle" x-text="cat"></span>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 2: Phantom Items (full width table) -->
+        <div class="xray-card">
+            <div class="xray-title">③ Phantom Items — Your Autopilot Basket</div>
+            <div class="xray-subtitle">The items you buy on repeat without thinking. These dominate your spending quietly.</div>
+
+            <div class="overflow-x-auto -mx-2">
+                <table class="w-full text-xs">
+                    <thead>
+                        <tr class="border-b border-borderLight">
+                            <th class="text-left py-2 px-2 text-textSubtle font-semibold uppercase tracking-wider text-[0.55rem]">Item</th>
+                            <th class="text-left py-2 px-2 text-textSubtle font-semibold uppercase tracking-wider text-[0.55rem]">Category</th>
+                            <th class="text-right py-2 px-2 text-textSubtle font-semibold uppercase tracking-wider text-[0.55rem]">Times Bought</th>
+                            <th class="text-right py-2 px-2 text-textSubtle font-semibold uppercase tracking-wider text-[0.55rem]">Avg Price</th>
+                            <th class="text-right py-2 px-2 text-textSubtle font-semibold uppercase tracking-wider text-[0.55rem]">Total Spend</th>
+                            <th class="py-2 px-2 text-textSubtle font-semibold uppercase tracking-wider text-[0.55rem] text-center">Frequency</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="(item, i) in data.phantom_items" :key="i">
+                            <tr class="border-b border-borderLight/50 hover:bg-bgHover transition-colors">
+                                <td class="py-1.5 px-2 font-semibold text-textBase" x-text="item.name"></td>
+                                <td class="py-1.5 px-2">
+                                    <span class="inline-flex items-center gap-1">
+                                        <span class="w-2 h-2 rounded-sm" :style="`background: ${getCategoryColor(item.category)}`"></span>
+                                        <span class="text-textMuted" x-text="item.category"></span>
+                                    </span>
+                                </td>
+                                <td class="py-1.5 px-2 text-right font-mono font-bold text-textBase" x-text="item.count + '×'"></td>
+                                <td class="py-1.5 px-2 text-right font-mono text-textMuted" x-text="'$' + item.avg_price"></td>
+                                <td class="py-1.5 px-2 text-right font-mono font-bold text-textBase" x-text="'$' + item.total_spend"></td>
+                                <td class="py-1.5 px-2">
+                                    <div class="hbar-track mx-auto" style="max-width: 100px; height: 8px;">
+                                        <div class="hbar-fill"
+                                             :style="`width: ${Math.min((item.count / (data.phantom_items[0]?.count || 1)) * 100, 100)}%;
+                                                      background: linear-gradient(90deg, hsl(220, 70%, 55%), hsl(260, 70%, 60%));`">
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Row 3: Shopping Rhythm + Receipt Complexity -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+            <!-- 4. Shopping Rhythm -->
+            <div class="xray-card">
+                <div class="xray-title">④ Shopping Rhythm</div>
+                <div class="xray-subtitle">When do you shop? Your weekly cadence decoded.</div>
+
+                <div class="flex items-end justify-around gap-1" style="height: 180px; padding-top: 1rem;">
+                    <template x-for="(day, i) in data.shopping_rhythm.days" :key="i">
+                        <div class="rhythm-col">
+                            <div class="rhythm-value" x-text="day.trips"></div>
+                            <div class="rhythm-bar"
+                                 :style="`height: ${getBarPx(day.trips, data.shopping_rhythm.days, 120)}px;
+                                          background: ${getRhythmGradient(day.trips, data.shopping_rhythm.days)};`">
+                            </div>
+                            <div class="rhythm-label" x-text="day.name"
+                                 :class="isMaxDay(day, data.shopping_rhythm.days) ? 'text-blue-500' : ''"></div>
+                            <div class="text-[0.55rem] font-mono text-textSubtle" x-text="'$' + day.avg"></div>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- Monthly trend sparkline (rendered as tiny bars) -->
+                <div class="mt-6 pt-4 border-t border-borderLight">
+                    <div class="xray-title" style="margin-bottom: 0.5rem;">Monthly Trip Frequency</div>
+                    <div class="flex items-end gap-px overflow-x-auto no-scrollbar" style="height: 50px;">
+                        <template x-for="(m, i) in data.shopping_rhythm.months.slice(-12)" :key="i">
+                            <div class="flex flex-col items-center gap-0.5 min-w-[20px] flex-1">
+                                <div class="w-full rounded-t-sm"
+                                     :style="`height: ${getBarPx(m.trips, data.shopping_rhythm.months.slice(-12), 40)}px;
+                                              background: hsl(220, 60%, 55%); opacity: 0.6;`"
+                                     :title="m.month + ': ' + m.trips + ' trips, $' + m.spend">
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                    <div class="flex justify-between text-[0.5rem] text-textSubtle mt-1">
+                        <span x-text="data.shopping_rhythm.months.slice(-12)[0]?.month || ''"></span>
+                        <span x-text="data.shopping_rhythm.months.slice(-1)[0]?.month || ''"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. Receipt Complexity Scatter -->
+            <div class="xray-card">
+                <div class="xray-title">⑤ Receipt Complexity Map</div>
+                <div class="xray-subtitle">Each dot = one receipt. Size = total $. Position = items vs. categories.</div>
+
+                <div class="dot-chart" id="complexity-chart">
+                    <template x-for="(r, i) in data.receipt_complexity" :key="i">
+                        <div class="dot-chart-dot"
+                             :style="`bottom: ${getComplexityY(r)}%;
+                                      left: ${getComplexityX(r)}%;
+                                      width: ${getComplexitySize(r)}px;
+                                      height: ${getComplexitySize(r)}px;
+                                      background: ${getStoreColor(r.store)};`"
+                             :title="r.store + ' · ' + r.date + ' · ' + r.items + ' items · $' + r.total">
+                        </div>
+                    </template>
+                    <!-- Axis labels -->
+                    <div class="absolute bottom-[-18px] left-1/2 transform -translate-x-1/2 text-[0.5rem] text-textSubtle font-semibold uppercase tracking-wider">Items per receipt →</div>
+                    <div class="absolute left-[-12px] top-1/2 transform -translate-y-1/2 -rotate-90 text-[0.5rem] text-textSubtle font-semibold uppercase tracking-wider whitespace-nowrap">Categories →</div>
+                </div>
+
+                <!-- Store color legend -->
+                <div class="mt-6 flex flex-wrap gap-x-3 gap-y-1">
+                    <template x-for="store in uniqueStores" :key="store">
+                        <div class="flex items-center gap-1">
+                            <span class="inline-block w-2 h-2 rounded-full" :style="`background: ${getStoreColor(store)}`"></span>
+                            <span class="text-[0.55rem] text-textSubtle" x-text="store"></span>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+        </div>
+
+        </div>
+    </template>
+</div>
+
+<script>
+function xrayDashboard() {
+    return {
+        loading: true,
+        data: null,
+
+        // Category color palette (Tufte-approved muted tones)
+        categoryColors: {
+            'Produce':          'hsl(145, 50%, 45%)',
+            'Dairy':            'hsl(200, 55%, 55%)',
+            'Meat':             'hsl(0, 55%, 50%)',
+            'Bakery':           'hsl(35, 60%, 55%)',
+            'Pantry':           'hsl(45, 50%, 50%)',
+            'Beverages':        'hsl(260, 45%, 55%)',
+            'Frozen':           'hsl(195, 60%, 50%)',
+            'Deli':             'hsl(15, 55%, 50%)',
+            'Health & Beauty':  'hsl(310, 40%, 55%)',
+            'Household':        'hsl(170, 40%, 45%)',
+            'Other':            'hsl(220, 10%, 55%)',
+        },
+
+        storeColors: {},
+        storeColorPalette: [
+            'hsl(220, 65%, 55%)', 'hsl(145, 55%, 45%)', 'hsl(35, 60%, 55%)',
+            'hsl(0, 55%, 50%)',   'hsl(280, 50%, 55%)', 'hsl(195, 60%, 50%)',
+            'hsl(15, 55%, 50%)',  'hsl(170, 40%, 45%)',
+        ],
+
+        get allCategories() {
+            if (!this.data?.store_dna) return [];
+            const cats = new Set();
+            this.data.store_dna.forEach(s => s.breakdown.forEach(b => cats.add(b.category)));
+            return [...cats];
+        },
+
+        get uniqueStores() {
+            if (!this.data?.receipt_complexity) return [];
+            return [...new Set(this.data.receipt_complexity.map(r => r.store))];
+        },
+
+        async fetchData() {
+            try {
+                const res = await fetch('/api/analytics/receipt-xray');
+                this.data = await res.json();
+            } catch (e) {
+                console.error('Failed to load Receipt X-Ray data:', e);
+            }
+            this.loading = false;
+        },
+
+        getCategoryColor(cat) {
+            return this.categoryColors[cat] || 'hsl(220, 10%, 55%)';
+        },
+
+        getStoreColor(store) {
+            if (!this.storeColors[store]) {
+                const idx = Object.keys(this.storeColors).length % this.storeColorPalette.length;
+                this.storeColors[store] = this.storeColorPalette[idx];
+            }
+            return this.storeColors[store];
+        },
+
+        getVolatilityColor(pct) {
+            if (pct < 15) return 'hsl(145, 55%, 45%)';
+            if (pct < 40) return 'hsl(45, 65%, 50%)';
+            return 'hsl(0, 60%, 50%)';
+        },
+
+        getBarPx(value, items, maxPx) {
+            const max = Math.max(...items.map(d => d.trips || d.count || 0));
+            return max > 0 ? Math.max(Math.round((value / max) * maxPx), 4) : 4;
+        },
+
+        getRhythmGradient(trips, days) {
+            const max = Math.max(...days.map(d => d.trips));
+            const ratio = max > 0 ? trips / max : 0;
+            const hue = 220 - (ratio * 30);
+            const sat = 45 + (ratio * 25);
+            return `hsl(${hue}, ${sat}%, 55%)`;
+        },
+
+        isMaxDay(day, days) {
+            return day.trips === Math.max(...days.map(d => d.trips));
+        },
+
+        getComplexityX(r) {
+            const maxItems = Math.max(...this.data.receipt_complexity.map(d => d.items));
+            return maxItems > 0 ? Math.min((r.items / maxItems) * 90 + 5, 95) : 50;
+        },
+
+        getComplexityY(r) {
+            const maxCats = Math.max(...this.data.receipt_complexity.map(d => d.categories));
+            return maxCats > 0 ? Math.min((r.categories / maxCats) * 85 + 5, 95) : 50;
+        },
+
+        getComplexitySize(r) {
+            const maxTotal = Math.max(...this.data.receipt_complexity.map(d => d.total));
+            const minSize = 6, maxSize = 22;
+            return maxTotal > 0 ? Math.round(minSize + (r.total / maxTotal) * (maxSize - minSize)) : 8;
+        },
+    }
+}
+</script>
+{% endblock %}

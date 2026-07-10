@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en"
+    x-data="{
+        currentTheme: localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'),
+        cycleTheme() {
+            if (this.currentTheme === 'light') {
+                this.currentTheme = 'dark';
+            } else if (this.currentTheme === 'dark') {
+                this.currentTheme = 'forest';
+            } else if (this.currentTheme === 'forest') {
+                this.currentTheme = 'sunset';
+            } else {
+                this.currentTheme = 'light';
+            }
+        }
+    }"
+    x-init="$watch('currentTheme', val => localStorage.setItem('theme', val))"
+    :class="[currentTheme, (currentTheme !== 'light') ? 'dark' : '']">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Grocery Price Tracker{% endblock %}</title>
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+    <!-- Typography -->
+    <link rel="stylesheet" href="/static/fonts/inter.css">
+    <!-- Tailwind CSS with dark mode -->
+    <!-- Precompiled Tailwind (scripts/build_css.sh) — replaces the browser Play runtime -->
+    <link rel="stylesheet" href="/static/css/tailwind.css">
+
+    <!-- HTMX -->
+    <script src="/static/js/vendor/htmx.min.js"></script>
+
+    <!-- Alpine.js Plugins -->
+    <script defer src="/static/js/vendor/alpine-collapse.min.js"></script>
+    <script defer src="/static/js/vendor/alpine-focus.min.js"></script>
+    <!-- Alpine.js Core -->
+    <script defer src="/static/js/vendor/alpine.min.js"></script>
+
+    <!-- Chart.js -->
+    <script src="/static/js/vendor/chart.umd.min.js"></script>
+
+    <!-- Toast Styles -->
+    <link rel="stylesheet" href="/static/css/toast.css">
+    <!-- Design System Tokens -->
+    <link rel="stylesheet" href="/static/css/themes.css">
+
+    <!-- CSRF Token for HTMX -->
+    {% if request and csrf_token %}
+    <meta name="csrf-token" content="{{ csrf_token(request) }}">
+    <script>
+        document.addEventListener('htmx:configRequest', (event) => {
+            event.detail.headers['X-CSRF-Token'] = '{{ csrf_token(request) }}';
+        });
+    </script>
+    {% endif %}
+
+    <!-- Page-Specific Head Content -->
+    {% block extra_head %}{% endblock %}
+</head>
+
+<body class="bg-bgMain transition-colors duration-200" x-data="{
+          showToast: false,
+          message: 'Processing...',
+          startTime: 0,
+          startProcess(detail) {
+              this.showToast = true;
+              this.message = detail.message || 'Processing...';
+              this.startTime = Date.now();
+          },
+          endProcess() {
+              const elapsed = Date.now() - this.startTime;
+              const remaining = 5000 - elapsed;
+              if (remaining > 0) {
+                  setTimeout(() => { this.showToast = false; }, remaining);
+              } else {
+                  this.showToast = false;
+              }
+          }
+      }" @process-start.window="startProcess($event.detail)" @process-end.window="endProcess()">
+
+    <!-- Skip Navigation -->
+    <a href="#main-content"
+       class="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-2 focus:left-2 focus:px-4 focus:py-2 focus:bg-indigo-600 focus:text-white focus:rounded-lg focus:font-semibold focus:shadow-lg">
+        Skip to main content
+    </a>
+
+    <!-- Toast Notification -->
+    <div class="toast-container" :class="{ 'toast-visible': showToast }">
+        <div class="flex items-center space-x-4 max-w-7xl mx-auto px-4 w-full">
+            <div class="text-lg font-semibold" x-text="message"></div>
+            <!-- Animation Track -->
+            <div class="cart-animation-track">
+                <div class="cart-icon">
+                    <svg class="w-8 h-8 text-orange-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path
+                            d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3zM16 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM6.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" />
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Navigation -->
+    <nav class="bg-bgCard shadow-sm border-b border-borderDefault transition-colors"
+        x-data="{ mobileMenuOpen: false }">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <!-- Logo/Title -->
+                <div class="flex items-center">
+                    <a href="/"
+                       class="text-xl font-bold text-textBase hover:text-blue-600 transition">🛒
+                        Grocery Tracker</a>
+                </div>
+                <!-- Search Bar -->
+                <div class="hidden md:flex flex-1 max-w-xs mx-6 relative"
+                     x-data="{ searchOpen: false }"
+                     @search-close.window="searchOpen = false; $refs.searchInput.value = ''"
+                     @keydown.escape.window="searchOpen = false">
+                    <label for="global-search" class="sr-only">Search grocery items</label>
+                    <input id="global-search"
+                           x-ref="searchInput"
+                           type="text"
+                           placeholder="Search items…"
+                           autocomplete="off"
+                           aria-label="Search grocery items"
+                           aria-autocomplete="list"
+                           aria-controls="search-results-container"
+                           class="w-full pl-9 pr-3 py-1.5 rounded-lg text-sm bg-bgMain border border-borderDefault text-textBase placeholder-textMuted focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                           hx-get="/api/search"
+                           hx-trigger="keyup changed delay:300ms"
+                           hx-target="#search-results-container"
+                           hx-include="this"
+                           name="q"
+                           @focus="searchOpen = true"
+                           @input="if ($event.target.value.length < 2) { searchOpen = false }; if ($event.target.value.length >= 2) { searchOpen = true }">
+                    <!-- Search icon (decorative) -->
+                    <svg aria-hidden="true" focusable="false"
+                         class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-textMuted pointer-events-none"
+                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                    <!-- Results dropdown -->
+                    <div id="search-results-container" x-show="searchOpen" class="absolute top-full left-0 right-0 mt-1 z-50"></div>
+                </div>
+
+                <!-- Desktop Navigation Links -->
+                <div class="hidden md:flex items-center space-x-4">
+                    <a href="/"
+                        class="text-sm text-textMuted hover:text-textBase transition">Dashboard</a>
+                    <a href="/receipts"
+                        class="text-sm text-textMuted hover:text-textBase transition">Receipts</a>
+                    <a href="/produce"
+                        class="text-sm text-green-600 dark:text-green-400 font-bold hover:text-green-800 dark:hover:text-green-300 transition">Quick Produce</a>
+                    <a href="/items"
+                        class="text-sm text-textMuted hover:text-textBase transition">Items</a>
+                    <a href="/trends"
+                        class="text-sm text-textMuted hover:text-textBase transition">Trends</a>
+                    <a href="/categories"
+                        class="text-sm text-textMuted hover:text-textBase transition">Categories</a>
+
+                    <!-- Settings Link -->
+                    <a href="/settings"
+                       class="p-2 rounded-lg text-textMuted hover:text-textBase hover:bg-bgMain transition"
+                       aria-label="Settings">
+                        <svg aria-hidden="true" focusable="false" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                    </a>
+
+                    <!-- Theme Toggle -->
+                    <button @click="cycleTheme()"
+                        class="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                        :aria-label="'Switch theme. Current: ' + currentTheme">
+                        <!-- Light Theme: Sun Icon (decorative) -->
+                        <svg x-show="currentTheme === 'light'" aria-hidden="true" focusable="false" class="w-5 h-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                        </svg>
+                        <!-- Dark Theme: Moon Icon (decorative) -->
+                        <svg x-show="currentTheme === 'dark'" aria-hidden="true" focusable="false" class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                        </svg>
+                        <!-- Forest Theme: Leaf/Sprout Icon (decorative) -->
+                        <svg x-show="currentTheme === 'forest'" aria-hidden="true" focusable="false" class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 19V5m0 0a9 9 0 00-9 9m9-9a9 9 0 019 9" />
+                        </svg>
+                        <!-- Sunset Theme: Flame Icon (decorative) -->
+                        <svg x-show="currentTheme === 'sunset'" aria-hidden="true" focusable="false" class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z" />
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Mobile Menu Button & Dark Mode -->
+                <div class="md:hidden flex items-center space-x-2">
+                    <!-- Theme Toggle (Mobile) -->
+                    <button @click="cycleTheme()"
+                        class="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                        :aria-label="'Switch theme. Current: ' + currentTheme">
+                        <!-- Light Theme: Sun Icon (decorative) -->
+                        <svg x-show="currentTheme === 'light'" aria-hidden="true" focusable="false" class="w-5 h-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                        </svg>
+                        <!-- Dark Theme: Moon Icon (decorative) -->
+                        <svg x-show="currentTheme === 'dark'" aria-hidden="true" focusable="false" class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                        </svg>
+                        <!-- Forest Theme: Leaf/Sprout Icon (decorative) -->
+                        <svg x-show="currentTheme === 'forest'" aria-hidden="true" focusable="false" class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 19V5m0 0a9 9 0 00-9 9m9-9a9 9 0 019 9" />
+                        </svg>
+                        <!-- Sunset Theme: Flame Icon (decorative) -->
+                        <svg x-show="currentTheme === 'sunset'" aria-hidden="true" focusable="false" class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z" />
+                        </svg>
+                    </button>
+
+                    <!-- Hamburger Button -->
+                    <button @click="mobileMenuOpen = !mobileMenuOpen"
+                        :aria-expanded="mobileMenuOpen"
+                        :aria-label="mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'"
+                        aria-controls="mobile-menu"
+                        class="p-2 rounded-lg text-textMuted hover:bg-bgHover focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2">
+                        <svg aria-hidden="true" focusable="false" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path x-show="!mobileMenuOpen" stroke-linecap="round" stroke-linejoin="round"
+                                stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                            <path x-show="mobileMenuOpen" stroke-linecap="round" stroke-linejoin="round"
+                                stroke-width="2" d="M6 18L18 6M6 6l12 12" style="display: none;" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile Menu (Collapsible) -->
+        <div id="mobile-menu"
+            x-show="mobileMenuOpen" x-transition:enter="transition ease-out duration-100"
+            x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+            x-transition:leave="transition ease-in duration-75" x-transition:leave-start="opacity-100 scale-100"
+            x-transition:leave-end="opacity-0 scale-95"
+            class="md:hidden border-t dark:border-gray-700 bg-bgCard">
+            <div class="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+                <a href="/"
+                    class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700">Dashboard</a>
+                <a href="/receipts"
+                    class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700">Receipts</a>
+                <a href="/produce"
+                    class="block px-3 py-2 rounded-md text-base font-bold text-green-600 dark:text-green-400 hover:bg-gray-50 dark:hover:bg-gray-700">Quick Produce</a>
+                <a href="/items"
+                    class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700">Items</a>
+                <a href="/trends"
+                    class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700">Trends</a>
+                <a href="/categories"
+                    class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700">Categories</a>
+            </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main id="main-content" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {% block content %}{% endblock %}
+    </main>
+
+    {% block extra_scripts %}{% endblock %}
+</body>
+
+</html>

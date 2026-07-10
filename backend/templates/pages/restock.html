@@ -1,0 +1,152 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Restock Predictions - Grocery Price Tracker{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
+        <div>
+            <h1 class="text-3xl font-bold text-textBase flex items-center gap-3">
+                <span class="text-2xl">🛒</span> RESTOCK PREDICTIONS
+            </h1>
+            <p class="text-textMuted mt-1">Items predicted to need repurchasing soon, with store price comparisons</p>
+        </div>
+
+        <div class="flex items-center gap-3">
+
+
+            <!-- Back to Trends -->
+            <a href="/trends"
+               class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-bgSkeleton hover:bg-bgHover text-textMuted text-sm font-medium transition">
+                ← Trends
+            </a>
+        </div>
+    </div>
+
+    <!-- Stats Summary -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="prediction-stats"
+         hx-get="/api/predictions/stats" hx-trigger="load" hx-swap="innerHTML">
+        <!-- Loaded via stats endpoint, but provide skeleton -->
+        <div class="bg-bgCard rounded-xl p-4 border border-borderDefault animate-pulse">
+            <div class="h-6 bg-bgSkeleton rounded w-12 mb-2"></div>
+            <div class="h-4 bg-bgSkeleton rounded w-20"></div>
+        </div>
+        <div class="bg-bgCard rounded-xl p-4 border border-borderDefault animate-pulse">
+            <div class="h-6 bg-bgSkeleton rounded w-12 mb-2"></div>
+            <div class="h-4 bg-bgSkeleton rounded w-20"></div>
+        </div>
+        <div class="bg-bgCard rounded-xl p-4 border border-borderDefault animate-pulse">
+            <div class="h-6 bg-bgSkeleton rounded w-12 mb-2"></div>
+            <div class="h-4 bg-bgSkeleton rounded w-20"></div>
+        </div>
+        <div class="bg-bgCard rounded-xl p-4 border border-borderDefault animate-pulse">
+            <div class="h-6 bg-bgSkeleton rounded w-12 mb-2"></div>
+            <div class="h-4 bg-bgSkeleton rounded w-20"></div>
+        </div>
+    </div>
+
+    <!-- Restock Table -->
+    <div class="bg-bgCard rounded-2xl shadow-lg border border-borderDefault overflow-hidden">
+        <div class="px-6 py-4 border-b border-borderDefault flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+                <h2 class="text-lg font-bold text-textBase flex items-center gap-2">
+                    <span>📋</span> Items Due for Restock
+                </h2>
+                <span class="text-xs text-textMuted">Requires 3+ historical purchases</span>
+            </div>
+
+            <!-- Toggle Group -->
+            <div role="tablist" aria-label="Restock view" class="inline-flex bg-bgSkeleton rounded-lg p-1 border border-borderDefault"
+                 x-data="{ view: 'optimized' }">
+                <button role="tab"
+                        id="tab-restock-table"
+                        aria-controls="restock-content-container"
+                        :aria-selected="view === 'table'"
+                        @click="view = 'table'"
+                        hx-get="/api/predictions/restock-table"
+                        hx-target="#restock-content-container"
+                        class="px-4 py-1.5 rounded-md text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500"
+                        :class="view === 'table' ? 'bg-bgInput text-textBase shadow-sm' : 'text-textMuted hover:text-textBase'">
+                    Table View
+                </button>
+                <button role="tab"
+                        id="tab-restock-optimized"
+                        aria-controls="restock-content-container"
+                        :aria-selected="view === 'optimized'"
+                        @click="view = 'optimized'"
+                        hx-get="/api/predictions/optimized-list"
+                        hx-target="#restock-content-container"
+                        class="px-4 py-1.5 rounded-md text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500"
+                        :class="view === 'optimized' ? 'bg-bgInput text-textBase shadow-sm' : 'text-textMuted hover:text-textBase'">
+                    Optimized Stores
+                </button>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto"
+             id="restock-content-container"
+             hx-get="/api/predictions/optimized-list"
+             hx-trigger="load"
+             hx-swap="innerHTML">
+            <!-- Loading skeleton -->
+            <div class="p-8 text-center">
+                <div class="inline-flex items-center gap-3 text-textMuted">
+                    <svg aria-hidden="true" focusable="false" class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Calculating purchase cadences...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Info Note -->
+    <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 flex items-start gap-3">
+        <span class="text-blue-500 text-lg mt-0.5">ℹ️</span>
+        <div class="text-sm text-blue-800 dark:text-blue-300">
+            <p class="font-semibold mb-1">How predictions work</p>
+            <p>The engine analyzes your purchase history to calculate average buying intervals. Items need at least 3 purchases to generate a prediction.
+               Prices shown are the most recent price paid at each store. Items not purchased in 6+ months are considered stale and hidden from this view.</p>
+            <p class="mt-2">
+                <strong>API endpoints:</strong>
+                <code class="bg-blue-100 dark:bg-blue-900/40 px-1.5 py-0.5 rounded text-xs">/api/predictions/shopping-list</code> (JSON) &middot;
+                <code class="bg-blue-100 dark:bg-blue-900/40 px-1.5 py-0.5 rounded text-xs">/api/predictions/cadences</code> (JSON)
+            </p>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Override the stats endpoint to render HTML instead of relying on HTMX JSON swap
+    document.addEventListener('DOMContentLoaded', async () => {
+        try {
+            const response = await fetch('/api/predictions/stats');
+            const stats = await response.json();
+            const container = document.getElementById('prediction-stats');
+
+            container.innerHTML = `
+                <div class="bg-bgCard rounded-xl p-4 border border-borderDefault">
+                    <div class="text-2xl font-bold text-textBase">${stats.total_tracked}</div>
+                    <div class="text-xs text-textMuted mt-1">Items Tracked</div>
+                </div>
+                <div class="bg-bgCard rounded-xl p-4 border border-borderDefault">
+                    <div class="text-2xl font-bold text-orange-600 dark:text-orange-400">${stats.urgent_count}</div>
+                    <div class="text-xs text-textMuted mt-1">Need Restock</div>
+                </div>
+                <div class="bg-bgCard rounded-xl p-4 border border-borderDefault">
+                    <div class="text-2xl font-bold text-red-600 dark:text-red-400">${stats.overdue_count}</div>
+                    <div class="text-xs text-textMuted mt-1">Overdue</div>
+                </div>
+                <div class="bg-bgCard rounded-xl p-4 border border-borderDefault">
+                    <div class="text-2xl font-bold text-blue-600 dark:text-blue-400">${stats.avg_cadence_days}d</div>
+                    <div class="text-xs text-textMuted mt-1">Avg Cadence</div>
+                </div>
+            `;
+        } catch (error) {
+            console.error('Error loading prediction stats:', error);
+        }
+    });
+</script>
+{% endblock %}

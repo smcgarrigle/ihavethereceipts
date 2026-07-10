@@ -1,0 +1,161 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Bulk Receipt Loader - Grocery Tracker{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 py-8" x-data="bulkLoader()">
+    <!-- Header Section -->
+    <div class="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div>
+            <h1 class="text-4xl font-black text-white tracking-tight mb-2">Bulk Receipt Loader</h1>
+            <p class="text-gray-400 max-w-2xl font-medium">
+                Upload hundreds of receipts at once. Our background worker will process them sequentially to ensure 100% accuracy while staying within API limits.
+            </p>
+        </div>
+
+        <!-- Queue Stats Summary (Active Polling) -->
+        <div class="flex items-center space-x-6 bg-gray-800/50 backdrop-blur-sm p-4 rounded-2xl border border-borderDefault"
+             hx-get="/api/bulk/status" hx-trigger="load, every 5s">
+            <div class="text-center px-4 border-r border-borderDefault">
+                <p class="text-[10px] font-bold text-textSubtle uppercase tracking-widest mb-1">Pending</p>
+                <p class="text-2xl font-black text-white" id="stat-pending">--</p>
+            </div>
+            <div class="text-center px-4">
+                <p class="text-[10px] font-bold text-textSubtle uppercase tracking-widest mb-1">ETR</p>
+                <p class="text-2xl font-black text-blue-400" id="stat-etr">--</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-10">
+        <!-- Sidebar: Upload Zone -->
+        <div class="lg:col-span-1 space-y-6">
+            <div class="bg-gray-800/30 rounded-3xl p-8 border-2 border-dashed border-borderDefault hover:border-blue-500/50 transition-all group flex flex-col items-center justify-center text-center cursor-pointer relative"
+                 @dragover.prevent="dragOver = true"
+                 @dragleave.prevent="dragOver = false"
+                 @drop.prevent="handleDrop($event)"
+                 :class="{ 'border-blue-500 bg-blue-500/5': dragOver }">
+
+                <input type="file" multiple class="absolute inset-0 opacity-0 cursor-pointer" @change="handleFileSelect($event)">
+
+                <div class="w-16 h-16 rounded-2xl bg-bgHover flex items-center justify-center mb-4 group-hover:scale-110 transition shadow-xl">
+                    <svg class="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-bold text-white mb-2">Drop Receipts Here</h3>
+                <p class="text-sm text-textSubtle font-medium px-4">JPG, PNG, or PDF files. Max 10MB each.</p>
+
+                <div class="mt-8">
+                    <button class="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold rounded-xl transition shadow-lg shadow-blue-600/20">
+                        Select Files
+                    </button>
+                </div>
+            </div>
+
+            <div class="bg-blue-900/10 border border-blue-500/20 rounded-2xl p-6">
+                <h4 class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-3">Capacity Note</h4>
+                <p class="text-sm text-blue-100/70 leading-relaxed font-medium">
+                    The queue processor runs at a safe pace (1 receipt every 5-10 seconds) to ensure maximum OCR quality and prevent rate limiting.
+                </p>
+                <div class="mt-4 flex items-center text-xs font-bold text-blue-400">
+                    <span class="w-2 h-2 rounded-full bg-blue-500 animate-pulse mr-2"></span>
+                    Worker Thread Active
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Area: Visual Queue -->
+        <div class="lg:col-span-2">
+            <div class="bg-gray-800/30 rounded-3xl border border-borderDefault overflow-hidden">
+                <div class="px-6 py-4 border-b border-borderDefault flex items-center justify-between bg-gray-800/50">
+                    <h3 class="text-sm font-bold text-white uppercase tracking-widest">Active Processing Queue</h3>
+                    <div class="flex items-center space-x-3">
+                        <button hx-post="/api/bulk/clear-history"
+                                hx-swap="none"
+                                onclick="htmx.trigger('#active-queue-list', 'load')"
+                                class="px-2 py-1 rounded bg-bgHover hover:bg-bgCard text-[10px] font-bold text-textSubtle hover:text-white tracking-wider uppercase transition">
+                            Clear History
+                        </button>
+                        <span class="px-2 py-1 rounded bg-bgHover text-[10px] font-bold text-textSubtle tracking-wider uppercase">Live Sync</span>
+                    </div>
+                </div>
+
+                <div class="divide-y divide-gray-700/50 overflow-y-auto max-h-[600px]" id="active-queue-list"
+                     hx-get="/api/bulk/active-items" hx-trigger="load, every 3s" hx-swap="innerHTML">
+                    <!-- HTMX will inject the list here -->
+                    <div class="p-12 text-center text-textSubtle">
+                        <p class="font-medium italic">No receipts currently in progress.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function bulkLoader() {
+    return {
+        dragOver: false,
+        files: [],
+
+        handleDrop(event) {
+            this.dragOver = false;
+            const droppedFiles = event.dataTransfer.files;
+            this.uploadFiles(droppedFiles);
+        },
+
+        handleFileSelect(event) {
+            const selectedFiles = event.target.files;
+            this.uploadFiles(selectedFiles);
+        },
+
+        async uploadFiles(fileList) {
+            if (fileList.length === 0) return;
+
+            // Upload in chunks of 1 to completely prevent 413 Request Entity Too Large errors
+            // Some high-res camera photos can be 5-10MB each.
+            const chunkSize = 1;
+            let successCount = 0;
+            let failCount = 0;
+
+            for (let i = 0; i < fileList.length; i += chunkSize) {
+                const chunk = Array.from(fileList).slice(i, i + chunkSize);
+                const formData = new FormData();
+
+                for (let j = 0; j < chunk.length; j++) {
+                    formData.append('files', chunk[j]);
+                }
+
+                try {
+                    const response = await fetch('/api/bulk/upload', {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content
+                        },
+                        body: formData
+                    });
+
+                    if (response.ok) {
+                        successCount += chunk.length;
+                        // Refresh UI after each chunk so they see progress immediately
+                        htmx.trigger('#active-queue-list', 'load');
+                        htmx.trigger('[hx-get="/api/bulk/status"]', 'load');
+                    } else {
+                        failCount += chunk.length;
+                    }
+                } catch (err) {
+                    console.error("Upload error:", err);
+                    failCount += chunk.length;
+                }
+            }
+
+            if (failCount > 0) {
+                alert(`Upload finished with ${failCount} failures. Please check file sizes and try again.`);
+            }
+        }
+    }
+}
+
+</script>
+{% endblock %}

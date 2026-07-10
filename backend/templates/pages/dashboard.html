@@ -1,0 +1,1273 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Dashboard - Grocery Price Tracker{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    {% if is_demo %}
+    <!-- Onboarding Demo Banner -->
+    <div class="bg-indigo-600 text-white rounded-xl shadow-lg p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-all" id="demo-banner">
+        <div>
+            <div class="flex items-center space-x-2">
+                <span class="text-2xl">👋</span>
+                <h3 class="text-lg font-black tracking-tight uppercase">Welcome to Grocery Price Tracker!</h3>
+            </div>
+            <p class="text-indigo-100 text-sm mt-1 leading-relaxed">
+                We have populated some realistic demonstration data so you can explore all features (charts, tables, and trends) immediately.
+                Once you've seen how it works, you can clear this data and begin importing your own receipts.
+            </p>
+        </div>
+        <button
+            hx-post="/api/onboarding/clear-demo"
+            hx-swap="none"
+            class="px-5 py-2.5 bg-white text-indigo-600 hover:bg-indigo-50 font-black rounded-xl text-xs uppercase tracking-wider transition-all shadow-md flex-shrink-0">
+            Clear Demo Data
+        </button>
+    </div>
+    {% endif %}
+
+    {% if not has_gemini_key %}
+    <!-- Gemini API Key Setup Warning -->
+    <div class="bg-gradient-to-r from-amber-500/10 to-orange-500/10 dark:from-amber-950/20 dark:to-orange-950/20 border border-amber-200 dark:border-amber-900/50 rounded-xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div class="flex items-start space-x-3">
+            <span class="bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 p-2 rounded-lg mt-0.5">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </span>
+            <div>
+                <h4 class="font-bold text-textBase">Gemini API Key Required for Image OCR</h4>
+                <p class="text-xs text-textMuted mt-1 leading-relaxed">
+                    Currently running OCR in offline/local mode. To unlock fast, highly-accurate cloud-based receipt image scanning,
+                    create a free Gemini API key and add it to your local <code class="bg-bgSkeleton px-1 py-0.5 rounded font-mono text-[11px]">.env</code> file:
+                    <code class="bg-bgSkeleton px-1 py-0.5 rounded font-mono text-[11px]">GEMINI_API_KEY=your_api_key</code>.
+                </p>
+                <p class="text-[11px] text-textSubtle mt-1.5 font-medium">
+                    💡 <strong>Note:</strong> Bulk digital PDF uploads (such as Whole Foods or Amazon Fresh digital invoices) do not require Gemini and work completely offline.
+                </p>
+            </div>
+        </div>
+        <a href="https://aistudio.google.com/" target="_blank" rel="noopener noreferrer"
+           class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-xs uppercase tracking-wider transition-all shadow-sm flex-shrink-0 text-center">
+            Get API Key
+        </a>
+    </div>
+    {% endif %}
+
+    <!-- Page Header -->
+    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+        <div>
+            <h1 class="text-3xl font-bold text-textBase">Dashboard</h1>
+            <p class="text-textMuted mt-1">Track your grocery spending</p>
+        </div>
+
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full lg:w-auto">
+            <!-- Upload Receipt Link -->
+            <a href="/receipts"
+               class="flex items-center bg-blue-600 text-white rounded-xl shadow-md border border-blue-500 p-4 transition-all hover:bg-blue-700 hover:shadow-lg group">
+                <div class="flex items-center space-x-4">
+                    <div class="bg-blue-500/30 w-12 h-12 flex items-center justify-center rounded-full">
+                        <svg class="w-6 h-6 group-hover:scale-110 transition-transform text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                        </svg>
+                    </div>
+                    <div class="flex flex-col">
+                        <span class="text-sm font-bold text-white">Upload Receipt</span>
+                        <span class="text-[10px] text-blue-200 uppercase tracking-widest font-semibold mt-0.5">Scan & Import</span>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Receipt X-Ray Link -->
+            <a href="/xray"
+               class="flex items-center bg-bgCard rounded-xl shadow-md border border-borderDefault p-4 transition-all hover:shadow-lg group">
+                <div class="flex items-center space-x-4">
+                    <div class="bg-indigo-100 dark:bg-indigo-900/30 w-12 h-12 flex items-center justify-center rounded-full">
+                        <span class="text-2xl group-hover:scale-110 transition-transform leading-none">🔬</span>
+                    </div>
+                    <div class="flex flex-col">
+                        <span class="text-sm font-bold text-textBase group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">Receipt X-Ray</span>
+                        <span class="text-[10px] text-textSubtle uppercase tracking-widest font-semibold mt-0.5">Intelligence Dashboard</span>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Savings Summary Card -->
+            <div class="flex items-center bg-bgCard rounded-xl shadow-md border border-borderDefault p-4 transition-all hover:shadow-lg">
+            <div class="flex items-center space-x-4">
+                <div class="bg-green-100 dark:bg-green-900/30 p-3 rounded-full">
+                    <svg class="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 1.343-3 3s1.343 3 3 3 3-1.343 3-3-1.343-3-3-3zM12 8V7m0 1v1m0 5v1m0-1c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm0 0v1m0-1V7m-7 1h14M5 12h14m-7 5h.01M5 19h14c1.105 0 2-.895 2-2V7c0-1.105-.895-2-2-2H5c-1.105 0-2 .895-2 2v10c0 1.105.895 2 2 2z"></path>
+                    </svg>
+                </div>
+                <div class="flex flex-col">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-sm font-medium text-textMuted uppercase tracking-wider">Total Savings</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300">
+                            {{ savings_percent }}% savings!
+                        </span>
+                    </div>
+                    <div class="flex items-baseline space-x-2 mt-0.5">
+                        <span class="text-2xl font-black text-textBase tracking-tight">${{ "{:,.2f}".format(total_savings) }}</span>
+                        <span class="text-sm text-textSubtle font-medium">on ${{ "{:,.2f}".format(total_spent) }} spent</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    </div>
+</div>
+
+<!-- Macro Spending Trends (Tufte Sparklines) -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10 px-2">
+        <!-- Weekly Spending -->
+        <div>
+            <h2 class="text-[10px] font-black text-textSubtle uppercase tracking-widest mb-2">Total Weekly Spending (Last 12 Weeks)</h2>
+            <div class="h-[120px] w-full relative">
+                <canvas id="weeklySpendingChart"
+                        role="img"
+                        aria-label="Weekly spending chart, last 12 weeks"
+                        aria-describedby="weeklySpendingChart-desc">
+                </canvas>
+                <p id="weeklySpendingChart-desc" class="sr-only">Bar chart showing your total grocery spending each week for the past 12 weeks.</p>
+            </div>
+        </div>
+        <!-- Monthly Spending -->
+        <div>
+            <h2 class="text-[10px] font-black text-textSubtle uppercase tracking-widest mb-2">Total Monthly Spending (Last 6 Months)</h2>
+            <div class="h-[120px] w-full relative">
+                <canvas id="monthlySpendingChart"
+                        role="img"
+                        aria-label="Monthly spending chart, last 6 months"
+                        aria-describedby="monthlySpendingChart-desc">
+                </canvas>
+                <p id="monthlySpendingChart-desc" class="sr-only">Bar chart showing your total grocery spending each month for the past 6 months.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Budget × Nutrition BI Section ──────────────────────────────────── -->
+    <div class="space-y-6 mb-10">
+
+      <!-- KPI Row -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-bgCard border border-borderDefault rounded-2xl p-5">
+          <p class="text-[10px] font-mono uppercase tracking-wider text-textSubtle">Monthly Spend</p>
+          <p class="text-3xl font-bold text-textBase mt-1">$487<span class="text-lg font-normal text-textMuted">.32</span></p>
+          <p class="text-xs text-emerald-500 mt-1">↓ 6.2% vs last month</p>
+        </div>
+        <div class="bg-bgCard border border-borderDefault rounded-2xl p-5">
+          <p class="text-[10px] font-mono uppercase tracking-wider text-textSubtle">Avg $/Day</p>
+          <p class="text-3xl font-bold text-textBase mt-1">$16<span class="text-lg font-normal text-textMuted">.24</span></p>
+          <p class="text-xs text-textMuted mt-1">Budget: $18.00/day</p>
+        </div>
+        <div class="bg-bgCard border border-borderDefault rounded-2xl p-5">
+          <p class="text-[10px] font-mono uppercase tracking-wider text-textSubtle">Best Protein Value</p>
+          <p class="text-3xl font-bold text-emerald-500 mt-1">$0.08<span class="text-sm font-normal text-textMuted">/g</span></p>
+          <p class="text-xs text-textMuted mt-1">Eggs · Costco</p>
+        </div>
+        <div class="bg-bgCard border border-borderDefault rounded-2xl p-5">
+          <p class="text-[10px] font-mono uppercase tracking-wider text-textSubtle">Nutrition Score</p>
+          <p class="text-3xl font-bold text-indigo-400 mt-1">74<span class="text-lg font-normal text-textMuted">/100</span></p>
+          <p class="text-xs text-amber-500 mt-1">↑ 3 pts — protein improving</p>
+        </div>
+      </div>
+
+      <!-- Row 1: Macro Breakdown + Protein ROI -->
+      <div class="grid grid-cols-1 lg:grid-cols-5 gap-6"
+           x-data="{
+                 showMissing: true,
+                 biData: null,
+                 init() {
+                     fetch('/api/analytics/bi-dashboard')
+                       .then(r => r.json())
+                       .then(data => this.biData = data);
+                 },
+                 get macros() {
+                     if (!this.biData) return [];
+                     if (this.showMissing) {
+                         return this.biData.macro_breakdown;
+                     }
+                     let filtered = this.biData.macro_breakdown.filter(m => m.label !== 'Missing USDA Data');
+                     let total = filtered.reduce((acc, m) => acc + m.spend, 0);
+                     if (total === 0) return [];
+                     return filtered.map(m => ({...m, pct: Math.round((m.spend / total) * 100)}));
+                 },
+                 get roi() {
+                     if (!this.biData) return [];
+                     return this.biData.protein_roi;
+                 },
+                 get maxCpp() {
+                     if (!this.roi.length) return 1;
+                     return Math.max(...this.roi.map(r => r.cpp));
+                 }
+             }">
+        <!-- Dollar-Weighted Macro Breakdown -->
+        <div class="lg:col-span-3 bg-bgCard border border-borderDefault rounded-2xl p-6">
+          <div class="flex items-center justify-between mb-1">
+              <h2 class="text-[10px] font-mono font-bold uppercase tracking-widest text-textSubtle">WHERE YOUR DOLLAR GOES — BY NUTRITIONAL PROFILE</h2>
+              <!-- Toggle Switch -->
+              <label class="flex items-center cursor-pointer gap-2 group">
+                  <span class="text-[10px] text-textMuted uppercase tracking-widest group-hover:text-textBase transition">Show Missing Data</span>
+                  <div class="relative">
+                      <input type="checkbox" x-model="showMissing" class="sr-only">
+                      <div class="block bg-bgSkeleton w-8 h-4 rounded-full border border-borderDefault transition-colors" :class="showMissing ? 'bg-red-500/20 border-red-500/50' : ''"></div>
+                      <div class="dot absolute left-1 top-1 bg-textMuted w-2 h-2 rounded-full transition transform" :class="showMissing ? 'translate-x-4 bg-red-500' : ''"></div>
+                  </div>
+              </label>
+          </div>
+
+          <p class="text-sm text-textMuted mb-4">Of your <strong class="text-textBase" x-text="biData ? `$${biData.kpis.monthly_spend.toFixed(0)}` : '...'"></strong> this month, how much went to each macro-dominant food group.</p>
+
+          <!-- Stacked Bar Chart -->
+          <div class="flex h-7 w-full rounded-lg overflow-hidden text-[10px] font-bold text-white mb-4">
+             <template x-for="m in macros" :key="m.label">
+                 <div class="flex items-center justify-center transition-all duration-500 ease-in-out whitespace-nowrap overflow-hidden"
+                      :style="`width:${m.pct}%; background:${m.color}`"
+                      x-text="m.pct > 5 ? `${m.label.split(' ')[0]} ${m.pct}%` : ''"></div>
+             </template>
+          </div>
+
+          <!-- Detail Rows -->
+          <div class="space-y-3">
+             <template x-for="m in macros" :key="m.label">
+                 <div class="flex items-center gap-3">
+                     <div class="w-3 h-3 rounded-sm flex-shrink-0 transition-colors duration-500" :style="`background:${m.color}`"></div>
+                     <div class="flex-1 min-w-0">
+                         <div class="flex justify-between items-baseline mb-0.5">
+                             <span class="text-xs font-semibold text-textBase transition-colors duration-500" :class="m.label.includes('Missing') ? 'text-red-500' : ''">
+                                 <span x-text="m.label"></span>
+                             </span>
+                             <span class="text-xs font-mono text-textMuted ml-2 flex-shrink-0" x-text="`$${m.spend.toFixed(2)} · ${m.pct}%`"></span>
+                         </div>
+                         <div class="w-full bg-bgSkeleton h-1.5 rounded-full overflow-hidden">
+                             <div class="h-1.5 rounded-full transition-all duration-500 ease-in-out" :style="`width:${m.pct * (100/40)}%; background:${m.color}`"></div>
+                         </div>
+                         <p class="text-[10px] text-textSubtle mt-0.5" x-text="m.examples"></p>
+                     </div>
+                 </div>
+             </template>
+          </div>
+          <p class="text-[10px] text-textSubtle mt-3">&ldquo;Macro-dominant&rdquo; = the macro providing &gt;40% of a food's calories.</p>
+        </div>
+        <!-- Protein ROI -->
+        <div class="lg:col-span-2 bg-bgCard border border-borderDefault rounded-2xl p-6">
+          <h2 class="text-[10px] font-mono font-bold uppercase tracking-widest text-textSubtle mb-1">PROTEIN ROI RANKING</h2>
+          <p class="text-sm text-textMuted mb-4">Cost per gram of protein. Lower = better value.</p>
+          <div id="dash-protein-roi" class="space-y-2.5"></div>
+          <p class="text-[10px] text-textSubtle mt-3">Red line = $0.20/g target.</p>
+        </div>
+      </div>
+
+      <!-- Row 2: Dual-Axis Spend + Protein -->
+      <div class="bg-bgCard border border-borderDefault rounded-2xl p-6">
+        <div class="flex items-start justify-between gap-4 flex-wrap mb-4">
+          <div>
+            <h2 class="text-[10px] font-mono font-bold uppercase tracking-widest text-textSubtle mb-1">SPEND vs PROTEIN INTAKE — 12-WEEK TREND</h2>
+            <p class="text-sm text-textMuted">Does spending more actually buy more protein? The gap reveals inefficiency.</p>
+          </div>
+          <div class="flex items-center gap-4 text-xs text-textMuted">
+            <span class="flex items-center gap-1.5"><span class="inline-block w-6 h-0.5 bg-indigo-500 rounded"></span>Weekly Spend ($)</span>
+            <span class="flex items-center gap-1.5"><span class="inline-block w-6 h-0.5 bg-emerald-500 rounded"></span>Protein (g)</span>
+          </div>
+        </div>
+        <div class="h-[240px] relative">
+            <canvas id="dash-dual-axis"
+                    role="img"
+                    aria-label="Dual-axis chart: weekly spend versus protein intake over 12 weeks"
+                    aria-describedby="dash-dual-axis-desc">
+            </canvas>
+            <p id="dash-dual-axis-desc" class="sr-only">Line chart comparing weekly grocery spend in dollars against weekly protein intake in grams over the past 12 weeks.</p>
+        </div>
+      </div>
+
+      <!-- Row 3: Category Efficiency Table + Basket Donut -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2 bg-bgCard border border-borderDefault rounded-2xl p-6 overflow-x-auto">
+          <h2 class="text-[10px] font-mono font-bold uppercase tracking-widest text-textSubtle mb-1">CATEGORY EFFICIENCY MATRIX</h2>
+          <p class="text-sm text-textMuted mb-4">$/g protein · $/g carbs · $/kcal. Cells thermally coded — green = efficient.</p>
+          <table class="w-full text-xs">
+            <thead><tr class="text-left border-b border-borderDefault">
+              <th class="pb-2 font-semibold text-textMuted pr-4">Category</th>
+              <th class="pb-2 font-semibold text-textMuted text-right pr-3">$/g protein</th>
+              <th class="pb-2 font-semibold text-textMuted text-right pr-3">$/g carbs</th>
+              <th class="pb-2 font-semibold text-textMuted text-right pr-3">$/kcal</th>
+              <th class="pb-2 font-semibold text-textMuted text-right">Mo. spend</th>
+            </tr></thead>
+            <tbody id="dash-efficiency-table" class="divide-y divide-borderDefault"></tbody>
+          </table>
+        </div>
+        <div class="bg-bgCard border border-borderDefault rounded-2xl p-6">
+          <h2 class="text-[10px] font-mono font-bold uppercase tracking-widest text-textSubtle mb-1">BASKET COMPOSITION</h2>
+          <p class="text-sm text-textMuted mb-3">Spend share by category this month.</p>
+          <div class="h-[210px] relative">
+              <canvas id="dash-basket"
+                      role="img"
+                      aria-label="Basket composition donut chart"
+                      aria-describedby="dash-basket-desc">
+              </canvas>
+              <p id="dash-basket-desc" class="sr-only">Donut chart showing spending share by grocery category this month.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 4: Nutrition Small Multiples by Store -->
+      <div class="bg-bgCard border border-borderDefault rounded-2xl p-6">
+        <h2 class="text-[10px] font-mono font-bold uppercase tracking-widest text-textSubtle mb-1">NUTRITION SMALL MULTIPLES — BY STORE</h2>
+        <p class="text-sm text-textMuted mb-5">Weekly protein &amp; fat from each store's purchases.</p>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-8" id="dash-small-multiples"></div>
+      </div>
+
+      <!-- Row 5: Bullet Charts -->
+      <div class="bg-bgCard border border-borderDefault rounded-2xl p-6">
+        <h2 class="text-[10px] font-mono font-bold uppercase tracking-widest text-textSubtle mb-1">BUDGET vs ACTUAL — BULLET CHART</h2>
+        <p class="text-sm text-textMuted mb-5">Actual spend vs. budget cap per category. Red line = cap.</p>
+        <div class="space-y-4" id="dash-bullets"></div>
+      </div>
+
+    </div>
+    <!-- ── End BI Section ───────────────────────────────────────────────────── -->
+
+    <!-- Summary Tables Grid (Moved Below) -->
+    <div class="bg-bgCard rounded-xl shadow-lg border border-borderDefault p-6 mb-10">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+            <h2 class="text-xl font-bold text-textBase flex items-center">
+                <span class="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 p-2 rounded-lg mr-3">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path>
+                    </svg>
+                </span>
+                Category Spending Trends
+            </h2>
+            <div class="flex items-center space-x-2 text-xs font-bold text-textSubtle uppercase tracking-widest bg-bgMain/40 px-3 py-1.5 rounded-full">
+                <span class="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
+                <span>Sub-category Performance</span>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-4 gap-6">
+            <!-- Trend Chart -->
+            <div class="xl:col-span-3 h-[350px] relative">
+                <div id="trendsLoadingIndicator" class="absolute inset-0 flex items-center justify-center bg-bgCard/80 z-10 transition-opacity">
+                    <div class="animate-pulse flex flex-col items-center">
+                        <div class="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                        <span class="mt-2 text-sm text-textSubtle font-medium">Analyzing trends...</span>
+                    </div>
+                </div>
+                <canvas id="categoryTrendsChart"></canvas>
+            </div>
+
+            <!-- Quick Insights / Legend Area -->
+            <div class="xl:col-span-1 space-y-4">
+                <div class="bg-bgMain/50 rounded-xl p-4 border border-borderDefault/50">
+                    <h3 class="text-xs font-black text-textSubtle uppercase tracking-widest mb-3">Total Spent (Historical)</h3>
+                    <div id="trends-legend" class="space-y-2">
+                        <!-- Legend items injected via JS -->
+                    </div>
+                </div>
+                <div class="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border border-indigo-100 dark:border-indigo-900/50">
+                    <p class="text-xs text-indigo-700 dark:text-indigo-400 font-medium leading-relaxed">
+                        <svg class="w-4 h-4 inline mr-1 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        These trends are calculated by filtering item names for specific protein and produce keywords.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Tables Grid (Moved Below) -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <!-- Top Categories -->
+        <div class="bg-bgCard rounded-xl shadow-lg border border-borderDefault p-4">
+            <h2 class="text-lg font-bold text-textBase mb-4 flex items-center">
+                <span class="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 p-1.5 rounded-lg mr-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z">
+                        </path>
+                    </svg>
+                </span>
+                Top Categories
+            </h2>
+            <div hx-get="/api/analytics/tables/top-categories" hx-trigger="load, refresh from:body"
+                class="min-h-[200px]">
+                <div class="animate-pulse space-y-4">
+                    <div class="h-4 bg-bgSkeleton rounded w-3/4"></div>
+                    <div class="h-4 bg-bgSkeleton rounded w-1/2"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Items -->
+        <div class="bg-bgCard rounded-xl shadow-lg border border-borderDefault p-4">
+            <h2 class="text-lg font-bold text-textBase mb-4 flex items-center">
+                <span
+                    class="bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 p-1.5 rounded-lg mr-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z">
+                        </path>
+                    </svg>
+                </span>
+                Top Items
+            </h2>
+            <div hx-get="/api/analytics/tables/top-items" hx-trigger="load, refresh from:body" class="min-h-[200px]">
+                <div class="animate-pulse space-y-4">
+                    <div class="h-4 bg-bgSkeleton rounded w-3/4"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Store Spending -->
+        <div class="bg-bgCard rounded-xl shadow-lg border border-borderDefault p-4">
+            <h2 class="text-lg font-bold text-textBase mb-4 flex items-center">
+                <span
+                    class="bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 p-1.5 rounded-lg mr-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4">
+                        </path>
+                    </svg>
+                </span>
+                Spend by Store
+            </h2>
+            <div hx-get="/api/analytics/tables/store-spend" hx-trigger="load, refresh from:body" class="min-h-[200px]">
+                <div class="animate-pulse space-y-4">
+                    <div class="h-4 bg-bgSkeleton rounded w-3/4"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Spending by Category & Store (Stacked Bar) -->
+    <div class="bg-bgCard rounded-xl shadow-lg border border-borderDefault p-6 mb-10">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-xl font-bold text-textBase flex items-center">
+                <span class="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 p-2 rounded-lg mr-3">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
+                </span>
+                Spending by Category & Store
+            </h2>
+            <div class="flex flex-col items-end text-right">
+                <span class="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest bg-indigo-50 dark:bg-indigo-900/30 px-2.5 py-1 rounded-full">Ordered by Best Value</span>
+                <p class="text-[10px] text-textSubtle mt-1 italic">Click any segment to view receipts</p>
+            </div>
+        </div>
+        <div hx-get="/api/analytics/widgets/category-store-stack" hx-trigger="load, refresh from:body" class="min-h-[200px]">
+             <div class="animate-pulse space-y-8">
+                <div class="space-y-3">
+                    <div class="h-4 bg-bgSkeleton rounded w-1/4"></div>
+                    <div class="h-10 bg-bgSkeleton rounded w-full"></div>
+                </div>
+                <div class="space-y-3">
+                    <div class="h-4 bg-bgSkeleton rounded w-1/3"></div>
+                    <div class="h-10 bg-bgSkeleton rounded w-full"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+
+    <!-- Randomized Category Item Trends (New Dynamic Section) -->
+    <div class="mb-10">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-xl font-bold text-textBase flex items-center">
+                <span class="bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 p-2 rounded-lg mr-3">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                    </svg>
+                </span>
+                Dynamic Item Price Trends
+            </h2>
+            <div class="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest bg-amber-50 dark:bg-amber-900/30 px-3 py-1.5 rounded-full flex items-center gap-2">
+                <svg class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                Rotating Categories
+            </div>
+        </div>
+
+        <div id="random-charts-grid" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- 4 Chart Slots -->
+            <template x-for="i in [0,1,2,3]">
+                <div class="bg-bgCard rounded-xl shadow-lg border border-borderDefault p-5 flex flex-col h-[320px]">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-sm font-black text-textSubtle uppercase tracking-widest" :id="'random-title-' + i">Loading...</h3>
+                        <span class="text-[10px] font-bold text-textSubtle">Unit Price ($)</span>
+                    </div>
+                    <div class="flex-grow relative">
+                        <canvas :id="'randomChart-' + i"></canvas>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+
+    <!-- Store Grid Container -->
+    <div x-data="{ showAll: false }">
+        <h2 class="text-xl font-bold text-textBase mb-6">Recent Receipts</h2>
+
+        <!-- Collapsible Store Grid -->
+        <div>
+            {% if stores %}
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-start">
+                {% for store in stores %}
+                <!-- Store Card -->
+                <div class="bg-bgCard rounded-xl shadow-lg border border-borderDefault flex flex-col"
+                    x-data="{ expanded: false }" x-show="showAll || {{ loop.index }} <= 4"
+                    :class="{ 'hidden': !showAll && {{ loop.index }} > 4 }"
+                    x-transition:enter="transition ease-out duration-300"
+                    x-transition:enter-start="opacity-0 transform translate-y-4"
+                    x-transition:enter-end="opacity-100 transform translate-y-0">
+
+                    <!-- Store Header -->
+                    <div
+                        class="p-4 border-b border-borderDefault bg-bgCard/90 backdrop-blur-md shadow-sm rounded-t-xl sticky top-0 z-20 flex justify-between items-start">
+                        <div class="overflow-hidden">
+                            <h2 class="text-lg font-bold text-textBase truncate"
+                                title="{{ store.name }}">{{
+                                store.name }}</h2>
+                            <p class="text-xs text-textMuted mt-0.5">{{ store.receipts|length }}
+                                receipts</p>
+                        </div>
+                        <div class="flex-shrink-0 text-right">
+                            <span class="block text-xl font-bold text-green-600 dark:text-green-400">${{
+                                "%.2f"|format(store.total_spent) }}</span>
+                            <span class="text-[10px] font-medium text-textSubtle uppercase tracking-wide">Total</span>
+                        </div>
+                    </div>
+
+                    <!-- Receipts List -->
+                    <div class="p-3 space-y-2 relative">
+                        <div class="space-y-2" :class="expanded ? '' : 'max-h-[calc(2*5rem)] overflow-hidden'">
+                            {% if store.receipts %}
+                            {% for receipt in store.receipts %}
+                            <!-- The loop index is 1-based. We want to show 2 items by default.
+                                     Alpine will handle the height constraint. -->
+                            <a href="/receipts/{{ receipt.id }}/review" class="block group">
+                                <div
+                                    class="bg-bgHover rounded-lg p-3 border border-transparent hover:border-blue-300 dark:hover:border-blue-500 hover:shadow-md transition-all duration-200">
+                                    <div class="flex justify-between items-start">
+                                        <div class="space-y-1">
+                                            <p
+                                                class="text-sm font-medium text-textBase group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                                                {{ receipt.purchase_date.strftime('%b %d, %Y') if receipt.purchase_date else 'Unknown Date' }}
+                                            </p>
+                                            <p class="text-xs text-textMuted">
+                                                {{ receipt.items|length }} items
+                                            </p>
+                                        </div>
+                                        <div class="flex items-center space-x-2">
+                                            <span
+                                                class="text-sm font-bold text-textBase bg-bgInput px-2 py-1 rounded shadow-sm">
+                                                ${{ "%.2f"|format(receipt.total_amount) }}
+                                            </span>
+                                            <svg class="w-4 h-4 text-textSubtle group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                                        </div>
+                                    </div>
+                                </div>
+                            </a>
+                            {% endfor %}
+                            {% else %}
+                            <div class="text-center py-8 text-textSubtle">
+                                <p class="text-sm">No receipts yet</p>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Expand Affordance (Only show if > 2 items) -->
+                        {% if store.receipts|length > 2 %}
+                        <div class="pt-2 text-center"
+                            :class="expanded ? 'border-t border-borderDefault mt-2' : 'absolute bottom-0 left-0 right-0 bg-gradient-to-t from-white dark:from-gray-800 to-transparent pt-8 pb-2 rounded-b-xl'">
+                            <button @click="expanded = !expanded"
+                                :aria-expanded="expanded"
+                                :aria-label="expanded ? 'Show fewer receipts for this store' : 'Show all receipts for this store'"
+                                class="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 flex items-center justify-center w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded">
+                                <span x-text="expanded ? 'Show Less' : 'Show All ({{ store.receipts|length }})'"></span>
+                                <svg class="w-4 h-4 ml-1 transform transition-transform duration-200"
+                                    :class="expanded ? 'rotate-180' : ''" fill="none" stroke="currentColor"
+                                    viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </button>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Global Show All Button -->
+            {% if stores|length > 4 %}
+            <div class="flex justify-center mt-8">
+                <button @click="showAll = !showAll"
+                    class="flex items-center space-x-2 px-6 py-2.5 bg-bgCard border border-borderDefault text-textMuted rounded-full hover:bg-bgHover hover:shadow-md transition-all">
+                    <span x-text="showAll ? 'Show Less' : 'Show All Receipts'"></span>
+                    <svg class="w-5 h-5 transform transition-transform" :class="showAll ? 'rotate-180' : ''" fill="none"
+                        stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </button>
+            </div>
+            {% endif %}
+
+            {% else %}
+            <!-- Empty State (Shown if no stores) -->
+            <div
+                class="text-center py-10 bg-bgHover rounded-xl border border-dashed border-borderDefault">
+                <p class="text-textMuted">No stores found.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div> <!-- End Store Grid Container -->
+
+    <!-- Modal for Store History -->
+    <div id="store-history-modal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 bg-bgOverlay backdrop-blur-sm transition-opacity" aria-hidden="true" onclick="closeStoreHistory()"></div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div class="inline-block align-bottom bg-bgCard rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full border border-borderDefault">
+                <div class="bg-bgCard px-6 pt-6 pb-6 shadow-highlight">
+                    <div class="flex justify-between items-start mb-6">
+                        <div>
+                            <h3 class="text-2xl font-black text-textBase leading-none uppercase tracking-tight" id="modal-title">Spending History</h3>
+                            <p class="text-sm text-textMuted mt-2 font-medium">Per visit spend</p>
+                        </div>
+                        <button onclick="closeStoreHistory()" class="p-2 rounded-full hover:bg-bgHover transition-colors">
+                            <svg class="w-6 h-6 text-textSubtle hover:text-textBase" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    </div>
+                    <div class="h-[400px] w-full">
+                        <canvas id="storeHistoryChart"></canvas>
+                    </div>
+                </div>
+                <div class="bg-bgHover px-6 py-4 flex justify-end border-t border-borderDefault">
+                    <button type="button" onclick="closeStoreHistory()" class="px-6 py-2.5 bg-bgInput text-sm font-black text-textMuted border border-borderInput rounded-xl hover:bg-bgHover transition shadow-sm uppercase tracking-wider">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Category-Store Drilldown -->
+    <div id="category-store-modal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="drilldown-modal-title" role="dialog" aria-modal="true">
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 bg-bgOverlay backdrop-blur-sm transition-opacity" aria-hidden="true" onclick="closeCategoryStoreDrilldown()"></div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div class="inline-block align-bottom bg-bgCard rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full border border-borderDefault">
+                <div class="bg-bgCard px-6 pt-6 pb-6 shadow-highlight">
+                    <div class="flex justify-between items-start mb-6">
+                        <div>
+                            <h3 class="text-2xl font-black text-textBase leading-none uppercase tracking-tight" id="drilldown-modal-title">Receipts</h3>
+                            <p class="text-sm text-textMuted mt-2 font-medium" id="drilldown-modal-subtitle">Browse history for this category</p>
+                        </div>
+                        <button onclick="closeCategoryStoreDrilldown()" class="p-2 rounded-full hover:bg-bgHover transition-colors">
+                            <svg class="w-6 h-6 text-textSubtle hover:text-textBase" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    </div>
+                    <div id="drilldown-modal-content" class="min-h-[400px]">
+                        <!-- Content loaded via HTMX -->
+                        <div class="flex flex-col items-center justify-center h-64 space-y-4">
+                            <div class="animate-spin rounded-full h-10 w-10 border-4 border-indigo-500 border-t-transparent shadow-indigo"></div>
+                            <span class="text-sm font-bold text-textSubtle uppercase tracking-widest animate-pulse">Fetching history...</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-bgHover px-6 py-4 flex justify-end border-t border-borderDefault">
+                    <button type="button" onclick="closeCategoryStoreDrilldown()" class="px-6 py-2.5 bg-bgInput text-sm font-black text-textMuted border border-borderInput rounded-xl hover:bg-bgHover transition shadow-sm uppercase tracking-wider">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let historyChart = null;
+
+        // ── Shared Tufte helper ─────────────────────────────────────────────────
+        function isDark() {
+            return document.documentElement.classList.contains('dark');
+        }
+        function getTufteDefaults() {
+            const dark = isDark();
+            const mutedColor = dark ? '#6b7280' : '#9ca3af';
+            const gridColor  = dark ? 'rgba(75,85,99,0.18)' : 'rgba(209,213,219,0.45)';
+            return {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: dark ? '#1f2937' : '#ffffff',
+                        titleColor: dark ? '#e5e7eb' : '#111827',
+                        bodyColor: mutedColor,
+                        borderColor: dark ? '#374151' : '#e5e7eb',
+                        borderWidth: 1,
+                        cornerRadius: 8,
+                        displayColors: false,
+                        padding: 10
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        border: { display: false },
+                        ticks: { color: mutedColor, font: { size: 9, family: 'monospace' }, maxRotation: 0 }
+                    },
+                    y: {
+                        grid: { color: gridColor },
+                        border: { display: false },
+                        ticks: { color: mutedColor, font: { size: 9 } }
+                    }
+                }
+            };
+        }
+        // ────────────────────────────────────────────────────────────────────────
+
+        function showStoreHistory(storeId, storeName) {
+            // Update Title
+            document.getElementById('modal-title').textContent = 'Spending History: ' + storeName;
+
+            // Show Modal
+            document.getElementById('store-history-modal').classList.remove('hidden');
+            _storeHistoryOpener = document.activeElement;
+            // Move focus into modal
+            requestAnimationFrame(() => {
+                const modal = document.getElementById('store-history-modal');
+                const first = modal.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+                if (first) first.focus();
+            });
+
+            // Fetch Data
+            fetch(`/api/analytics/store-history/${storeId}`)
+                .then(response => response.json())
+                .then(data => {
+                    const ctx = document.getElementById('storeHistoryChart').getContext('2d');
+
+                    if (historyChart) {
+                        historyChart.destroy();
+                    }
+
+                    const tufteOpts = getTufteDefaults();
+                    tufteOpts.scales.y.beginAtZero = true;
+                    tufteOpts.plugins.tooltip.callbacks = {
+                        label: ctx => ' $' + ctx.parsed.y.toFixed(2)
+                    };
+
+                    historyChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: data.labels,
+                            datasets: [{
+                                label: 'Daily Spend ($)',
+                                data: data.data,
+                                borderColor: '#3b82f6',
+                                backgroundColor: 'rgba(59,130,246,0.06)',
+                                tension: 0.3,
+                                fill: true,
+                                borderWidth: 1.5,
+                                pointRadius: 0,
+                                pointHoverRadius: 4
+                            }]
+                        },
+                        options: tufteOpts
+                    });
+                });
+        }
+
+        let _storeHistoryOpener = null;
+        function closeStoreHistory() {
+            document.getElementById('store-history-modal').classList.add('hidden');
+            if (_storeHistoryOpener) { _storeHistoryOpener.focus(); _storeHistoryOpener = null; }
+        }
+
+        // --- Category-Store Drilldown Functions ---
+        function showCategoryStoreDrilldown(categoryId, storeId, categoryName, storeName) {
+            const titleEl = document.getElementById('drilldown-modal-title');
+            const subtitleEl = document.getElementById('drilldown-modal-subtitle');
+            if (titleEl) titleEl.textContent = categoryName;
+            if (subtitleEl) subtitleEl.textContent = 'Purchase history at ' + storeName;
+
+            document.getElementById('category-store-modal').classList.remove('hidden');
+            _drilldownOpener = document.activeElement;
+            requestAnimationFrame(() => {
+                const modal = document.getElementById('category-store-modal');
+                const first = modal.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+                if (first) first.focus();
+            });
+
+            // Show loading state in content area
+            document.getElementById('drilldown-modal-content').innerHTML = `
+                <div class="flex flex-col items-center justify-center h-64 space-y-4">
+                    <div class="animate-spin rounded-full h-10 w-10 border-4 border-indigo-500 border-t-transparent shadow-indigo"></div>
+                    <span class="text-sm font-bold text-textSubtle uppercase tracking-widest animate-pulse">Loading data...</span>
+                </div>
+            `;
+
+            // Use HTMX to load content
+            htmx.ajax('GET', `/api/analytics/drilldown/category-store/${categoryId}/${storeId}`, {
+                target: '#drilldown-modal-content',
+                swap: 'innerHTML'
+            });
+        }
+
+        let _drilldownOpener = null;
+        function closeCategoryStoreDrilldown() {
+            document.getElementById('category-store-modal').classList.add('hidden');
+            if (_drilldownOpener) { _drilldownOpener.focus(); _drilldownOpener = null; }
+        }
+
+        // Close modals on escape key
+        document.addEventListener('keydown', function (event) {
+            if (event.key === "Escape") {
+                closeStoreHistory();
+                closeCategoryStoreDrilldown();
+            }
+        });
+
+
+        // --- Category Trends Chart ---
+        function initTrendsChart() {
+            fetch('/api/analytics/sub-category-trends')
+                .then(response => response.json())
+                .then(data => {
+                    const loader = document.getElementById('trendsLoadingIndicator');
+                    if (loader) loader.style.display = 'none';
+
+                    if (!data.labels || data.labels.length === 0) return;
+
+                    const ctx = document.getElementById('categoryTrendsChart').getContext('2d');
+                    const colors = [
+                        '#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899'
+                    ];
+
+                    const datasets = data.datasets.map((ds, idx) => ({
+                        ...ds,
+                        borderColor: colors[idx % colors.length],
+                        backgroundColor: 'transparent',
+                        tension: 0.3,
+                        pointRadius: 0,
+                        pointHoverRadius: 3,
+                        borderWidth: 1.5,
+                        fill: false
+                    }));
+
+                    const opts = getTufteDefaults();
+                    opts.scales.y.beginAtZero = true;
+                    opts.plugins.tooltip = {
+                        ...opts.plugins.tooltip,
+                        mode: 'index',
+                        intersect: false,
+                        displayColors: true,
+                        callbacks: { label: ctx => ' $' + ctx.parsed.y.toFixed(2) }
+                    };
+                    opts.plugins.legend.display = false;
+
+                    new Chart(ctx, {
+                        type: 'line',
+                        data: { labels: data.labels, datasets: datasets },
+                        options: opts
+                    });
+
+                    // Build Custom Legend
+                    const legendEl = document.getElementById('trends-legend');
+                    if (legendEl) {
+                        legendEl.innerHTML = datasets.map(ds => {
+                            const total = ds.data.reduce((a, b) => a + b, 0);
+                            return `
+                                <div class="flex items-center justify-between text-sm">
+                                    <div class="flex items-center">
+                                        <span class="w-2 h-2 rounded-full mr-2 flex-shrink-0" style="background-color: ${ds.borderColor}"></span>
+                                        <span class="font-medium text-textMuted text-xs">${ds.label}</span>
+                                    </div>
+                                    <span class="text-xs font-mono text-textSubtle">$${total.toFixed(2)}</span>
+                                </div>
+                            `;
+                        }).join('');
+                    }
+                })
+                .catch(err => {
+                    console.error('Trends Error:', err);
+                    const loader = document.getElementById('trendsLoadingIndicator');
+                    if (loader) loader.innerHTML = '<span class="text-red-500 text-xs font-bold">Failed to load trends</span>';
+                });
+        }
+
+        // --- Shopping Basket Cost Over Time Chart ---
+        function initBasketChart() {
+            fetch('/api/analytics/basket-over-time?limit=10')
+                .then(response => {
+                    if (!response.ok) throw new Error('Network response was not ok');
+                    return response.json();
+                })
+                .then(data => {
+                    // Hide loading indicator
+                    const loader = document.getElementById('basketLoadingIndicator');
+                    if (loader) loader.style.display = 'none';
+
+                    if (!data.labels || data.labels.length === 0) {
+                        return; // No data yet
+                    }
+
+                    // Inject Basket Items
+                    const listEl = document.getElementById('basketItemsList');
+                    if (listEl && data.items) {
+                        listEl.innerHTML = data.items.map(item => `
+                            <span class="px-2.5 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-[10px] font-bold rounded-lg border border-indigo-100 dark:border-indigo-900/50">
+                                ${item}
+                            </span>
+                        `).join('');
+                    }
+
+                    const ctx = document.getElementById('basketOverTimeChart').getContext('2d');
+                    const bOpts = getTufteDefaults();
+                    bOpts.scales.y.ticks.callback = v => '$' + v;
+                    bOpts.plugins.tooltip.callbacks = { label: c => ' $' + c.parsed.y.toFixed(2) };
+                    new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: data.labels,
+                            datasets: [{
+                                label: 'Top 10 Items Basket Cost ($)',
+                                data: data.data,
+                                borderColor: '#6366f1',
+                                backgroundColor: 'rgba(99,102,241,0.07)',
+                                tension: 0.3,
+                                fill: true,
+                                borderWidth: 1.5,
+                                pointRadius: 0,
+                                pointHoverRadius: 4
+                            }]
+                        },
+                        options: bOpts
+                    });
+                })
+                .catch(error => {
+                    console.error('Error fetching basket data:', error);
+                    const loader = document.getElementById('basketLoadingIndicator');
+                    if (loader) {
+                        loader.innerHTML = '<span class="text-red-500 text-sm">Error loading data</span>';
+                    }
+                });
+        }
+
+        // --- Randomized Category Charts ---
+        function initRandomCategoryCharts() {
+            fetch('/api/analytics/random-category-item-trends')
+                .then(response => response.json())
+                .then(chartsData => {
+                    if (!chartsData || chartsData.length === 0) return;
+
+                    const colors = [
+                        '#6366f1', '#10b981', '#f59e0b', '#ef4444',
+                        '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16'
+                    ];
+
+                    chartsData.forEach((chart, chartIdx) => {
+                        const titleEl = document.getElementById(`random-title-${chartIdx}`);
+                        if (titleEl) titleEl.textContent = chart.category_name;
+
+                        const ctx = document.getElementById(`randomChart-${chartIdx}`).getContext('2d');
+
+                        const datasets = chart.datasets.map((ds, dsIdx) => ({
+                            ...ds,
+                            borderColor: colors[dsIdx % colors.length],
+                            backgroundColor: 'transparent',
+                            tension: 0.3,
+                            pointRadius: 0,
+                            pointHoverRadius: 3,
+                            borderWidth: 1.5,
+                            fill: false,
+                            spanGaps: true
+                        }));
+
+                        const rOpts = getTufteDefaults();
+                        rOpts.scales.y.ticks.callback = v => '$' + v.toFixed(2);
+                        rOpts.plugins.tooltip = {
+                            ...rOpts.plugins.tooltip,
+                            mode: 'index',
+                            intersect: false,
+                            displayColors: true,
+                            callbacks: {
+                                label: ctx => {
+                                    const lbl = ctx.dataset.label ? ctx.dataset.label + ': ' : '';
+                                    return lbl + '$' + ctx.parsed.y.toFixed(2);
+                                }
+                            }
+                        };
+
+                        new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: chart.labels.map(d => {
+                                    const date = new Date(d);
+                                    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                                }),
+                                datasets: datasets
+                            },
+                            options: rOpts
+                        });
+                    });
+                })
+                .catch(err => console.error('Random Charts Error:', err));
+        }
+
+        // --- Tufte Weekly Spending Chart ---
+        function initWeeklySpendingChart() {
+            fetch('/api/analytics/weekly-spending')
+                .then(response => response.json())
+                .then(data => {
+                    const ctx = document.getElementById('weeklySpendingChart').getContext('2d');
+                    new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: data.labels,
+                            datasets: [{
+                                data: data.data,
+                                backgroundColor: data.data.map((v, i) => i === data.data.length - 1 ? '#22c55e' : (document.documentElement.classList.contains('dark') ? '#4b5563' : '#e5e7eb')),
+                                hoverBackgroundColor: '#3b82f6',
+                                borderRadius: 0,
+                                barThickness: 'flex',
+                                categoryPercentage: 1.0,
+                                barPercentage: 0.85
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    backgroundColor: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
+                                    titleColor: document.documentElement.classList.contains('dark') ? '#ffffff' : '#111827',
+                                    bodyColor: document.documentElement.classList.contains('dark') ? '#9ca3af' : '#4b5563',
+                                    borderColor: document.documentElement.classList.contains('dark') ? '#374151' : '#e5e7eb',
+                                    borderWidth: 1,
+                                    displayColors: false,
+                                    callbacks: {
+                                        label: function(context) {
+                                            return '$' + context.parsed.y.toFixed(2);
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    grid: { display: false },
+                                    ticks: {
+                                        font: { size: 9, family: 'monospace' },
+                                        color: document.documentElement.classList.contains('dark') ? '#6b7280' : '#9ca3af',
+                                        maxRotation: 0,
+                                        autoSkip: false
+                                    },
+                                    border: { display: false }
+                                },
+                                y: {
+                                    display: false,
+                                    beginAtZero: true
+                                }
+                            },
+                            animation: false
+                        }
+                    });
+                })
+                .catch(err => console.error('Error fetching weekly spending:', err));
+        }
+
+        // --- Tufte Monthly Spending Chart ---
+        function initMonthlySpendingChart() {
+            fetch('/api/analytics/monthly-spending')
+                .then(response => response.json())
+                .then(data => {
+                    const ctx = document.getElementById('monthlySpendingChart').getContext('2d');
+                    new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: data.labels,
+                            datasets: [{
+                                data: data.data,
+                                backgroundColor: data.data.map((v, i) => i === data.data.length - 1 ? '#22c55e' : (document.documentElement.classList.contains('dark') ? '#4b5563' : '#e5e7eb')),
+                                hoverBackgroundColor: '#3b82f6',
+                                borderRadius: 0,
+                                barThickness: 'flex',
+                                categoryPercentage: 1.0,
+                                barPercentage: 0.85
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    backgroundColor: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
+                                    titleColor: document.documentElement.classList.contains('dark') ? '#ffffff' : '#111827',
+                                    bodyColor: document.documentElement.classList.contains('dark') ? '#9ca3af' : '#4b5563',
+                                    borderColor: document.documentElement.classList.contains('dark') ? '#374151' : '#e5e7eb',
+                                    borderWidth: 1,
+                                    displayColors: false,
+                                    callbacks: {
+                                        label: function(context) {
+                                            return '$' + context.parsed.y.toFixed(2);
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    grid: { display: false },
+                                    ticks: {
+                                        font: { size: 9, family: 'monospace' },
+                                        color: document.documentElement.classList.contains('dark') ? '#6b7280' : '#9ca3af',
+                                        maxRotation: 0,
+                                        autoSkip: false
+                                    },
+                                    border: { display: false }
+                                },
+                                y: {
+                                    display: false,
+                                    beginAtZero: true
+                                }
+                            },
+                            animation: false
+                        }
+                    });
+                })
+                .catch(err => console.error('Error fetching monthly spending:', err));
+        }
+
+        // Initialize when DOM is ready
+        // ── BI Section Data (synthetic — wire to live API endpoints to ship) ──
+        const BI_MACRO = [
+          { label: 'Protein-dominant foods', color: '#10b981', pct: 18, spend: 87.72, examples: 'Eggs, Greek Yogurt, Chicken' },
+          { label: 'Carb-dominant foods',    color: '#f59e0b', pct: 29, spend: 141.32, examples: 'Bread, Rice, Pasta, Fruit' },
+          { label: 'Fat-dominant foods',     color: '#3b82f6', pct: 16, spend: 77.97,  examples: 'Cheese, Nuts, Olive Oil' },
+          { label: 'Mixed macro foods',      color: '#8b5cf6', pct: 21, spend: 102.34, examples: 'Avocado, Whole Milk, Salmon' },
+          { label: 'Non-nutritive / Other',  color: '#6b7280', pct: 16, spend: 77.97,  examples: 'Coffee, Spices, Paper Goods' },
+        ];
+        const BI_ROI = [
+          { name: 'Eggs (Costco)',          cpp: 0.08 },
+          { name: 'Chicken Breast',         cpp: 0.11 },
+          { name: 'Greek Yogurt',           cpp: 0.13 },
+          { name: 'Canned Tuna',            cpp: 0.14 },
+          { name: 'Black Beans',            cpp: 0.15 },
+          { name: 'Whole Milk',             cpp: 0.22 },
+          { name: 'Salmon (WF)',            cpp: 0.29 },
+          { name: 'Cheese (Sharp Cheddar)', cpp: 0.34 },
+          { name: 'Protein Bar (iHerb)',    cpp: 0.41 },
+        ];
+        const BI_WEEKS   = ['W1','W2','W3','W4','W5','W6','W7','W8','W9','W10','W11','W12'];
+        const BI_SPEND   = [98,112,87,145,93,108,121,89,134,97,115,103];
+        const BI_PROTEIN = [310,295,340,260,380,315,290,405,270,350,320,295];
+        const BI_CATS = [
+          { name: 'Dairy & Eggs',    cpp: 0.13, cpc: 0.02, cpcal: 0.006, spend: 82 },
+          { name: 'Meat & Seafood',  cpp: 0.20, cpc: 0.08, cpcal: 0.008, spend: 95 },
+          { name: 'Produce',         cpp: 0.55, cpc: 0.03, cpcal: 0.018, spend: 68 },
+          { name: 'Grains & Bakery', cpp: 0.80, cpc: 0.01, cpcal: 0.003, spend: 54 },
+          { name: 'Snacks',          cpp: 0.45, cpc: 0.04, cpcal: 0.009, spend: 41 },
+          { name: 'Beverages',       cpp: 1.20, cpc: 0.06, cpcal: 0.014, spend: 37 },
+          { name: 'Supplements',     cpp: 0.35, cpc: null,  cpcal: 0.040, spend: 62 },
+          { name: 'Pantry',          cpp: 0.90, cpc: 0.02, cpcal: 0.005, spend: 48 },
+        ];
+        const BI_STORES = [
+          { name: 'Whole Foods',  protein:[42,38,51,35,48,40,36,53,39,44,41,38], fat:[55,60,48,65,52,58,62,46,61,54,57,59] },
+          { name: 'Costco',       protein:[85,90,78,95,88,82,91,76,93,87,84,89], fat:[72,68,80,65,75,70,67,82,64,74,71,69] },
+          { name: 'Amazon Fresh', protein:[28,32,25,35,30,27,33,24,36,29,31,26], fat:[35,38,32,40,36,34,39,31,41,37,35,33] },
+          { name: 'iHerb',        protein:[18,15,21,14,19,17,16,22,13,20,18,15], fat:[10,12,9,13,11,10,12,8,14,11,10,12]  },
+        ];
+        const BI_BULLETS = [
+          { cat: 'Groceries (Total)', budget: 500, actual: 487, good: 450 },
+          { cat: 'Meat & Seafood',    budget: 100, actual: 95,  good: 80  },
+          { cat: 'Supplements',       budget: 50,  actual: 62,  good: 45  },
+          { cat: 'Snacks',            budget: 40,  actual: 41,  good: 30  },
+          { cat: 'Beverages',         budget: 35,  actual: 37,  good: 25  },
+        ];
+        const BI_BASKET_COLORS = ['#6366f1','#10b981','#f59e0b','#3b82f6','#ef4444','#8b5cf6','#14b8a6','#f97316'];
+
+        function biHeat(val, lo, hi) {
+          const t = Math.min(1, Math.max(0, (val - lo) / (hi - lo)));
+          return `rgba(${Math.round(16+t*223)},${Math.round(185-t*117)},${Math.round(129-t*61)},0.18)`;
+        }
+
+        function initBISection() {
+          // Macro rows (now handled by Alpine.js)
+
+          // Protein ROI bars (now handled by Alpine.js)
+          // Efficiency table (now handled by Alpine.js)
+
+          // Basket donut
+          const basketCtx = document.getElementById('dash-basket');
+          if (basketCtx) new Chart(basketCtx.getContext('2d'), {
+            type:'doughnut',
+            data:{ labels: BI_CATS.map(c=>c.name), datasets:[{ data: BI_CATS.map(c=>c.spend), backgroundColor: BI_BASKET_COLORS, borderWidth:0, hoverOffset:4 }] },
+            options:{ responsive:true, maintainAspectRatio:false, cutout:'68%', plugins:{ legend:{ position:'bottom', labels:{ color:isDark()?'#9ca3af':'#6b7280', font:{size:9}, usePointStyle:true, boxWidth:6, padding:8 } } } }
+          });
+
+          // Small multiples
+          const smEl = document.getElementById('dash-small-multiples');
+          if (smEl) BI_STORES.forEach(s => {
+            const col = document.createElement('div');
+            col.className = 'space-y-1';
+            const safeId = s.name.replace(/\s+/g,'-');
+            col.innerHTML = `<div class="flex justify-between items-baseline">
+              <span class="text-xs font-bold text-textBase">${s.name}</span>
+              <span class="text-[9px] font-mono text-textSubtle">g/wk</span>
+            </div>
+            <div class="h-14 w-full"><canvas id="dash-sm-${safeId}"></canvas></div>
+            <div class="flex gap-3 text-[9px] text-textSubtle"><span><span class="text-emerald-500">●</span> Protein</span><span><span class="text-amber-500">●</span> Fat</span></div>`;
+            smEl.appendChild(col);
+            new Chart(document.getElementById(`dash-sm-${safeId}`).getContext('2d'), {
+              type:'line',
+              data:{ labels:BI_WEEKS, datasets:[
+                { data:s.protein, borderColor:'#10b981', borderWidth:1.5, pointRadius:0, tension:0.3, fill:false },
+                { data:s.fat,     borderColor:'#f59e0b', borderWidth:1.5, pointRadius:0, tension:0.3, fill:false }
+              ]},
+              options:{ responsive:true, maintainAspectRatio:false, scales:{x:{display:false},y:{display:false}}, plugins:{legend:{display:false},tooltip:{enabled:false}} }
+            });
+          });
+
+          // Bullet charts
+          const bulEl = document.getElementById('dash-bullets');
+          if (bulEl) {
+            BI_BULLETS.forEach(b => {
+              const actualPct = (b.actual / b.budget) * 100;
+              const goodPct   = (b.good   / b.budget) * 100;
+              const over = b.actual > b.budget;
+              const d = document.createElement('div');
+              d.className = 'flex items-center gap-4';
+              d.innerHTML = `<span class="w-36 text-xs font-medium text-textMuted text-right flex-shrink-0">${b.cat}</span>
+                <div class="flex-1 relative h-5 flex items-center">
+                  <div class="absolute inset-0 rounded bg-bgSkeleton"></div>
+                  <div class="absolute left-0 h-full rounded bg-bgHover" style="width:${goodPct}%"></div>
+                  <div class="absolute top-1 bottom-1 rounded ${over?'bg-red-500':'bg-textBase'}" style="width:${Math.min(actualPct,110)}%"></div>
+                  <div class="absolute top-0 bottom-0 w-[2px] bg-red-600 z-20" style="left:100%"></div>
+                </div>
+                <div class="w-24 flex-shrink-0 flex gap-2 text-xs font-mono">
+                  <span class="${over?'text-red-400':'text-emerald-500'}">$${b.actual}</span>
+                  <span class="text-textSubtle">/ $${b.budget}</span>
+                </div>`;
+              bulEl.appendChild(d);
+            });
+            const leg = document.createElement('div');
+            leg.className = 'flex gap-6 text-[10px] text-textSubtle mt-2 pl-40';
+            leg.innerHTML = `<span><span class="inline-block w-3 h-1 bg-bgSkeleton rounded mr-1"></span>Poor</span><span><span class="inline-block w-3 h-1 bg-bgHover rounded mr-1"></span>Satisfactory</span><span><span class="inline-block w-3 h-2 bg-textBase rounded mr-1"></span>Actual</span><span><span class="inline-block w-0.5 h-3 bg-red-600 mr-1"></span>Budget cap</span>`;
+            bulEl.appendChild(leg);
+          }
+        }
+        // ── End BI init ─────────────────────────────────────────────────────────
+
+        document.addEventListener('DOMContentLoaded', () => {
+             initBISection();
+             initRandomCategoryCharts();
+             initWeeklySpendingChart();
+             initMonthlySpendingChart();
+        });
+
+    </script>
+</div>
+{% endblock %}

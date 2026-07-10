@@ -1,0 +1,107 @@
+{% extends "layouts/base.html" %}
+{% block title %}Search: "{{ query }}" — Grocery Tracker{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-8">
+
+    <!-- Header -->
+    <div class="mb-8">
+        <h1 class="text-2xl font-bold text-textBase mb-1">
+            {% if query %}Search results for <span class="text-indigo-400">"{{ query }}"</span>
+            {% else %}Search{% endif %}
+        </h1>
+        <p class="text-sm text-textMuted">{{ results|length }} item{% if results|length != 1 %}s{% endif %} found</p>
+    </div>
+
+    <!-- Search bar (re-search from page) -->
+    <form method="get" action="/search" class="mb-8 flex gap-3">
+        <input type="text" name="q" value="{{ query }}" autofocus
+               placeholder="Search items..."
+               class="flex-1 px-4 py-2.5 rounded-xl bg-bgCard border border-borderDefault text-sm text-textBase placeholder-textMuted focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
+        <button type="submit"
+                class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-colors">
+            Search
+        </button>
+    </form>
+
+    {% if not query %}
+    <!-- Empty prompt state -->
+    <div class="text-center py-20 text-textMuted">
+        <div class="text-5xl mb-4">🔍</div>
+        <p class="text-lg font-medium">Type something to search your items</p>
+    </div>
+
+    {% elif not results %}
+    <!-- No results state -->
+    <div class="rounded-2xl border border-borderDefault bg-bgCard p-12 text-center">
+        <div class="text-4xl mb-4">😶</div>
+        <h2 class="text-xl font-semibold text-textBase mb-2">No items found</h2>
+        <p class="text-sm text-textMuted">No items match <strong>"{{ query }}"</strong> in your purchase history.</p>
+    </div>
+
+    {% else %}
+    <!-- Results table -->
+    <div class="rounded-2xl border border-borderDefault bg-bgCard overflow-hidden">
+        <div class="divide-y divide-borderDefault">
+            {% for r in results %}
+            {% set item = r.item %}
+            <a href="/items/{{ item.id }}/insights"
+               class="flex items-center gap-4 px-5 py-4 hover:bg-bgMain transition-colors group">
+
+                <!-- Category icon -->
+                <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-lg">
+                    {% if item.category and item.category.name %}
+                        {% set cat = item.category.name | lower %}
+                        {% if 'produce' in cat or 'fruit' in cat or 'veg' in cat %}🥦
+                        {% elif 'dairy' in cat %}🥛
+                        {% elif 'meat' in cat or 'seafood' in cat or 'fish' in cat %}🥩
+                        {% elif 'snack' in cat or 'chip' in cat %}🍿
+                        {% elif 'bev' in cat or 'drink' in cat %}🥤
+                        {% elif 'bread' in cat or 'bak' in cat %}🍞
+                        {% elif 'frozen' in cat %}🧊
+                        {% else %}🛒
+                        {% endif %}
+                    {% else %}🛒{% endif %}
+                </div>
+
+                <!-- Name & category -->
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-semibold text-textBase group-hover:text-indigo-400 transition-colors truncate">
+                        {{ item.name }}
+                    </p>
+                    {% if item.category %}
+                    <p class="text-xs text-textMuted mt-0.5">{{ item.category.name }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- Last purchase info -->
+                <div class="hidden sm:flex flex-col items-end gap-0.5 flex-shrink-0 text-right">
+                    {% if r.last_price is not none %}
+                    <span class="text-sm font-bold text-emerald-400">${{ "%.2f"|format(r.last_price) }}</span>
+                    {% else %}
+                    <span class="text-sm text-textMuted">—</span>
+                    {% endif %}
+                    {% if r.last_store %}
+                    <span class="text-xs text-textMuted truncate max-w-[140px]">{{ r.last_store }}</span>
+                    {% endif %}
+                    {% if r.last_date %}
+                    <span class="text-xs text-textMuted">
+                        {% set d = r.last_date %}
+                        {% if d is string %}{{ d[:10] }}{% else %}{{ d.strftime('%b %-d, %Y') }}{% endif %}
+                    </span>
+                    {% endif %}
+                </div>
+
+                <!-- Arrow -->
+                <svg class="w-4 h-4 text-textMuted opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 hidden sm:block"
+                     fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

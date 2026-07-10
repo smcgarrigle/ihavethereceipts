@@ -1,0 +1,180 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Style Guide - Grocery Price Tracker{% endblock %}
+
+{% block content %}
+<div class="space-y-12">
+
+    <div>
+        <h1 class="text-3xl font-bold text-textBase flex items-center gap-3">
+            <span class="text-2xl">🎨</span> STYLE GUIDE
+        </h1>
+        <p class="text-textMuted text-sm mt-2">
+            Living catalog of design tokens and shared UI patterns. Use the theme toggle in the
+            header to preview every section across Light, Dark, Forest, and Sunset.
+        </p>
+    </div>
+
+    <!-- Color Tokens -->
+    <section class="bg-bgCard rounded-2xl shadow border border-borderDefault p-6 space-y-4">
+        <h2 class="text-xl font-bold text-textBase">Color Tokens</h2>
+        <p class="text-textMuted text-sm">
+            CSS custom properties defined in <code class="bg-bgSkeleton px-1.5 py-0.5 rounded text-xs">themes.css</code>,
+            mapped to Tailwind utilities (<code class="bg-bgSkeleton px-1.5 py-0.5 rounded text-xs">bg-bgCard</code>,
+            <code class="bg-bgSkeleton px-1.5 py-0.5 rounded text-xs">text-textMuted</code>, etc). Swatches reflect the
+            active theme live.
+        </p>
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            {% for label, var in [
+                ('bg-main', '--bg-main'), ('bg-card', '--bg-card'), ('bg-hover', '--bg-hover'),
+                ('bg-input', '--bg-input'), ('bg-skeleton', '--bg-skeleton'), ('bg-overlay', '--bg-overlay'),
+                ('text-base', '--text-base'), ('text-muted', '--text-muted'), ('text-subtle', '--text-subtle'),
+                ('border-default', '--border-default'), ('border-light', '--border-light'), ('border-input', '--border-input')
+            ] %}
+            <div class="space-y-1.5">
+                <div class="h-14 rounded-lg border border-borderDefault" style="background-color: var({{ var }});"></div>
+                <div class="text-xs font-mono text-textMuted">{{ var }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <!-- Typography -->
+    <section class="bg-bgCard rounded-2xl shadow border border-borderDefault p-6 space-y-4">
+        <h2 class="text-xl font-bold text-textBase">Typography</h2>
+        <div class="space-y-2">
+            <h1 class="text-3xl font-bold text-textBase">Heading 1 — text-3xl font-bold text-textBase</h1>
+            <h2 class="text-xl font-bold text-textBase">Heading 2 — text-xl font-bold text-textBase</h2>
+            <h3 class="text-lg font-semibold text-textBase">Heading 3 — text-lg font-semibold text-textBase</h3>
+            <p class="text-textBase">Body text — text-textBase</p>
+            <p class="text-textMuted text-sm">Muted / secondary text — text-textMuted text-sm</p>
+            <p class="text-textSubtle text-sm">Subtle / placeholder text — text-textSubtle text-sm</p>
+            <p class="font-mono text-xs bg-bgSkeleton inline-block px-1.5 py-0.5 rounded text-textBase">Monospace tag — font-mono text-xs bg-bgSkeleton</p>
+        </div>
+    </section>
+
+    <!-- Buttons -->
+    <section class="bg-bgCard rounded-2xl shadow border border-borderDefault p-6 space-y-4">
+        <h2 class="text-xl font-bold text-textBase">Buttons</h2>
+        <div class="flex flex-wrap gap-3 items-center">
+            <button class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium">Primary</button>
+            <button class="px-4 py-2 bg-bgInput text-textBase border border-borderInput rounded-lg hover:bg-bgHover transition text-sm font-medium">Secondary</button>
+            <button class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm font-medium">Danger</button>
+            <button class="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold rounded-xl transition shadow-lg shadow-blue-600/20">Emphasis (shadowed)</button>
+            <button disabled class="px-4 py-2 bg-bgSkeleton text-textSubtle rounded-lg text-sm font-medium cursor-not-allowed">Disabled</button>
+            <button class="text-sm text-textMuted hover:text-textBase transition-colors">Text link</button>
+        </div>
+    </section>
+
+    <!-- Form Controls -->
+    <section class="bg-bgCard rounded-2xl shadow border border-borderDefault p-6 space-y-4">
+        <h2 class="text-xl font-bold text-textBase">Form Controls</h2>
+        <div class="grid sm:grid-cols-2 gap-4 max-w-2xl">
+            <div class="space-y-1.5">
+                <label class="text-xs font-medium text-textMuted">Text input</label>
+                <input type="text" placeholder="Search items…"
+                       class="w-full bg-bgInput text-textBase border border-borderInput rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            </div>
+            <div class="space-y-1.5">
+                <label class="text-xs font-medium text-textMuted">Select</label>
+                <select class="w-full bg-bgSkeleton text-textBase rounded-lg px-3 py-2 text-sm border-none focus:ring-2 focus:ring-blue-500 font-medium">
+                    <option>Last 3 Months</option>
+                    <option selected>Last 6 Months</option>
+                    <option>Last 1 Year</option>
+                    <option>All Time</option>
+                </select>
+            </div>
+            <div class="flex items-center gap-2">
+                <input type="checkbox" id="sg-checkbox" checked class="rounded border-borderInput text-blue-600 focus:ring-blue-500">
+                <label for="sg-checkbox" class="text-sm text-textBase">Checkbox label</label>
+            </div>
+            <div class="flex items-center gap-2">
+                <input type="radio" id="sg-radio" name="sg-radio" checked class="border-borderInput text-blue-600 focus:ring-blue-500">
+                <label for="sg-radio" class="text-sm text-textBase">Radio label</label>
+            </div>
+        </div>
+    </section>
+
+    <!-- Surfaces: Cards, Badges, Skeletons -->
+    <section class="bg-bgCard rounded-2xl shadow border border-borderDefault p-6 space-y-6">
+        <h2 class="text-xl font-bold text-textBase">Surfaces &amp; Indicators</h2>
+
+        <div>
+            <h3 class="text-sm font-semibold text-textMuted mb-2">Cards</h3>
+            <div class="grid sm:grid-cols-2 gap-4">
+                <div class="bg-bgCard rounded-xl shadow border border-borderDefault p-4">
+                    <div class="font-bold text-textBase">Standard card</div>
+                    <p class="text-textMuted text-sm mt-1">bg-bgCard rounded-xl shadow border border-borderDefault</p>
+                </div>
+                <div class="bg-bgHover rounded-xl border border-borderLight p-4">
+                    <div class="font-bold text-textBase">Inset / hover surface</div>
+                    <p class="text-textMuted text-sm mt-1">bg-bgHover rounded-xl border border-borderLight</p>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <h3 class="text-sm font-semibold text-textMuted mb-2">Badges</h3>
+            <div class="flex flex-wrap gap-2">
+                <span class="debug-badge">debug-badge</span>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300">Success</span>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">Warning</span>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300">Error</span>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">Info</span>
+            </div>
+        </div>
+
+        <div>
+            <h3 class="text-sm font-semibold text-textMuted mb-2">Skeleton loaders</h3>
+            <div class="space-y-2 max-w-md">
+                <div class="skeleton h-4 w-3/4"></div>
+                <div class="skeleton h-4 w-1/2"></div>
+                <div class="skeleton h-20 w-full"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Toast -->
+    <section class="bg-bgCard rounded-2xl shadow border border-borderDefault p-6 space-y-4">
+        <h2 class="text-xl font-bold text-textBase">Toast Notification</h2>
+        <p class="text-textMuted text-sm">
+            Floating bottom-island toast (<code class="bg-bgSkeleton px-1.5 py-0.5 rounded text-xs">toast.css</code>),
+            driven by <code class="bg-bgSkeleton px-1.5 py-0.5 rounded text-xs">process-start</code> /
+            <code class="bg-bgSkeleton px-1.5 py-0.5 rounded text-xs">process-end</code> window events from the base layout.
+        </p>
+        <button
+            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium"
+            onclick="window.dispatchEvent(new CustomEvent('process-start', { detail: { message: 'Style guide demo toast…' } }));
+                     setTimeout(() => window.dispatchEvent(new CustomEvent('process-end')), 2000);">
+            Trigger demo toast
+        </button>
+    </section>
+
+    <!-- Live Fragment Previews -->
+    <section class="bg-bgCard rounded-2xl shadow border border-borderDefault p-6 space-y-4">
+        <h2 class="text-xl font-bold text-textBase">Live Fragment Previews</h2>
+        <p class="text-textMuted text-sm">
+            Real HTMX fragment templates rendered with sample data, so layout regressions surface here
+            before they reach a real page.
+        </p>
+        {% set stores = ['Whole Foods', 'Trader Joe\'s', 'Costco'] %}
+        {% set items = [
+            {'item_id': 1, 'item_name': 'Organic Bananas', 'category': 'Produce', 'avg_interval': 6, 'predicted_exhaustion': '2026-06-09', 'urgency': 'overdue',
+             'store_prices': [{'store': 'Whole Foods', 'price': 0.79}, {'store': 'Trader Joe\'s', 'price': 0.69}, {'store': 'Costco', 'price': 0.59}]},
+            {'item_id': 2, 'item_name': '2% Milk, 1 Gallon', 'category': 'Dairy', 'avg_interval': 9, 'predicted_exhaustion': '2026-06-12', 'urgency': 'high',
+             'store_prices': [{'store': 'Whole Foods', 'price': 4.29}, {'store': 'Costco', 'price': 3.49}]},
+            {'item_id': 3, 'item_name': 'Sourdough Bread Loaf', 'category': 'Bakery', 'avg_interval': 12, 'predicted_exhaustion': '2026-06-18', 'urgency': 'medium',
+             'store_prices': [{'store': 'Trader Joe\'s', 'price': 3.99}]},
+            {'item_id': 4, 'item_name': 'Olive Oil, 1L', 'category': 'Pantry', 'avg_interval': 45, 'predicted_exhaustion': '2026-07-20', 'urgency': 'low',
+             'store_prices': [{'store': 'Costco', 'price': 11.99}, {'store': 'Whole Foods', 'price': 14.49}]},
+        ] %}
+        <div>
+            <h3 class="text-sm font-semibold text-textMuted mb-2">fragments/restock_table.html</h3>
+            <div class="border border-borderDefault rounded-xl overflow-x-auto">
+                {% include "fragments/restock_table.html" %}
+            </div>
+        </div>
+    </section>
+
+</div>
+{% endblock %}

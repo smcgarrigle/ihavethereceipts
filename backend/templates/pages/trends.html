@@ -1,0 +1,954 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Spending Trends - Grocery Price Tracker{% endblock %}
+{% block extra_head %}
+<style>
+    .no-scrollbar::-webkit-scrollbar {
+        display: none;
+    }
+    .no-scrollbar {
+        -ms-overflow-style: none;  /* IE and Edge */
+        scrollbar-width: none;  /* Firefox */
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-12">
+    <!-- Restock Predictions Banner -->
+    <a href="/restock"
+       class="block bg-gradient-to-r from-orange-500/10 via-amber-500/10 to-yellow-500/10 dark:from-orange-500/20 dark:via-amber-500/20 dark:to-yellow-500/20 border border-orange-200 dark:border-orange-800/50 rounded-2xl p-4 hover:shadow-lg transition-all group">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <span class="text-2xl">🛒</span>
+                <div>
+                    <span class="font-bold text-textBase group-hover:text-orange-600 dark:group-hover:text-orange-400 transition">Restock Predictions</span>
+                    <span class="text-textMuted text-sm ml-2">See what's running low &amp; compare store prices</span>
+                </div>
+            </div>
+            <span class="text-textSubtle group-hover:text-orange-500 transition text-xl">→</span>
+        </div>
+    </a>
+
+
+    <!-- Global Chart Filters (HTMX) -->
+    <div class="bg-bgCard rounded-2xl shadow p-4 flex flex-col md:flex-row gap-4 justify-between items-center border border-borderDefault">
+        <div class="flex items-center gap-3">
+            <span class="text-2xl">⚙️</span>
+            <span class="font-bold text-textBase">Global Filters</span>
+        </div>
+        <form hx-get="/api/trends/fragment/all-charts" hx-target="#htmx-scripts" hx-trigger="change" class="flex flex-wrap gap-4 items-center">
+            <select name="time_range" class="bg-bgSkeleton text-textBase rounded-lg px-3 py-2 text-sm border-none focus:ring-2 focus:ring-blue-500 font-medium">
+                <option value="3m">Last 3 Months</option>
+                <option value="6m" selected>Last 6 Months</option>
+                <option value="year">Last 1 Year</option>
+                <option value="all">All Time</option>
+            </select>
+            <input type="hidden" name="usda_time_range" id="usda_time_range_input" value="6m">
+            <input type="hidden" name="nutrient_type" id="nutrient_type_input" value="sugar">
+        </form>
+    </div>
+
+    <div id="htmx-scripts"></div>
+
+
+    <!-- 1. Store Top Items Price Charts -->
+    <div class="space-y-6">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
+            <div>
+                <h1 class="text-3xl font-bold text-textBase flex items-center gap-3">
+                    <span class="text-2xl">📈</span> STORE PRICE TRENDS
+                </h1>
+                <p class="text-textMuted mt-1">Price volatility for your top 5 items at your most frequented stores</p>
+            </div>
+
+            <div class="flex bg-bgSkeleton rounded-lg p-1 overflow-x-auto max-w-full no-scrollbar">
+                <button onclick="setTimeRange('6m')" id="btn-6m" class="px-4 py-1.5 text-sm font-bold rounded-md bg-bgInput shadow-sm text-textBase transition-all whitespace-nowrap">6 Months</button>
+                <button onclick="setTimeRange('ytd')" id="btn-ytd" class="px-4 py-1.5 text-sm font-medium rounded-md text-textMuted hover:text-gray-900 dark:hover:text-white transition-all whitespace-nowrap">YTD</button>
+                <button onclick="setTimeRange('year')" id="btn-year" class="px-4 py-1.5 text-sm font-medium rounded-md text-textMuted hover:text-gray-900 dark:hover:text-white transition-all whitespace-nowrap">1 Year</button>
+                <button onclick="setTimeRange('all')" id="btn-all" class="px-4 py-1.5 text-sm font-medium rounded-md text-textMuted hover:text-gray-900 dark:hover:text-white transition-all whitespace-nowrap">All Time</button>
+            </div>
+        </div>
+
+        <!-- NUTRITIONAL ANALYTICS & MACRO PROFILE SECTION -->
+        <div class="space-y-8">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                    <h2 class="text-lg font-bold text-textBase flex items-center gap-2">
+                        <span class="text-lg">🧬</span> NUTRITIONAL PROFILE OF YOUR PURCHASES
+                    </h2>
+                    <p class="text-xs text-textMuted mt-1">What entered your kitchen — not necessarily what you ate. Based on items with nutrient data.</p>
+                </div>
+                <a href="/xray" id="nutrition-coverage-badge"
+                   class="hidden shrink-0 items-center gap-2 px-3 py-1.5 rounded-full border border-borderDefault bg-bgSkeleton text-xs font-semibold text-textMuted hover:text-textBase transition-colors"
+                   title="Share of spend in this time range backed by nutrient data. Click to match more items.">
+                    <span class="w-2 h-2 rounded-full" id="nutrition-coverage-dot"></span>
+                    <span id="nutrition-coverage-text"></span>
+                </a>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- Left: Macronutrient Caloric Profile -->
+                <div class="lg:col-span-2 bg-bgCard rounded-3xl shadow-xl p-6 border border-borderDefault flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-start mb-6">
+                            <div>
+                                <h3 class="text-xl font-bold text-textBase flex items-center gap-2">
+                                    <span class="text-xl">🥗</span> MACRONUTRIENT CALORIC PROFILE
+                                </h3>
+                                <p class="text-xs text-textMuted mt-1">Weekly calories purchased, structured by Fats, Sugars, and Proteins</p>
+                            </div>
+                        </div>
+
+                        <!-- Overall Split Segmented Bar -->
+                        <div class="mb-6 space-y-2">
+                            <span class="text-xs font-semibold text-textSubtle uppercase tracking-wider">Overall Caloric Contribution Split</span>
+                            <div class="h-4 w-full bg-bgSkeleton rounded-lg overflow-hidden flex font-mono text-[9px] text-white font-bold">
+                                <div id="cal-split-fat" class="bg-amber-500 h-full flex items-center justify-center transition-all duration-500" style="width: 0%">
+                                    <span id="cal-split-fat-text"></span>
+                                </div>
+                                <div id="cal-split-sugar" class="bg-blue-500 h-full flex items-center justify-center transition-all duration-500" style="width: 0%">
+                                    <span id="cal-split-sugar-text"></span>
+                                </div>
+                                <div id="cal-split-protein" class="bg-emerald-500 h-full flex items-center justify-center transition-all duration-500" style="width: 0%">
+                                    <span id="cal-split-protein-text"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="h-[280px] w-full relative">
+                            <canvas id="calorieProfileChart"
+                                    role="img"
+                                    aria-label="Macronutrient caloric profile stacked bar chart"
+                                    aria-describedby="calorieProfileChart-desc">
+                            </canvas>
+                            <p id="calorieProfileChart-desc" class="sr-only">Stacked bar chart showing weekly calories purchased broken down by fats, sugars, and proteins over the selected time period.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Daily average purchase density vs Daily Value -->
+                <div class="bg-bgCard rounded-3xl shadow-xl p-6 border border-borderDefault flex flex-col">
+                    <h3 class="text-lg font-bold text-textBase mb-2 flex items-center gap-2">
+                        <span class="text-lg">📊</span> DAILY PURCHASE DENSITY
+                    </h3>
+                    <p class="text-xs text-textMuted mb-6">Average daily nutrient mass purchased vs. Daily Reference Value (DV)</p>
+
+                    <div class="space-y-5 flex-1 flex flex-col justify-between">
+                        <!-- Fat -->
+                        <div class="space-y-1">
+                            <div class="flex justify-between text-xs font-semibold">
+                                <span class="text-textBase">Fat</span>
+                                <span class="text-textMuted"><span id="avg-fat" class="font-mono">0g</span> / <span id="ref-fat">78g</span></span>
+                            </div>
+                            <div class="relative w-full h-4 flex items-center">
+                                <div class="w-full bg-bgSkeleton h-2 rounded-full overflow-hidden relative">
+                                    <div id="bar-fat" class="h-2 bg-blue-500 transition-all duration-500" style="width: 0%"></div>
+                                </div>
+                                <!-- Target Tick -->
+                                <div id="target-fat" class="absolute top-0 bottom-0 w-[2px] bg-red-600 dark:bg-red-400 z-10" style="left: 66.7%"></div>
+                            </div>
+                        </div>
+
+                        <!-- Sugar -->
+                        <div class="space-y-1">
+                            <div class="flex justify-between text-xs font-semibold">
+                                <span class="text-textBase">Sugar</span>
+                                <span class="text-textMuted"><span id="avg-sugar" class="font-mono">0g</span> / <span id="ref-sugar">50g</span></span>
+                            </div>
+                            <div class="relative w-full h-4 flex items-center">
+                                <div class="w-full bg-bgSkeleton h-2 rounded-full overflow-hidden relative">
+                                    <div id="bar-sugar" class="h-2 bg-blue-500 transition-all duration-500" style="width: 0%"></div>
+                                </div>
+                                <div id="target-sugar" class="absolute top-0 bottom-0 w-[2px] bg-red-600 dark:bg-red-400 z-10" style="left: 66.7%"></div>
+                            </div>
+                        </div>
+
+                        <!-- Protein -->
+                        <div class="space-y-1">
+                            <div class="flex justify-between text-xs font-semibold">
+                                <span class="text-textBase">Protein</span>
+                                <span class="text-textMuted"><span id="avg-protein" class="font-mono">0g</span> / <span id="ref-protein">50g</span></span>
+                            </div>
+                            <div class="relative w-full h-4 flex items-center">
+                                <div class="w-full bg-bgSkeleton h-2 rounded-full overflow-hidden relative">
+                                    <div id="bar-protein" class="h-2 bg-emerald-500 transition-all duration-500" style="width: 0%"></div>
+                                </div>
+                                <div id="target-protein" class="absolute top-0 bottom-0 w-[2px] bg-red-600 dark:bg-red-400 z-10" style="left: 66.7%"></div>
+                            </div>
+                        </div>
+
+                        <!-- Sodium -->
+                        <div class="space-y-1">
+                            <div class="flex justify-between text-xs font-semibold">
+                                <span class="text-textBase">Sodium</span>
+                                <span class="text-textMuted"><span id="avg-sodium" class="font-mono">0mg</span> / <span id="ref-sodium">2300mg</span></span>
+                            </div>
+                            <div class="relative w-full h-4 flex items-center">
+                                <div class="w-full bg-bgSkeleton h-2 rounded-full overflow-hidden relative">
+                                    <div id="bar-sodium" class="h-2 bg-blue-500 transition-all duration-500" style="width: 0%"></div>
+                                </div>
+                                <div id="target-sodium" class="absolute top-0 bottom-0 w-[2px] bg-red-600 dark:bg-red-400 z-10" style="left: 66.7%"></div>
+                            </div>
+                        </div>
+
+                        <div class="mt-4 p-2 bg-bgSkeleton/40 rounded-xl text-[10px] text-textMuted text-center">
+                            Vertical line represents recommended Daily Value limit/target.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tufte Sparklines / Small Multiples -->
+            <div class="bg-bgCard rounded-3xl shadow-xl p-6 border border-borderDefault">
+                <h3 class="text-xs font-bold text-textSubtle uppercase tracking-wider mb-6">NUTRITION TREND SMALL MULTIPLES</h3>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+                    <!-- Sodium -->
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-baseline">
+                            <span class="text-xs font-semibold text-textBase">Sodium</span>
+                            <span class="text-[10px] text-textMuted uppercase font-mono">Weekly mg</span>
+                        </div>
+                        <div class="h-[60px] w-full">
+                            <canvas id="chart-sm-sodium" role="img" aria-label="Weekly sodium purchased sparkline"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Fat -->
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-baseline">
+                            <span class="text-xs font-semibold text-textBase">Total Fat</span>
+                            <span class="text-[10px] text-textMuted uppercase font-mono">Weekly g</span>
+                        </div>
+                        <div class="h-[60px] w-full">
+                            <canvas id="chart-sm-fat" role="img" aria-label="Weekly fat purchased sparkline"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Sugar -->
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-baseline">
+                            <span class="text-xs font-semibold text-textBase">Sugar</span>
+                            <span class="text-[10px] text-textMuted uppercase font-mono">Weekly g</span>
+                        </div>
+                        <div class="h-[60px] w-full">
+                            <canvas id="chart-sm-sugar" role="img" aria-label="Weekly sugar purchased sparkline"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Protein -->
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-baseline">
+                            <span class="text-xs font-semibold text-textBase">Protein</span>
+                            <span class="text-[10px] text-textMuted uppercase font-mono">Weekly g</span>
+                        </div>
+                        <div class="h-[60px] w-full">
+                            <canvas id="chart-sm-protein" role="img" aria-label="Weekly protein purchased sparkline"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Collapsible Detail: Product Contributor Breakdown -->
+            <div class="bg-bgCard rounded-3xl shadow-xl border border-borderDefault overflow-hidden" x-data="{ open: false }">
+                <button @click="open = !open" class="w-full px-6 py-4 flex justify-between items-center bg-bgSkeleton/20 hover:bg-bgSkeleton/40 transition-all">
+                    <span class="font-bold text-textBase flex items-center gap-2 text-sm">
+                        <span>🔍</span> Detail: Top Product Contributors
+                    </span>
+                    <span class="text-textSubtle text-xs" x-text="open ? 'Hide Detail ▲' : 'Show Detail ▼'"></span>
+                </button>
+                <div x-show="open" x-collapse class="p-6 border-t border-borderDefault" style="display: none;">
+                    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8" x-data="{ nutrient: 'sugar', percent: false }">
+                        <div>
+                            <h4 class="text-base font-bold text-textBase">Product Contribution Breakdown</h4>
+                            <p class="text-xs text-textMuted">Weekly purchased amounts by top contributing products for selected nutrient</p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-3">
+                            <div class="flex bg-bgSkeleton/50 rounded-xl p-1">
+                                <button @click="nutrient = 'sodium'; setNutrient('sodium')" :class="nutrient === 'sodium' ? 'bg-bgInput shadow-sm text-red-600' : 'text-textSubtle hover:text-textMuted'" class="px-3 py-1.5 text-xs font-bold rounded-lg transition-all">Sodium</button>
+                                <button @click="nutrient = 'fat'; setNutrient('fat')" :class="nutrient === 'fat' ? 'bg-bgInput shadow-sm text-amber-600' : 'text-textSubtle hover:text-textMuted'" class="px-3 py-1.5 text-xs font-bold rounded-lg transition-all">Fat</button>
+                                <button @click="nutrient = 'sugar'; setNutrient('sugar')" :class="nutrient === 'sugar' ? 'bg-bgInput shadow-sm text-blue-600' : 'text-textSubtle hover:text-textMuted'" class="px-3 py-1.5 text-xs font-bold rounded-lg transition-all">Sugar</button>
+                                <button @click="nutrient = 'protein'; setNutrient('protein')" :class="nutrient === 'protein' ? 'bg-bgInput shadow-sm text-emerald-600' : 'text-textSubtle hover:text-textMuted'" class="px-3 py-1.5 text-xs font-bold rounded-lg transition-all">Protein</button>
+                            </div>
+                            <button @click="percent = !percent; togglePercentMode(percent)" :class="percent ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-700/50 dark:text-gray-400'" class="px-3 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-2">
+                                <span x-text="percent ? '100% Stacked' : 'Absolute Mass'"></span>
+                                <span>🔄</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="h-[350px] w-full relative">
+                        <canvas id="nutritionChart"
+                                role="img"
+                                aria-label="Weekly nutrient purchases stacked bar chart"
+                                aria-describedby="nutritionChart-desc">
+                        </canvas>
+                        <p id="nutritionChart-desc" class="sr-only">Stacked bar chart showing weekly purchased amounts of the selected nutrient (sodium, fat, sugar, or protein) broken down by top contributing products.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8" id="storeChartsContainer">
+            <!-- Amazon Fresh -->
+            <div class="bg-bgCard rounded-3xl shadow-xl p-6 border border-borderDefault">
+                <h3 class="text-lg font-bold text-textBase mb-4 flex items-center gap-2">
+                    Amazon Fresh
+                </h3>
+                <div class="h-[300px] w-full relative">
+                    <canvas id="chart-amazon-fresh" role="img" aria-label="Amazon Fresh top item price trends line chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Amazon.com -->
+            <div class="bg-bgCard rounded-3xl shadow-xl p-6 border border-borderDefault">
+                <h3 class="text-lg font-bold text-textBase mb-4 flex items-center gap-2">
+                    Amazon.com
+                </h3>
+                <div class="h-[300px] w-full relative">
+                    <canvas id="chart-amazon-com" role="img" aria-label="Amazon.com top item price trends line chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Whole Foods Market -->
+            <div class="bg-bgCard rounded-3xl shadow-xl p-6 border border-borderDefault">
+                <h3 class="text-lg font-bold text-textBase mb-4 flex items-center gap-2">
+                    Whole Foods Market
+                </h3>
+                <div class="h-[300px] w-full relative">
+                    <canvas id="chart-wholefoods" role="img" aria-label="Whole Foods Market top item price trends line chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Costco -->
+            <div class="bg-bgCard rounded-3xl shadow-xl p-6 border border-borderDefault">
+                <h3 class="text-lg font-bold text-textBase mb-4 flex items-center gap-2">
+                    Costco
+                </h3>
+                <div class="h-[300px] w-full relative">
+                    <canvas id="chart-costco" role="img" aria-label="Costco top item price trends line chart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Low-Data Bootstrap Charts -->
+    <div class="space-y-6 pt-8 border-t border-borderDefault">
+        <div>
+            <h2 class="text-2xl font-bold text-textBase flex items-center gap-3">
+                <span class="text-2xl">📊</span> QUICK INSIGHTS
+            </h2>
+            <p class="text-textMuted mt-1">High-value visualizations that work with minimal data</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Basket Composition -->
+            <div class="bg-bgCard rounded-3xl shadow-xl p-6 border border-borderDefault">
+                <h3 class="text-lg font-bold text-textBase mb-4">Basket Spend Composition</h3>
+                <div class="h-[250px] w-full relative">
+                    <canvas id="chart-basket" role="img" aria-label="Basket spend composition donut chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Store-to-Store Diff -->
+            <div class="bg-bgCard rounded-3xl shadow-xl p-6 border border-borderDefault">
+                <h3 class="text-lg font-bold text-textBase mb-4">Identical Item Store Diff</h3>
+                <div class="h-[250px] w-full relative">
+                    <canvas id="chart-store-diff" role="img" aria-label="Identical item store price comparison bar chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Weekly Spend Trajectory -->
+            <div class="bg-bgCard rounded-3xl shadow-xl p-6 border border-borderDefault">
+                <h3 class="text-lg font-bold text-textBase mb-4">Weekly Spend Trajectory</h3>
+                <div class="h-[250px] w-full relative">
+                    <canvas id="chart-weekly-traj" role="img" aria-label="Weekly spend trajectory line chart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+
+
+    <!-- 3. USDA Product Types -->
+    <div class="space-y-6 pt-8 border-t border-borderDefault">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
+            <div>
+                <h2 class="text-2xl font-bold text-textBase flex items-center gap-3">
+                    <span class="text-2xl">🏷️</span> USDA PRODUCT TYPES
+                </h2>
+                <p class="text-textMuted mt-1">Household consumption by USDA food categories</p>
+            </div>
+
+            <div class="flex bg-bgSkeleton rounded-lg p-1 overflow-x-auto max-w-full no-scrollbar">
+                <button onclick="setUsdaTimeRange('3m')" id="btn-usda-3m" class="px-4 py-1.5 text-sm font-medium rounded-md text-textMuted hover:text-gray-900 dark:hover:text-white transition-all whitespace-nowrap">3 Months</button>
+                <button onclick="setUsdaTimeRange('6m')" id="btn-usda-6m" class="px-4 py-1.5 text-sm font-medium rounded-md text-textMuted hover:text-gray-900 dark:hover:text-white transition-all whitespace-nowrap">6 Months</button>
+                <button onclick="setUsdaTimeRange('year')" id="btn-usda-year" class="px-4 py-1.5 text-sm font-medium rounded-md text-textMuted hover:text-gray-900 dark:hover:text-white transition-all whitespace-nowrap">1 Year</button>
+                <button onclick="setUsdaTimeRange('all')" id="btn-usda-all" class="px-4 py-1.5 text-sm font-bold rounded-md bg-bgInput shadow-sm text-textBase transition-all whitespace-nowrap">All Time</button>
+            </div>
+        </div>
+
+        <div class="bg-bgCard rounded-lg shadow dark:shadow-gray-900/50 p-6 flex justify-center">
+            <div class="h-[400px] w-full max-w-[600px] relative">
+                <canvas id="usdaChart"
+                        role="img"
+                        aria-label="USDA product types donut chart"
+                        aria-describedby="usdaChart-desc">
+                </canvas>
+                <p id="usdaChart-desc" class="sr-only">Donut chart showing household consumption broken down by USDA food categories for the selected time period.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let nutritionChartInstance = null;
+    let calorieProfileChartInstance = null;
+
+    let storeChartInstances = {};
+    let smallMultipleInstances = {};
+    let usdaChartInstance = null;
+    let currentTimeRange = '6m';
+    let currentUsdaTimeRange = '6m';
+    let currentNutrient = 'sugar';
+    let isPercentMode = false;
+
+    let basketChartInstance = null;
+    let storeDiffChartInstance = null;
+    let weeklyTrajChartInstance = null;
+
+    function initBasketChart() {
+        const ctx = document.getElementById('chart-basket').getContext('2d');
+        basketChartInstance = new Chart(ctx, {
+            type: 'doughnut',
+            data: { labels: [], datasets: [] },
+            options: {
+                responsive: true, maintainAspectRatio: false, cutout: '65%',
+                plugins: {
+                    legend: { position: 'right', labels: { color: document.documentElement.classList.contains('dark') ? '#e5e7eb' : '#374151', font: { size: 10 }, usePointStyle: true, boxWidth: 6 } }
+                }
+            }
+        });
+    }
+
+    function initStoreDiffChart() {
+        const ctx = document.getElementById('chart-store-diff').getContext('2d');
+        storeDiffChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: { labels: [], datasets: [] },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: {
+                    x: { ticks: { color: '#9ca3af', font: { size: 10 } }, grid: { display: false } },
+                    y: { title: { display: true, text: 'Unit Price ($)', color: '#9ca3af' }, ticks: { color: '#9ca3af' }, grid: { color: document.documentElement.classList.contains('dark') ? '#374151' : '#e5e7eb' } }
+                },
+                plugins: {
+                    legend: { position: 'bottom', labels: { color: document.documentElement.classList.contains('dark') ? '#e5e7eb' : '#374151', font: { size: 10 }, usePointStyle: true } }
+                }
+            }
+        });
+    }
+
+    function initWeeklyTrajChart() {
+        const ctx = document.getElementById('chart-weekly-traj').getContext('2d');
+        weeklyTrajChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: { labels: [], datasets: [] },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: {
+                    x: { ticks: { color: '#9ca3af', font: { size: 10 } }, grid: { display: false } },
+                    y: { title: { display: true, text: 'Total ($)', color: '#9ca3af' }, ticks: { color: '#9ca3af' }, grid: { color: document.documentElement.classList.contains('dark') ? '#374151' : '#e5e7eb' } }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
+
+    function initCalorieProfileChart() {
+        const ctx = document.getElementById('calorieProfileChart').getContext('2d');
+        const isDark = document.documentElement.classList.contains('dark');
+
+        calorieProfileChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: { labels: [], datasets: [] },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        stacked: true,
+                        grid: { display: false },
+                        ticks: { color: '#9ca3af', font: { size: 9 } }
+                    },
+                    y: {
+                        stacked: true,
+                        grid: { color: isDark ? 'rgba(75, 85, 99, 0.2)' : 'rgba(229, 231, 235, 0.5)' },
+                        ticks: { color: '#9ca3af', font: { size: 9 } }
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ': ' + context.parsed.y.toFixed(0) + ' kcal';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function updateSmallMultiple(id, labels, data, label, unit, color) {
+        const canvas = document.getElementById(id);
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (smallMultipleInstances[id]) {
+            smallMultipleInstances[id].data.labels = labels;
+            smallMultipleInstances[id].data.datasets[0].data = data;
+            smallMultipleInstances[id].update();
+            return;
+        }
+
+        smallMultipleInstances[id] = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    borderColor: color,
+                    backgroundColor: color + '15',
+                    fill: true,
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    pointHoverRadius: 4,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { display: false },
+                    y: { display: false }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return label + ': ' + context.parsed.y + unit;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function updateAllCharts(data) {
+        if (data.nutrition) {
+            nutritionChartInstance.data.labels = data.nutrition.labels; nutritionChartInstance.data.datasets = data.nutrition.datasets;
+            nutritionChartInstance.options.scales.y.title.text = data.nutrition.unit === 'mg' ? 'Sodium (mg)' : `Mass (${data.nutrition.unit})`;
+            nutritionChartInstance.update();
+        }
+        if (data.usda) { usdaChartInstance.data.labels = data.usda.labels; usdaChartInstance.data.datasets = data.usda.datasets; usdaChartInstance.update(); }
+
+        if (data.store_fresh) { storeChartInstances['chart-amazon-fresh'].data.labels = data.store_fresh.labels; storeChartInstances['chart-amazon-fresh'].data.datasets = data.store_fresh.datasets; storeChartInstances['chart-amazon-fresh'].update(); }
+        if (data.store_com) { storeChartInstances['chart-amazon-com'].data.labels = data.store_com.labels; storeChartInstances['chart-amazon-com'].data.datasets = data.store_com.datasets; storeChartInstances['chart-amazon-com'].update(); }
+        if (data.store_wholefoods) { storeChartInstances['chart-wholefoods'].data.labels = data.store_wholefoods.labels; storeChartInstances['chart-wholefoods'].data.datasets = data.store_wholefoods.datasets; storeChartInstances['chart-wholefoods'].update(); }
+        if (data.store_costco) { storeChartInstances['chart-costco'].data.labels = data.store_costco.labels; storeChartInstances['chart-costco'].data.datasets = data.store_costco.datasets; storeChartInstances['chart-costco'].update(); }
+
+        if (data.basket) { basketChartInstance.data.labels = data.basket.labels; basketChartInstance.data.datasets = data.basket.datasets; basketChartInstance.update(); }
+        if (data.store_diff) { storeDiffChartInstance.data.labels = data.store_diff.labels; storeDiffChartInstance.data.datasets = data.store_diff.datasets; storeDiffChartInstance.update(); }
+        if (data.weekly_traj) { weeklyTrajChartInstance.data.labels = data.weekly_traj.labels; weeklyTrajChartInstance.data.datasets = data.weekly_traj.datasets; weeklyTrajChartInstance.update(); }
+
+        if (data.calorie_profile) {
+            calorieProfileChartInstance.data.labels = data.calorie_profile.labels;
+            calorieProfileChartInstance.data.datasets = data.calorie_profile.datasets;
+            calorieProfileChartInstance.update();
+        }
+
+        if (data.nutrition_multiples) {
+            const m = data.nutrition_multiples;
+            updateSmallMultiple('chart-sm-sodium', m.labels, m.sodium, 'Sodium', 'mg', '#ef4444');
+            updateSmallMultiple('chart-sm-fat', m.labels, m.fat, 'Fat', 'g', '#f59e0b');
+            updateSmallMultiple('chart-sm-sugar', m.labels, m.sugar, 'Sugar', 'g', '#3b82f6');
+            updateSmallMultiple('chart-sm-protein', m.labels, m.protein, 'Protein', 'g', '#10b981');
+        }
+
+        if (data.nutrition_density) {
+            const d = data.nutrition_density;
+            const fatPct = d.caloric_split.fat || 0;
+            const sugarPct = d.caloric_split.sugar || 0;
+            const proteinPct = d.caloric_split.protein || 0;
+
+            document.getElementById('cal-split-fat').style.width = `${fatPct}%`;
+            document.getElementById('cal-split-sugar').style.width = `${sugarPct}%`;
+            document.getElementById('cal-split-protein').style.width = `${proteinPct}%`;
+
+            document.getElementById('cal-split-fat-text').innerText = fatPct > 5 ? `${fatPct}% Fat` : '';
+            document.getElementById('cal-split-sugar-text').innerText = sugarPct > 5 ? `${sugarPct}% Sugar` : '';
+            document.getElementById('cal-split-protein-text').innerText = proteinPct > 5 ? `${proteinPct}% Protein` : '';
+
+            const nutrients = ['fat', 'sugar', 'protein', 'sodium'];
+            nutrients.forEach(n => {
+                const avg = d.averages[n] || 0;
+                const ref = d.references[n];
+                const unit = n === 'sodium' ? 'mg' : 'g';
+
+                document.getElementById(`avg-${n}`).innerText = avg.toFixed(1) + unit;
+                document.getElementById(`ref-${n}`).innerText = ref + unit;
+
+                const pctOfRef = ref > 0 ? (avg / ref) * 100 : 0;
+                const barWidth = Math.min(150, pctOfRef);
+                document.getElementById(`bar-${n}`).style.width = `${barWidth}%`;
+
+                const targetPos = 66.7; // (100 / 150) * 100
+                document.getElementById(`target-${n}`).style.left = `${targetPos}%`;
+
+                const fillBar = document.getElementById(`bar-${n}`);
+                if (n === 'protein') {
+                    fillBar.className = "h-2 rounded-l-md bg-emerald-500 transition-all duration-500";
+                } else {
+                    if (avg > ref) {
+                        fillBar.className = "h-2 rounded-l-md bg-red-500 transition-all duration-500";
+                    } else {
+                        fillBar.className = "h-2 rounded-l-md bg-blue-500 transition-all duration-500";
+                    }
+                }
+            });
+        }
+
+        if (data.nutrition_coverage) {
+            const c = data.nutrition_coverage;
+            const badge = document.getElementById('nutrition-coverage-badge');
+            const dot = document.getElementById('nutrition-coverage-dot');
+            const text = document.getElementById('nutrition-coverage-text');
+            if (badge && dot && text) {
+                text.innerText = `Based on ${c.spend_pct}% of spend (${c.covered_items}/${c.total_items} items)`;
+                dot.className = 'w-2 h-2 rounded-full ' +
+                    (c.spend_pct >= 60 ? 'bg-emerald-500' : c.spend_pct >= 30 ? 'bg-amber-500' : 'bg-red-500');
+                badge.classList.remove('hidden');
+                badge.classList.add('inline-flex');
+            }
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        initCalorieProfileChart();
+        initNutritionChart();
+        initStoreCharts();
+        initUsdaChart();
+        initBasketChart();
+        initStoreDiffChart();
+        initWeeklyTrajChart();
+        htmx.ajax("GET", "/api/trends/fragment/all-charts", {target: "#htmx-scripts"});
+    });
+
+    function setUsdaTimeRange(range) {
+        document.getElementById("usda_time_range_input").value = range;
+        htmx.trigger("form", "change");
+
+        currentUsdaTimeRange = range;
+
+        // Update button styles
+        const buttons = ['3m', '6m', 'year', 'all'];
+        buttons.forEach(b => {
+            const el = document.getElementById(`btn-usda-${b}`);
+            if (b === range) {
+                el.className = "px-4 py-1.5 text-sm font-bold rounded-md bg-bgInput shadow-sm text-textBase transition-all whitespace-nowrap";
+            } else {
+                el.className = "px-4 py-1.5 text-sm font-medium rounded-md text-textMuted hover:text-gray-900 dark:hover:text-white transition-all whitespace-nowrap";
+            }
+        });
+
+        }
+
+
+    function setTimeRange(range) {
+        document.querySelector("form select[name='time_range']").value = range;
+        htmx.trigger("form", "change");
+
+        currentTimeRange = range;
+
+        // Update button styles
+        const buttons = ['6m', 'ytd', 'year', 'all'];
+        buttons.forEach(b => {
+            const el = document.getElementById(`btn-${b}`);
+            if (b === range) {
+                el.className = "px-4 py-1.5 text-sm font-bold rounded-md bg-bgInput shadow-sm text-textBase transition-all whitespace-nowrap";
+            } else {
+                el.className = "px-4 py-1.5 text-sm font-medium rounded-md text-textMuted hover:text-gray-900 dark:hover:text-white transition-all whitespace-nowrap";
+            }
+        });
+
+        }
+
+
+    function setNutrient(nutrient) {
+        document.getElementById("nutrient_type_input").value = nutrient;
+        htmx.trigger("form", "change");
+
+        currentNutrient = nutrient;
+        }
+
+
+    function togglePercentMode(val) {
+        isPercentMode = val;
+        if (!nutritionChartInstance) return;
+
+        nutritionChartInstance.options.scales.y.stacked = true;
+        if (isPercentMode) {
+            nutritionChartInstance.options.scales.y.max = 100;
+            nutritionChartInstance.options.plugins.tooltip.callbacks.label = function(context) {
+                let label = context.dataset.label || '';
+                if (label) label += ': ';
+                if (context.parsed.y !== null) {
+                    label += context.parsed.y + '%';
+                }
+                return label;
+            };
+        } else {
+            delete nutritionChartInstance.options.scales.y.max;
+            nutritionChartInstance.options.plugins.tooltip.callbacks.label = null; // Revert to default
+        }
+
+        nutritionChartInstance.update();
+    }
+
+    function initNutritionChart() {
+        const ctx = document.getElementById('nutritionChart').getContext('2d');
+        const isDark = document.documentElement.classList.contains('dark');
+
+        nutritionChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: [],
+                datasets: []
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                scales: {
+                    x: {
+                        stacked: true,
+                        title: { display: true, text: 'Week', color: '#9ca3af' },
+                        grid: { color: isDark ? '#374151' : '#e5e7eb' },
+                        ticks: { color: '#9ca3af' }
+                    },
+                    y: {
+                        stacked: true,
+                        beginAtZero: true,
+                        title: { display: true, text: 'Grams (g)', color: '#9ca3af' },
+                        grid: { color: isDark ? '#374151' : '#e5e7eb' },
+                        ticks: { color: '#9ca3af' }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            color: isDark ? '#e5e7eb' : '#374151',
+                            usePointStyle: true,
+                            font: { size: 10 },
+                            padding: 20
+                        }
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false
+                    }
+                }
+            }
+        });
+    }
+
+
+
+    function initUsdaChart() {
+        const ctx = document.getElementById('usdaChart').getContext('2d');
+        usdaChartInstance = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: [],
+                datasets: []
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '65%',
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            color: document.documentElement.classList.contains('dark') ? '#e5e7eb' : '#374151',
+                            usePointStyle: true,
+                            font: { size: 12 },
+                            padding: 20
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed !== null) {
+                                    label += context.parsed + ' purchases';
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function initStoreChart(canvasId) {
+        const ctx = document.getElementById(canvasId).getContext('2d');
+        const isDark = document.documentElement.classList.contains('dark');
+
+        storeChartInstances[canvasId] = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: []
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        title: { display: true, text: 'Date (Weeks)', color: '#9ca3af' },
+                        grid: { color: isDark ? '#374151' : '#e5e7eb' },
+                        ticks: { color: '#9ca3af' }
+                    },
+                    y: {
+                        title: { display: true, text: 'Price (USD$)', color: '#9ca3af' },
+                        grid: { color: isDark ? '#374151' : '#e5e7eb' },
+                        ticks: {
+                            color: '#9ca3af',
+                            callback: function(value) {
+                                return '$' + value;
+                            }
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            color: isDark ? '#e5e7eb' : '#374151',
+                            usePointStyle: true,
+                            font: { size: 10 },
+                            boxWidth: 8
+                        }
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) label += ': ';
+                                if (context.parsed.y !== null) {
+                                    label += new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(context.parsed.y);
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function initStoreCharts() {
+        initStoreChart('chart-amazon-fresh');
+        initStoreChart('chart-amazon-com');
+        initStoreChart('chart-wholefoods');
+        initStoreChart('chart-costco');
+    }
+
+    async function loadStoreData(storeName, canvasId) {
+        try {
+            const response = await fetch(`/api/trends/store-top-items?store=${encodeURIComponent(storeName)}&time_range=${currentTimeRange}`);
+            const data = await response.json();
+
+            if (data && data.labels && data.datasets) {
+                const chart = storeChartInstances[canvasId];
+                chart.data.labels = data.labels;
+                chart.data.datasets = data.datasets;
+                chart.update();
+            }
+        } catch (error) {
+            console.error(`Error loading data for ${storeName}:`, error);
+        }
+    }
+
+    async function loadUsdaData() {
+        try {
+            const response = await fetch(`/api/trends/usda-product-types?time_range=${currentUsdaTimeRange}`);
+            const data = await response.json();
+
+            if (data && data.labels && data.datasets) {
+                usdaChartInstance.data.labels = data.labels;
+                usdaChartInstance.data.datasets = data.datasets;
+                usdaChartInstance.update();
+            }
+        } catch (error) {
+            console.error('Error loading USDA product types data:', error);
+        }
+    }
+
+    async function loadNutritionData() {
+        try {
+            const response = await fetch(`/api/trends/nutrition-trends?time_range=${currentTimeRange}&nutrient_type=${currentNutrient}`);
+            const data = await response.json();
+
+            if (data && data.labels && data.datasets) {
+                nutritionChartInstance.data.labels = data.labels;
+                nutritionChartInstance.data.datasets = data.datasets;
+
+                // Update axis title
+                nutritionChartInstance.options.scales.y.title.text = data.unit === 'mg' ? 'Sodium (mg)' : `Mass (${data.unit})`;
+
+                // Handle 100% mode if active
+                if (isPercentMode) {
+                    nutritionChartInstance.options.scales.y.max = 100;
+                } else {
+                    delete nutritionChartInstance.options.scales.y.max;
+                }
+
+                nutritionChartInstance.update();
+            }
+        } catch (error) {
+            console.error('Error loading nutrition trends data:', error);
+        }
+    }
+
+    async function loadAllTrendData() {
+        // Fetch Store Charts
+        await Promise.all([
+            loadStoreData('Amazon Fresh', 'chart-amazon-fresh'),
+            loadStoreData('Amazon.com', 'chart-amazon-com'),
+            loadStoreData('Whole Foods', 'chart-wholefoods'),
+            loadStoreData('Costco', 'chart-costco'),
+            loadNutritionData()
+        ]);
+
+
+    }
+</script>
+{% endblock %}

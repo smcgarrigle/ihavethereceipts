@@ -1,0 +1,401 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Receipts - Grocery Price Tracker{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div>
+        <h1 class="text-3xl font-bold text-textBase flex items-center">
+            Receipts
+            {% if ocr_usage is defined %}
+            <span class="debug-badge ml-4" title="Daily API Usage">
+                {{ ocr_model }} | Used: {{ ocr_usage }}
+            </span>
+            {% endif %}
+        </h1>
+        <p class="text-textMuted mt-1">Upload and manage your grocery receipts</p>
+    </div>
+
+    <!-- Upload Section -->
+    <div class="bg-bgCard rounded-lg shadow dark:shadow-gray-900/50 p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-semibold text-textBase">Upload Receipt</h2>
+            <div class="flex gap-2">
+                <a href="/receipts/bulk"
+                    class="text-sm px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded hover:bg-blue-200 dark:hover:bg-blue-900/50 transition flex items-center gap-1 no-underline font-medium">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                    </svg>
+                    Bulk Upload
+                </a>
+                <button @click="$dispatch('open-manual-modal')"
+                    class="text-sm px-3 py-1.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded hover:bg-green-200 dark:hover:bg-green-900/50 transition flex items-center gap-1 font-medium">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z">
+                        </path>
+                    </svg>
+                    Manual Entry
+                </button>
+                <div class="h-8 w-px bg-bgSkeleton mx-1"></div>
+                <div class="flex gap-1">
+                    <a href="/api/export/all/csv"
+                       class="text-xs px-2 py-1.5 bg-bgSkeleton text-textMuted rounded hover:bg-bgHover transition font-mono border border-borderDefault">CSV</a>
+                    <a href="/api/export/all/excel"
+                       class="text-xs px-2 py-1.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded hover:bg-green-200 dark:hover:bg-green-900/50 transition font-mono border border-green-200 dark:border-green-800">XLSX</a>
+                </div>
+            </div>
+        </div>
+
+        <form hx-post="/api/receipts/upload" hx-encoding="multipart/form-data" hx-target="#upload-result"
+            @submit="startProgress()" class="relative"
+            x-data="{
+                selectedFile: null,
+                uploading: false,
+                isDragging: false,
+                progress: 0,
+                progressInterval: null,
+                startProgress() {
+                    // Don't clear selectedFile immediately to keep UI state until process starts
+                    this.uploading = true;
+                    this.progress = 0;
+
+                    if (this.progressInterval) clearInterval(this.progressInterval);
+
+                    // 45 seconds to reach 100%
+                    // Update every 100ms = 450 steps
+                    // Increment = 100 / 450 = ~0.222
+                    this.progressInterval = setInterval(() => {
+                        if (this.progress < 100) {
+                            this.progress += (100 / 450);
+                        } else {
+                            clearInterval(this.progressInterval);
+                        }
+                    }, 100);
+                }
+            }"
+            @htmx:before-request="$dispatch('process-start', { message: 'Uploading and Processing Receipt...' })"
+            @htmx:after-request="uploading = false; if(progressInterval) clearInterval(progressInterval); progress = 100; selectedFile = null;">
+            <!-- Improved Drag & Drop Zone - ENTIRE AREA IS CLICKABLE -->
+            <label for="receipt-file" class="block cursor-pointer"
+                   @dragover.prevent="isDragging = true"
+                   @dragleave.prevent="isDragging = false"
+                   @drop.prevent="isDragging = false; document.getElementById('receipt-file').files = $event.dataTransfer.files; selectedFile = $event.dataTransfer.files[0]">
+                <div
+                    class="border-2 border-dashed border-borderInput rounded-lg p-8 text-center transition-all duration-200"
+                    :class="isDragging ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20'">
+                    <svg class="mx-auto h-12 w-12 text-textSubtle" stroke="currentColor" fill="none"
+                        viewBox="0 0 48 48">
+                        <path
+                            d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    <div class="mt-4">
+                        <span class="mt-2 block text-sm font-medium text-textBase">
+                            Click anywhere to upload or drag and drop
+                        </span>
+                        <span class="mt-1 block text-xs text-textMuted">
+                            PNG, JPG, PDF up to 10MB
+                        </span>
+                    </div>
+                </div>
+                <input id="receipt-file" name="file" type="file" class="sr-only" accept="image/*,.pdf"
+                    @change="selectedFile = $event.target.files[0]" />
+            </label>
+
+            <!-- File name display -->
+            <div x-show="selectedFile" class="mt-2 text-sm text-textMuted font-medium">
+                Selected: <span class="text-blue-600 dark:text-blue-400" x-text="selectedFile?.name"></span>
+            </div>
+
+            <!-- Upload Button -->
+            <div class="mt-4 flex flex-col items-end gap-2">
+                <button type="submit"
+                    class="px-6 py-2 text-white rounded-lg transition-all duration-300 flex items-center space-x-2 shadow-sm font-semibold"
+                    :class="selectedFile && !uploading ? 'bg-blue-500 hover:bg-blue-600 ring-2 ring-blue-500/50 scale-[1.02] shadow-md' : 'bg-blue-600 hover:bg-blue-700 disabled:bg-bgSkeleton disabled:text-textMuted disabled:shadow-none'"
+                    :disabled="!selectedFile || uploading">
+                    <span x-show="!uploading">Upload & Process</span>
+                    <span x-show="uploading">Processing...</span>
+                    <!-- Spinner -->
+                    <svg x-show="uploading" class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg"
+                        fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
+                        </circle>
+                        <path class="opacity-75" fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                        </path>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Progress Bar -->
+            <div x-show="uploading" x-transition.opacity class="w-full bg-bgSkeleton rounded-full h-2.5 mt-4 overflow-hidden">
+                <div class="bg-green-600 h-2.5 rounded-full transition-all duration-100 ease-linear"
+                     :style="'width: ' + progress + '%'"></div>
+            </div>
+            <!-- Progress Text -->
+            <p x-show="uploading" class="text-sm text-center mt-2 text-textMuted">
+               Analyzing receipt... <span x-text="Math.round(progress)"></span>%
+            </p>
+
+            <!-- Upload Result -->
+            <div id="upload-result" class="mt-4"></div>
+        </form>
+    </div>
+
+    <!-- Recent Receipts -->
+    <div class="bg-bgCard rounded-lg shadow dark:shadow-gray-900/50">
+        <div class="p-6 border-b border-borderDefault">
+            <h2 class="text-lg font-semibold text-textBase">Recent Receipts</h2>
+
+            <!-- Store Filter Bar -->
+            {% if stores %}
+            <div class="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4" x-data="sortFilterApp()">
+                <!-- Store Filters -->
+                <div class="flex flex-wrap gap-2 items-center">
+                    <div class="text-sm font-medium text-textMuted py-1">Filter by Store:</div>
+                    <template x-for="store in allStores" :key="store">
+                        <button @click="toggleStore(store)"
+                            :class="selectedStores.includes(store)
+                                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                : 'bg-bgSkeleton text-textMuted hover:bg-bgHover'"
+                            class="px-3 py-1 rounded-full text-xs font-semibold transition-colors" x-text="store">
+                        </button>
+                    </template>
+                    <button x-show="selectedStores.length > 0" @click="clearFilter()"
+                        class="px-3 py-1 text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300">
+                        Clear
+                    </button>
+                </div>
+
+                <!-- Sort Control -->
+                <div class="flex items-center gap-2">
+                    <span class="text-sm font-medium text-textMuted">Sort:</span>
+                    <button @click="toggleSort()"
+                        class="flex items-center gap-1 px-3 py-1.5 text-sm bg-bgInput border border-borderInput rounded-md hover:bg-bgHover text-textMuted transition-colors">
+                        <span x-text="sort === 'desc' ? 'Newest First' : 'Oldest First'"></span>
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                :d="sort === 'desc' ? 'M19 9l-7 7-7-7' : 'M5 15l7-7 7 7'"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <script id="stores-data" type="application/json">
+            {{ stores | tojson | safe }}
+        </script>
+        <script>
+            function sortFilterApp() {
+                const storesData = JSON.parse(document.getElementById('stores-data').textContent);
+
+                return {
+                    allStores: storesData,
+                    selectedStores: [],
+                    sort: 'desc',
+
+                    toggleStore(store) {
+                        if (this.selectedStores.includes(store)) {
+                            this.selectedStores = this.selectedStores.filter(s => s !== store);
+                        } else {
+                            this.selectedStores.push(store);
+                        }
+                        this.applyFilter();
+                    },
+
+                    clearFilter() {
+                        this.selectedStores = [];
+                        this.applyFilter();
+                    },
+
+                    toggleSort() {
+                        this.sort = this.sort === 'desc' ? 'asc' : 'desc';
+                        // Trigger HTMX request with new sort param
+                        htmx.ajax('GET', `/api/receipts/list?sort=${this.sort}`, {
+                            target: '#receipts-container',
+                            swap: 'innerHTML'
+                        });
+                    },
+
+                    applyFilter() {
+                        const container = document.getElementById('receipts-container');
+                        const rows = container.querySelectorAll('[data-store]');
+
+                        rows.forEach(row => {
+                            const store = row.getAttribute('data-store');
+                            if (this.selectedStores.length === 0 || this.selectedStores.includes(store)) {
+                                row.classList.remove('hidden');
+                            } else {
+                                row.classList.add('hidden');
+                            }
+                        });
+                    },
+
+                    init() {
+                        document.body.addEventListener('htmx:afterSwap', (evt) => {
+                            if (evt.target.id === 'receipts-container') {
+                                this.applyFilter();
+                            }
+                        });
+                    }
+                }
+            }
+        </script>
+
+        <div id="receipts-container" class="p-6 min-h-[200px]" hx-get="/api/receipts/list" hx-trigger="load" hx-swap="innerHTML">
+            <!-- Loading state skeleton -->
+            <div class="text-center py-8">
+                <div class="animate-pulse space-y-4">
+                    <div class="h-4 bg-bgSkeleton rounded w-3/4 mx-auto"></div>
+                    <div class="h-4 bg-bgSkeleton rounded w-1/2 mx-auto"></div>
+                    <div class="h-4 bg-bgSkeleton rounded w-5/6 mx-auto"></div>
+                </div>
+                <p class="text-sm text-textMuted mt-4">Loading receipts...</p>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Image Viewer Modal -->
+<div x-data="{ open: false, imgSrc: '' }" @open-image.window="imgSrc = $event.detail; open = true"
+    @keydown.escape.window="open = false" x-show="open" x-trap="open" x-cloak class="fixed inset-0 z-50 overflow-y-auto"
+    aria-labelledby="modal-title" role="dialog" aria-modal="true">
+
+    <!-- Backdrop -->
+    <div x-show="open" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-200"
+        x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+        class="fixed inset-0 bg-bgOverlay transition-opacity" @click="open = false"></div>
+
+    <div class="flex min-h-screen items-center justify-center p-4 text-center sm:p-0">
+        <div x-show="open" x-transition:enter="ease-out duration-300"
+            x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+            x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" x-transition:leave="ease-in duration-200"
+            x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+            x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+            class="relative transform overflow-hidden rounded-lg bg-bgCard text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-2xl">
+
+            <div class="bg-bgCard px-4 pb-4 pt-5 sm:p-6 pb-4">
+                <div class="sm:flex sm:items-start">
+                    <div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left w-full">
+                        <h3 class="text-base font-semibold leading-6 text-textBase" id="modal-title">
+                            Receipt Image</h3>
+                        <div class="mt-4 flex justify-center bg-bgSkeleton rounded-lg p-2">
+                            <template x-if="imgSrc.toLowerCase().endsWith('.pdf')">
+                                <embed :src="imgSrc" type="application/pdf" class="w-full h-[70vh] rounded">
+                            </template>
+                            <template x-if="!imgSrc.toLowerCase().endsWith('.pdf')">
+                                <img :src="imgSrc" alt="Receipt" class="max-h-[70vh] object-contain rounded"
+                                    onerror="this.src='/static/placeholder-receipt.png'">
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-bgHover px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+                <button type="button"
+                    class="mt-3 inline-flex w-full justify-center rounded-md bg-bgInput px-3 py-2 text-sm font-semibold text-textBase shadow-sm ring-1 ring-inset ring-borderInput hover:bg-bgHover sm:mt-0 sm:w-auto"
+                    @click="open = false">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Manual Receipt Modal -->
+<div x-data="{ open: false, today: new Date().toISOString().split('T')[0] }" @open-manual-modal.window="open = true"
+    @keydown.escape.window="open = false" x-show="open" x-trap="open" x-cloak class="fixed inset-0 z-50 overflow-y-auto"
+    aria-labelledby="manual-modal-title" role="dialog" aria-modal="true">
+
+    <!-- Backdrop -->
+    <div x-show="open" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-200"
+        x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+        class="fixed inset-0 bg-bgOverlay transition-opacity" @click="open = false"></div>
+
+    <div class="flex min-h-screen items-center justify-center p-4 text-center sm:p-0">
+        <div x-show="open" x-transition:enter="ease-out duration-300"
+            x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+            x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" x-transition:leave="ease-in duration-200"
+            x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+            x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+            class="relative transform overflow-hidden rounded-lg bg-bgCard text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-md">
+
+            <form @submit.prevent="
+                    fetch('/api/receipts/manual', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-Token': '{{ csrf_token(request) }}'
+                        },
+                        body: JSON.stringify({
+                            store_name: $el.store_name.value,
+                            purchase_date: $el.purchase_date.value,
+                            total_amount: $el.total_amount.value ? parseFloat($el.total_amount.value) : 0,
+                            notes: $el.notes.value
+                        })
+                    })
+                    .then(r => r.json())
+                    .then(data => {
+                        if(data.success) {
+                            window.location.href = '/receipts/' + data.receipt_id + '/review';
+                        } else {
+                            alert('Error creating receipt');
+                        }
+                    })
+                ">
+                <div class="bg-bgCard px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+                    <h3 class="text-base font-semibold leading-6 text-textBase mb-4"
+                        id="manual-modal-title">
+                        Add Receipt Manually
+                    </h3>
+
+                    <div class="space-y-4">
+                        <div>
+                            <label for="manual-store-name" class="block text-sm font-medium text-textMuted">Store Name</label>
+                            <input id="manual-store-name" type="text" name="store_name" required placeholder="e.g. Farmer's Market"
+                                class="mt-1 block w-full rounded-md border-borderInput bg-bgInput text-textBase shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                        </div>
+
+                        <div>
+                            <label for="manual-purchase-date" class="block text-sm font-medium text-textMuted">Date</label>
+                            <input id="manual-purchase-date" type="date" name="purchase_date" :value="today" required
+                                class="mt-1 block w-full rounded-md border-borderInput bg-bgInput text-textBase shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-textMuted">Total Amount
+                                (Optional)</label>
+                            <div class="relative mt-1 rounded-md shadow-sm">
+                                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                    <span class="text-textSubtle sm:text-sm">$</span>
+                                </div>
+                                <input type="number" name="total_amount" step="0.01" placeholder="0.00"
+                                    class="block w-full rounded-md border-borderInput bg-bgInput text-textBase pl-7 focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-textMuted">Notes</label>
+                            <textarea name="notes" rows="2" placeholder="e.g. Fresh veggies and fruits..."
+                                class="mt-1 block w-full rounded-md border-borderInput bg-bgInput text-textBase shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-bgHover px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6 gap-2">
+                    <button type="submit"
+                        class="inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 sm:w-auto">
+                        Create & Add Items
+                    </button>
+                    <button type="button" @click="open = false"
+                        class="mt-3 inline-flex w-full justify-center rounded-md bg-bgInput px-3 py-2 text-sm font-semibold text-textBase shadow-sm ring-1 ring-inset ring-borderInput hover:bg-bgHover sm:mt-0 sm:w-auto">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+</div>
+{% endblock %}

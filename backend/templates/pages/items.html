@@ -1,0 +1,616 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Items - Grocery Price Tracker{% endblock %}
+
+{% block content %}
+<div class="space-y-6" x-data="{
+        tab: '{{ initial_tab }}',
+        showDismissModal: false,
+        pendingDismiss: null,
+        confirmDismiss() {
+            if (!this.pendingDismiss) return;
+            const { id1, id2, cardId } = this.pendingDismiss;
+
+            fetch('/api/items/duplicates/ignore', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': '{{ csrf_token(request) }}'
+                },
+                body: JSON.stringify({ item_id_1: id1, item_id_2: id2 })
+            })
+            .then(response => {
+                if (response.ok) {
+                    document.getElementById(cardId).remove();
+                    this.showDismissModal = false;
+                    this.pendingDismiss = null;
+                } else {
+                    alert('Failed to dismiss');
+                }
+            });
+        }
+     }" @open-dismiss-modal.window="showDismissModal = true; pendingDismiss = $event.detail"
+    @keydown.escape.window="showDismissModal = false; pendingDismiss = null">
+    <!-- Page Header -->
+    <div>
+        <h1 class="text-3xl font-bold text-textBase">Items</h1>
+        <p class="text-textMuted mt-1">Track prices and merge duplicates</p>
+    </div>
+
+    <!-- Tabs -->
+    <div class="border-b border-borderDefault">
+        <nav class="-mb-px flex space-x-8">
+            <button @click="tab = 'all'" class="py-2 px-1 border-b-2 font-medium text-sm"
+                :class="tab === 'all' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-textMuted hover:text-textBase hover:border-gray-300 dark:hover:border-gray-600'">
+                All Items
+            </button>
+            <button @click="tab = 'duplicates'" class="py-2 px-1 border-b-2 font-medium text-sm"
+                :class="tab === 'duplicates' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-textMuted hover:text-textBase hover:border-gray-300 dark:hover:border-gray-600'">
+                Find Duplicates
+            </button>
+            <button @click="tab = 'search'" class="py-2 px-1 border-b-2 font-medium text-sm"
+                :class="tab === 'search' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-textMuted hover:text-textBase hover:border-gray-300 dark:hover:border-gray-600'">
+                Search
+            </button>
+            <button @click="tab = 'dismissed'" class="py-2 px-1 border-b-2 font-medium text-sm"
+                :class="tab === 'dismissed' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-textMuted hover:text-textBase hover:border-gray-300 dark:hover:border-gray-600'">
+                Dismissed
+            </button>
+        </nav>
+    </div>
+
+    <!-- All Items Tab -->
+    <div x-show="tab === 'all'" x-cloak class="bg-bgCard rounded-lg shadow dark:shadow-gray-900/50">
+        <div class="p-6 border-b border-borderDefault">
+            <h2 class="text-lg font-semibold text-textBase">All Items</h2>
+        </div>
+
+        <div class="p-6" hx-get="/api/items/list" hx-trigger="load" hx-target="this" hx-swap="innerHTML">
+            <!-- Loading state -->
+            <div class="text-center py-12 flex flex-col items-center justify-center">
+                <svg class="animate-spin h-10 w-10 text-blue-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none"
+                    viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                    </path>
+                </svg>
+                <p class="text-textMuted">Loading your items...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Duplicates Tab -->
+    <div x-show="tab === 'duplicates'" x-cloak
+        class="bg-bgCard rounded-lg shadow dark:shadow-gray-900/50">
+        <div class="p-6 border-b border-borderDefault">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h2 class="text-lg font-semibold text-textBase">Potential Duplicates</h2>
+                    <p class="text-sm text-textMuted mt-1">Items with similar names that might be the
+                        same</p>
+                </div>
+                <button class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    @click="htmx.trigger('#duplicates-list', 'refresh')">
+                    Refresh
+                </button>
+            </div>
+        </div>
+
+        <div id="duplicates-list" class="p-6" hx-get="/api/items/duplicates" hx-trigger="load, refresh" hx-target="this"
+            hx-swap="innerHTML">
+            <!-- Loading state -->
+            <div class="text-center py-8">
+                <div class="animate-pulse">
+                    <div class="h-4 bg-bgSkeleton rounded w-3/4 mx-auto mb-4"></div>
+                    <div class="h-4 bg-bgSkeleton rounded w-1/2 mx-auto"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search Tab -->
+    <div x-show="tab === 'search'" x-cloak class="bg-bgCard rounded-lg shadow dark:shadow-gray-900/50">
+        <div class="p-6 border-b border-borderDefault">
+            <h2 class="text-lg font-semibold text-textBase mb-2">Search Items</h2>
+
+            <!-- Documentation Alert -->
+            <div
+                class="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg flex items-start space-x-3">
+                <svg class="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor"
+                    viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <div class="text-xs text-blue-800 dark:text-blue-300 leading-relaxed">
+                    <p class="font-bold mb-1 uppercase tracking-wider">How to Merge Items</p>
+                    <p>Search for items you want to combine. Select the one you want to <strong>Keep</strong> (radio)
+                        and the others you want to <strong>Merge</strong> (checkboxes). Merging preserves all history
+                        and pricing data.</p>
+                </div>
+            </div>
+
+            <input type="search" placeholder="Search for items to merge..."
+                class="w-full px-4 py-2 border border-borderInput rounded-lg bg-bgInput text-textBase placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                hx-get="/api/items/search" hx-trigger="keyup changed delay:300ms" hx-target="#search-results"
+                name="q" />
+        </div>
+
+        <div id="search-results" class="p-6">
+            <p class="text-textMuted text-sm">Start typing to search...</p>
+        </div>
+    </div>
+
+    <!-- Dismissed Suggestions Tab -->
+    <div x-show="tab === 'dismissed'" x-cloak
+        class="bg-bgCard rounded-lg shadow dark:shadow-gray-900/50">
+        <div class="p-6 border-b border-borderDefault">
+            <h2 class="text-lg font-semibold text-textBase">Dismissed Suggestions</h2>
+            <p class="text-sm text-textMuted mt-1">Manage pairs of items you've marked as "not
+                duplicates"</p>
+        </div>
+        <div class="p-6" hx-get="/api/items/ignored-suggestions" hx-trigger="load, refresh-dismissed from:body"
+            hx-target="this">
+            <!-- Loading state -->
+            <div class="text-center py-8">
+                <div class="animate-pulse">
+                    <div class="h-4 bg-bgSkeleton rounded w-3/4 mx-auto mb-4"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dismiss Confirmation Modal -->
+    <div x-show="showDismissModal" x-trap="showDismissModal" style="display: none;" class="fixed inset-0 z-[100] overflow-y-auto"
+        aria-labelledby="modal-title" role="dialog" aria-modal="true">
+
+        <!-- Backdrop -->
+        <div x-show="showDismissModal" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0"
+            x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-200"
+            x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+            class="fixed inset-0 bg-bgOverlay transition-opacity"></div>
+
+        <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+            <!-- Modal Panel -->
+            <div x-show="showDismissModal" @click.away="showDismissModal = false"
+                x-transition:enter="ease-out duration-300"
+                x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                x-transition:leave="ease-in duration-200"
+                x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                class="relative transform overflow-hidden rounded-lg bg-bgCard text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
+
+                <div class="bg-bgCard px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+                    <div class="sm:flex sm:items-start">
+                        <div
+                            class="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-yellow-100 dark:bg-yellow-900 sm:mx-0 sm:h-10 sm:w-10">
+                            <svg class="h-6 w-6 text-yellow-600 dark:text-yellow-400" fill="none" viewBox="0 0 24 24"
+                                stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                            </svg>
+                        </div>
+                        <div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left">
+                            <h3 class="text-base font-semibold leading-6 text-textBase"
+                                id="modal-title">Dismiss Suggestion</h3>
+                            <div class="mt-2">
+                                <p class="text-sm text-textMuted">Are you sure you want to dismiss
+                                    this duplicate suggestion? It will not be shown again.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-bgHover px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+                    <button type="button" @click="confirmDismiss()"
+                        class="inline-flex w-full justify-center rounded-md bg-yellow-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-yellow-500 sm:ml-3 sm:w-auto">
+                        Dismiss
+                    </button>
+                    <button type="button" @click="showDismissModal = false"
+                        class="mt-3 inline-flex w-full justify-center rounded-md bg-bgInput px-3 py-2 text-sm font-semibold text-textBase shadow-sm ring-1 ring-inset ring-borderInput hover:bg-bgHover sm:mt-0 sm:w-auto">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Enrich Data Modal -->
+    <div x-data="{
+        showEnrichModal: false,
+        currentItemId: null,
+        currentItemName: '',
+        searchResults: [],
+        loading: false,
+        searchQuery: '',
+        source: 'fdc', // Default to FDC
+
+        initEnrich(detail) {
+            this.showEnrichModal = true;
+            this.currentItemId = detail.id;
+            this.currentItemName = detail.name;
+            this.searchQuery = detail.name;
+            this.searchResults = [];
+            this.performSearch();
+        },
+
+        performSearch() {
+            if(!this.searchQuery) return;
+            this.loading = true;
+            const url = this.source === 'fdc'
+                ? `/api/items/fdc/search?q=${encodeURIComponent(this.searchQuery)}`
+                : `/api/items/external/search?q=${encodeURIComponent(this.searchQuery)}`;
+
+            fetch(url)
+                .then(r => r.json())
+                .then(data => {
+                    if (this.source === 'fdc') {
+                        // Normalize FDC results to match the template's expectations
+                        this.searchResults = data.map(item => ({
+                            code: item.fdcId,
+                            product_name: item.description,
+                            brand: item.brandOwner || item.brandName || '',
+                            categories: item.foodCategory || '',
+                            image_url: null // FDC doesn't provide images usually
+                        }));
+                    } else {
+                        this.searchResults = data;
+                    }
+                    this.loading = false;
+                })
+                .catch(err => {
+                    console.error(err);
+                    this.loading = false;
+                });
+        },
+
+        applyImage(url) {
+            if(!confirm('Use this image for the item?')) return;
+
+            fetch(`/api/items/${this.currentItemId}/image`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({image_url: url})
+            })
+            .then(r => r.json())
+            .then(data => {
+                if(data.success) {
+                    this.showEnrichModal = false;
+                    window.location.reload();
+                } else {
+                    alert('Error updating image');
+                }
+            });
+        }
+    }" @open-enrich-modal.window="initEnrich($event.detail)" @keydown.escape.window="showEnrichModal = false"
+        x-show="showEnrichModal" x-trap="showEnrichModal" style="display: none;" class="fixed inset-0 z-[100] overflow-y-auto"
+        aria-labelledby="enrich-modal-title" role="dialog" aria-modal="true">
+
+        <!-- Backdrop -->
+        <div x-show="showEnrichModal" x-transition.opacity class="fixed inset-0 bg-bgOverlay"></div>
+
+        <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+            <div x-show="showEnrichModal" @click.away="showEnrichModal = false"
+                x-transition:enter="ease-out duration-300"
+                x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                class="relative transform overflow-hidden rounded-lg bg-bgCard text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-2xl">
+
+                <div class="bg-bgCard px-4 pb-4 pt-5 sm:p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold text-textBase" id="enrich-modal-title">
+                            Enrich Data: <span x-text="currentItemName"></span>
+                        </h3>
+                        <button @click="showEnrichModal = false"
+                            class="text-textSubtle hover:text-textMuted text-2xl">&times;</button>
+                    </div>
+
+                    <!-- Source Toggle -->
+                    <div class="flex space-x-2 mb-4 bg-bgSkeleton p-1 rounded-lg">
+                        <button @click="source = 'fdc'; performSearch()"
+                                :class="source === 'fdc' ? 'bg-bgInput shadow-sm' : 'text-textSubtle'"
+                                class="flex-1 py-1 text-xs font-medium rounded-md transition-all">
+                            USDA FoodData
+                        </button>
+                        <button @click="source = 'off'; performSearch()"
+                                :class="source === 'off' ? 'bg-bgInput shadow-sm' : 'text-textSubtle'"
+                                class="flex-1 py-1 text-xs font-medium rounded-md transition-all">
+                            OpenFoodFacts
+                        </button>
+                    </div>
+
+                    <!-- Search Bar -->
+                    <div class="flex gap-2 mb-4">
+                        <input type="text" x-model="searchQuery" @keyup.enter="performSearch()"
+                            aria-label="Search product database"
+                            class="flex-1 rounded-md border-borderInput bg-bgInput text-textBase shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2"
+                            placeholder="Search generic product database...">
+                        <button @click="performSearch()"
+                            class="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm">
+                            Search
+                        </button>
+                    </div>
+
+                    <!-- Results -->
+                    <div class="max-h-96 overflow-y-auto space-y-3">
+                        <template x-if="loading">
+                            <div class="text-center py-4">
+                                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
+                                <p class="text-sm text-textSubtle mt-2" x-text="source === 'fdc' ? 'Searching USDA FoodData Central...' : 'Searching OpenFoodFacts...'"></p>
+                            </div>
+                        </template>
+
+                        <template x-if="!loading && searchResults.length === 0">
+                            <p class="text-center text-textSubtle py-4">No results found.</p>
+                        </template>
+
+                        <template x-for="result in searchResults" :key="result.code">
+                            <div
+                                class="flex items-start gap-3 p-3 border border-borderDefault rounded-lg hover:bg-bgHover transition">
+                                <!-- Image -->
+                                <div
+                                    class="w-16 h-16 flex-shrink-0 bg-bgSkeleton rounded overflow-hidden flex items-center justify-center">
+                                    <template x-if="result.image_url">
+                                        <img :src="result.image_url" class="w-full h-full object-contain">
+                                    </template>
+                                    <template x-if="!result.image_url">
+                                        <span class="text-xs text-textSubtle">No Img</span>
+                                    </template>
+                                </div>
+
+                                <!-- Info -->
+                                <div class="flex-1 min-w-0">
+                                    <p class="font-medium text-textBase truncate"
+                                        x-text="result.product_name"></p>
+                                    <p class="text-xs text-textMuted" x-text="result.brand"></p>
+                                    <div class="flex gap-2 mt-1">
+                                        <span x-show="result.categories"
+                                            class="text-xs bg-bgSkeleton px-1.5 py-0.5 rounded text-textMuted truncate max-w-[150px]"
+                                            x-text="result.categories.split(',')[0]"></span>
+                                    </div>
+                                </div>
+
+                                <!-- Action -->
+                                <button @click="applyImage(result.image_url)" x-show="result.image_url"
+                                    class="px-3 py-1.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-medium rounded hover:bg-green-200 dark:hover:bg-green-900/50">
+                                    Use Image
+                                </button>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Relevant Receipts Modal -->
+    <div id="relevantReceiptsModal" x-data="{ openRelevant: false }"
+        @open-relevant-receipts.window="openRelevantReceipts($event.detail.ids)"
+        class="fixed inset-0 z-[110] hidden overflow-y-auto" aria-labelledby="relevant-modal-title" role="dialog"
+        aria-modal="true">
+
+        <!-- Backdrop -->
+        <div class="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+            onclick="document.getElementById('relevantReceiptsModal').classList.add('hidden')"></div>
+
+        <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+            <div
+                class="relative transform overflow-hidden rounded-xl bg-bgMain text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-2xl border border-borderDefault">
+                <div
+                    class="bg-bgCard px-6 py-4 flex justify-between items-center border-b border-borderDefault">
+                    <h3 class="text-lg font-bold text-textBase" id="relevant-modal-title">Relevant
+                        Receipts</h3>
+                    <button onclick="document.getElementById('relevantReceiptsModal').classList.add('hidden')"
+                        class="text-textSubtle hover:text-textMuted text-2xl px-2">✕</button>
+                </div>
+                <div id="relevant-receipts-list"
+                    class="p-6 max-h-[70vh] overflow-y-auto bg-bgMain/50">
+                    <div class="flex flex-col items-center justify-center py-12">
+                        <svg class="animate-spin h-8 w-8 text-blue-500 mb-4" xmlns="http://www.w3.org/2000/svg"
+                            fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
+                            </circle>
+                            <path class="opacity-75" fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                            </path>
+                        </svg>
+                        <p class="text-textMuted">Loading receipts...</p>
+                    </div>
+                </div>
+                <div
+                    class="bg-bgSkeleton/80 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6 border-t border-borderDefault">
+                    <button type="button"
+                        onclick="document.getElementById('relevantReceiptsModal').classList.add('hidden')"
+                        class="inline-flex w-full justify-center rounded-lg bg-bgInput px-4 py-2 text-sm font-semibold text-textBase shadow-sm ring-1 ring-inset ring-borderInput hover:bg-bgHover sm:w-auto transition-all">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Global function for FDC enrichment
+    async function autoEnrich(itemId) {
+        if (!confirm('Search USDA FoodData Central and update this item?')) return;
+
+        try {
+            const response = await fetch(`/api/items/${itemId}/enrich`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-Token': '{{ csrf_token(request) }}'
+                }
+            });
+            const data = await response.json();
+            if (data.success) {
+                alert(data.message);
+                location.reload();
+            } else {
+                alert(data.message || 'No match found.');
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Error connecting to enrichment service.');
+        }
+    }
+
+    // Global function for relevant receipts modal
+    window.openRelevantReceipts = function (ids) {
+        if (!ids) return;
+        const modal = document.getElementById('relevantReceiptsModal');
+        const container = document.getElementById('relevant-receipts-list');
+
+        // Show modal
+        modal.classList.remove('hidden');
+
+        // Fetch receipts via HTMX
+        htmx.ajax('GET', `/api/receipts/list?ids=${ids}`, {
+            target: '#relevant-receipts-list',
+            swap: 'innerHTML'
+        });
+    }
+
+    // Function to show price history chart
+    async function showPriceHistory(elementOrId, itemName) {
+        let itemId = elementOrId;
+        if (elementOrId && typeof elementOrId === 'object' && elementOrId.getAttribute) {
+            itemId = elementOrId.getAttribute('data-item-id');
+            itemName = elementOrId.getAttribute('data-item-name');
+        }
+        const response = await fetch(`/api/analytics/price-trends/${itemId}`);
+        const data = await response.json();
+
+        // Detect dark mode
+        const isDark = document.documentElement.classList.contains('dark');
+
+        // Close any existing charts/modals
+        const existing = document.getElementById('priceHistoryModal');
+        if (existing) existing.remove();
+
+        // Create modal
+        const modal = document.createElement('div');
+        modal.id = 'priceHistoryModal';
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+        modal.innerHTML = `
+        <div class="bg-bgCard rounded-lg p-6 max-w-2xl w-full mx-4 shadow-2xl overflow-hidden">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-textBase">${itemName} - Price History</h3>
+                <button onclick="this.closest('.fixed').remove()" class="text-textMuted hover:text-textBase text-2xl px-2">✕</button>
+            </div>
+            <div class="mb-4">
+                 <p class="text-xs text-textMuted">Click on a stack/purchase to view the receipt.</p>
+            </div>
+            <div class="relative h-80 w-full">
+                <canvas id="priceHistoryChart"></canvas>
+            </div>
+        </div>
+    `;
+
+        document.body.appendChild(modal);
+
+        // Process data for Line Chart
+        // 1. Get all unique dates, sorted chronologically
+        const allDates = [...new Set(data.map(d => d.date))].sort();
+
+        // 2. Get all unique stores
+        const stores = [...new Set(data.map(d => d.store))];
+
+        // 3. Create datasets for each store
+        const datasets = [];
+        const colors = [
+            '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#6366f1', '#14b8a6'
+        ];
+
+        stores.forEach((store, i) => {
+            const storeData = data.filter(d => d.store === store);
+            // Create a sparse array of data points matching the allDates array
+            const datasetData = allDates.map(date => {
+                const purchase = storeData.find(d => d.date === date);
+                return purchase ? purchase.price : null; // Use null so line skips
+            });
+
+            const metaData = allDates.map(date => {
+                return storeData.find(d => d.date === date) || null;
+            });
+
+            datasets.push({
+                label: store,
+                data: datasetData,
+                borderColor: colors[i % colors.length],
+                backgroundColor: colors[i % colors.length],
+                borderWidth: 2,
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                tension: 0.2,
+                spanGaps: true, // Connect lines over missing data points
+                meta: metaData
+            });
+        });
+
+        const ctx = document.getElementById('priceHistoryChart');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: allDates,
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                onClick: (event, elements) => {
+                    if (elements.length > 0) {
+                        const { datasetIndex, index } = elements[0];
+                        const purchase = datasets[datasetIndex].meta[index];
+                        if (purchase && purchase.receipt_id) {
+                            // Close this modal first
+                            modal.remove();
+                            // Show receipts modal
+                            window.openRelevantReceipts(purchase.receipt_id);
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: { color: isDark ? '#e5e7eb' : '#374151', usePointStyle: true }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function (context) {
+                                const raw = context.raw;
+                                if (raw === null) return null;
+                                return `${context.dataset.label}: $${raw.toFixed(2)}`;
+                            }
+                        }
+                    },
+                    title: {
+                        display: true,
+                        text: 'Price History Timeline',
+                        color: isDark ? '#fff' : '#111'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Unit Price ($)', color: isDark ? '#9ca3af' : '#6b7280' },
+                        ticks: { color: isDark ? '#9ca3af' : '#6b7280' },
+                        grid: { color: isDark ? '#374151' : '#e5e7eb' }
+                    },
+                    x: {
+                        title: { display: true, text: 'Date', color: isDark ? '#9ca3af' : '#6b7280' },
+                        ticks: { color: isDark ? '#9ca3af' : '#6b7280' },
+                        grid: { color: isDark ? '#374151' : '#e5e7eb' }
+                    }
+                }
+            }
+        });
+
+        // Close logic
+        modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+        const escapeHandler = (e) => { if (e.key === 'Escape') { modal.remove(); document.removeEventListener('keydown', escapeHandler); } };
+        document.addEventListener('keydown', escapeHandler);
+    }
+</script>
+{% endblock %}

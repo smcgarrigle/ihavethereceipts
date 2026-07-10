@@ -1,0 +1,100 @@
+<!-- HTMX fragment: Restock table rows loaded by /api/predictions/restock-table -->
+{% if items %}
+<table class="min-w-full text-sm">
+    <thead>
+        <tr class="border-b border-borderDefault">
+            <th class="text-left py-3 px-4 font-semibold text-textMuted uppercase text-xs tracking-wider">Item</th>
+            <th class="text-left py-3 px-2 font-semibold text-textMuted uppercase text-xs tracking-wider hidden sm:table-cell">Category</th>
+            <th class="text-center py-3 px-2 font-semibold text-textMuted uppercase text-xs tracking-wider">Cycle</th>
+            <th class="text-center py-3 px-2 font-semibold text-textMuted uppercase text-xs tracking-wider">Due</th>
+            <th class="text-center py-3 px-2 font-semibold text-textMuted uppercase text-xs tracking-wider">Status</th>
+            {% for store in stores %}
+            <th class="text-center py-3 px-2 font-semibold text-textMuted uppercase text-xs tracking-wider hidden md:table-cell">{{ store }}</th>
+            {% endfor %}
+        </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+        {% for item in items %}
+        <tr class="hover:bg-bgHover/50 transition-colors">
+            <!-- Item Name -->
+            <td class="py-3 px-4">
+                <a href="/items/{{ item.item_id }}/insights"
+                   class="font-medium text-textBase hover:text-blue-600 dark:hover:text-blue-400 transition">
+                    {{ item.item_name[:45] }}{% if item.item_name|length > 45 %}…{% endif %}
+                </a>
+                <!-- Mobile: show store prices stacked -->
+                <div class="md:hidden mt-1 space-y-0.5">
+                    {% for sp in item.store_prices[:3] %}
+                    <div class="text-xs text-textMuted">
+                        {{ sp.store }}: <span class="font-semibold {% if loop.first %}text-green-600 dark:text-green-400{% endif %}">${{ "%.2f"|format(sp.price) }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </td>
+
+            <!-- Category -->
+            <td class="py-3 px-2 text-textMuted hidden sm:table-cell">
+                {{ item.category }}
+            </td>
+
+            <!-- Cycle (avg interval) -->
+            <td class="py-3 px-2 text-center text-textMuted font-mono text-xs">
+                {{ item.avg_interval|int }}d
+            </td>
+
+            <!-- Due Date -->
+            <td class="py-3 px-2 text-center text-textMuted text-xs">
+                {{ item.predicted_exhaustion }}
+            </td>
+
+            <!-- Urgency Badge -->
+            <td class="py-3 px-2 text-center">
+                {% if item.urgency == 'overdue' %}
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400">
+                    🔴 Overdue
+                </span>
+                {% elif item.urgency == 'high' %}
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400">
+                    🟠 High
+                </span>
+                {% elif item.urgency == 'medium' %}
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400">
+                    🟡 Soon
+                </span>
+                {% else %}
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-bgSkeleton text-textMuted">
+                    ⚪ Low
+                </span>
+                {% endif %}
+            </td>
+
+            <!-- Per-Store Prices (Desktop) -->
+            {% for store in stores %}
+            <td class="py-3 px-2 text-center hidden md:table-cell">
+                {% set ns = namespace(found=false) %}
+                {% for sp in item.store_prices %}
+                    {% if sp.store == store %}
+                        {% set ns.found = true %}
+                        <span class="font-mono text-sm {% if loop.first and sp.price == item.store_prices[0].price %}text-green-600 dark:text-green-400 font-bold{% else %}text-textMuted{% endif %}">
+                            ${{ "%.2f"|format(sp.price) }}
+                        </span>
+                    {% endif %}
+                {% endfor %}
+                {% if not ns.found %}
+                <span class="text-textSubtle">—</span>
+                {% endif %}
+            </td>
+            {% endfor %}
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="text-center py-16">
+    <div class="text-4xl mb-4">🛒</div>
+    <h3 class="text-lg font-semibold text-textBase mb-2">No Items Due for Restock</h3>
+    <p class="text-textMuted max-w-md mx-auto">
+        All tracked items are well-stocked. Items need at least 3 purchases before the prediction engine can calculate their cadence.
+    </p>
+</div>
+{% endif %}

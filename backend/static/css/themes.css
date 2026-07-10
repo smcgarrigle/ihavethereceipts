@@ -1,0 +1,148 @@
+/* ============================================================
+   GROCERY TRACKER — DESIGN SYSTEM TOKENS
+   Single source of truth for all theme variables.
+   Mapped to Tailwind utility classes via tailwind.config in base.html:
+     bg-bgMain, bg-bgCard, bg-bgHover, bg-bgInput, bg-bgSkeleton, bg-bgOverlay
+     text-textBase, text-textMuted, text-textSubtle
+     border-borderDefault, border-borderLight, border-borderInput
+   ============================================================ */
+
+/* ── Light Theme (default) ──────────────────────────────── */
+:root, html.light {
+    --bg-main:         #f9fafb;   /* gray-50  — page background */
+    --bg-card:         #ffffff;   /* white    — card / panel surface */
+    --bg-hover:        #f3f4f6;   /* gray-100 — subtle hover */
+    --bg-input:        #ffffff;   /* white    — form inputs */
+    --bg-skeleton:     #e5e7eb;   /* gray-200 — loading skeletons & code tags */
+    --bg-overlay:      rgba(0,0,0,0.5); /* modal backdrop */
+    --text-base:       #111827;   /* gray-900 — primary text */
+    --text-muted:      #4b5563;   /* gray-600 — secondary / labels */
+    --text-subtle:     #9ca3af;   /* gray-400 — placeholder / de-emphasised */
+    --border-default:  #e5e7eb;   /* gray-200 — standard border */
+    --border-light:    #f3f4f6;   /* gray-100 — hairline / divider */
+    --border-input:    #d1d5db;   /* gray-300 — form input border */
+    --shadow-card:     0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
+}
+
+/* ── Dark Theme ─────────────────────────────────────────── */
+html.dark {
+    --bg-main:         #111827;   /* gray-900 */
+    --bg-card:         #1f2937;   /* gray-800 */
+    --bg-hover:        #374151;   /* gray-700 */
+    --bg-input:        #374151;   /* gray-700 */
+    --bg-skeleton:     #374151;   /* gray-700 */
+    --bg-overlay:      rgba(0,0,0,0.75);
+    --text-base:       #f9fafb;   /* gray-50 */
+    --text-muted:      #9ca3af;   /* gray-400 */
+    --text-subtle:     #6b7280;   /* gray-500 */
+    --border-default:  #374151;   /* gray-700 */
+    --border-light:    #374151;   /* gray-700 */
+    --border-input:    #4b5563;   /* gray-600 */
+    --shadow-card:     0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
+}
+
+/* ── Forest Theme (Earthy / Organic) ────────────────────── */
+html.forest {
+    --bg-main:         #060b07;
+    --bg-card:         #0f1c12;
+    --bg-hover:        #1a2e1d;
+    --bg-input:        #1a2e1d;
+    --bg-skeleton:     #1f2d23;
+    --bg-overlay:      rgba(0,0,0,0.75);
+    --text-base:       #ecfdf5;   /* emerald-50 */
+    --text-muted:      #a7f3d0;   /* emerald-200 */
+    --text-subtle:     #6ee7b7;   /* emerald-300 — slightly dimmer */
+    --border-default:  #1f2d23;
+    --border-light:    #1a2e1d;
+    --border-input:    #2d4a31;
+    --shadow-card:     0 1px 3px rgba(16,185,129,0.08), 0 1px 2px rgba(0,0,0,0.4);
+}
+
+/* ── Sunset Theme (Warm / Amber) ────────────────────────── */
+html.sunset {
+    --bg-main:         #1a0f0a;
+    --bg-card:         #2a1a10;
+    --bg-hover:        #3d2517;
+    --bg-input:        #3d2517;
+    --bg-skeleton:     #3d2517;
+    --bg-overlay:      rgba(0,0,0,0.75);
+    --text-base:       #fef3c7;   /* amber-100 */
+    --text-muted:      #fbbf24;   /* amber-400 */
+    --text-subtle:     #d97706;   /* amber-600 — slightly dimmer */
+    --border-default:  #3d2517;
+    --border-light:    #2a1a10;
+    --border-input:    #5c3820;
+    --shadow-card:     0 1px 3px rgba(245,158,11,0.08), 0 1px 2px rgba(0,0,0,0.4);
+}
+
+/* ============================================================
+   BASE OVERRIDES
+   Force theme tokens onto elements that Tailwind doesn't reach
+   (elements rendered without semantic classes, or via HTMX).
+   ============================================================ */
+
+body {
+    background-color: var(--bg-main);
+    color: var(--text-base);
+}
+
+/* ── Skeleton / shimmer ─── */
+.skeleton {
+    background-color: var(--bg-skeleton);
+    border-radius: 0.25rem;
+    animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.5; }
+}
+
+/* ── Inline code tags ─── */
+code {
+    background-color: var(--bg-skeleton);
+    color: var(--text-muted);
+    padding: 0.1em 0.35em;
+    border-radius: 0.25rem;
+    font-size: 0.85em;
+}
+
+/* ── Debug badge (used in receipt review / item matching) ─── */
+.debug-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+                 "Liberation Mono", "Courier New", monospace;
+    background-color: var(--bg-skeleton);
+    color: var(--text-muted);
+    border: 1px solid var(--border-input);
+}
+
+/* ── Forest / Sunset — nav surface ─── */
+html.forest nav,
+html.sunset nav {
+    background-color: var(--bg-card);
+    border-color: var(--border-default);
+}
+
+/* ── Forest / Sunset — hover tints for interactive elements ─── */
+html.forest .hover-tinted:hover,
+html.sunset .hover-tinted:hover {
+    background-color: color-mix(in srgb, var(--bg-card) 60%, var(--text-muted) 40%);
+}
+
+/* ── Shadow tinting for themed cards ─── */
+html.forest .shadow-sm,
+html.forest .shadow {
+    box-shadow: var(--shadow-card) !important;
+}
+
+html.sunset .shadow-sm,
+html.sunset .shadow {
+    box-shadow: var(--shadow-card) !important;
+}

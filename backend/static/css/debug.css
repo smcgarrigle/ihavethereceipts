@@ -1,0 +1,137 @@
+.debug-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
+    /* Light Mode */
+    background-color: #f3f4f6;
+    color: #4b5563;
+    border: 1px solid #d1d5db;
+}
+
+.dark .debug-badge {
+    /* Dark Mode */
+    background-color: #374151;
+    color: #9ca3af;
+    border-color: #4b5563;
+}
+
+/* Custom variables for theme engine */
+html, html.light {
+    --bg-main: #f9fafb;
+    --bg-card: #ffffff;
+    --text-base: #111827;
+    --text-muted: #4b5563;
+    --primary-custom: #3b82f6;
+    --accent-custom: #2563eb;
+    --border-custom: #e5e7eb;
+}
+
+html.dark {
+    --bg-main: #0f172a;
+    --bg-card: #1e293b;
+    --text-base: #f8fafc;
+    --text-muted: #9ca3af;
+    --primary-custom: #60a5fa;
+    --accent-custom: #3b82f6;
+    --border-custom: #334155;
+}
+
+html.forest {
+    --bg-main: #060b07;
+    --bg-card: #0f1c12;
+    --text-base: #ecfdf5;
+    --text-muted: #a7f3d0;
+    --primary-custom: #10b981;
+    --accent-custom: #059669;
+    --border-custom: #1f2d23;
+}
+
+html.sunset {
+    --bg-main: #1a0f0a;
+    --bg-card: #2a1a10;
+    --text-base: #fef3c7;
+    --text-muted: #fbbf24;
+    --primary-custom: #f59e0b;
+    --accent-custom: #d97706;
+    --border-custom: #3d2517;
+}
+
+/* Base style overrides for theme engine */
+body {
+    background-color: var(--bg-main) !important;
+    color: var(--text-base) !important;
+}
+
+/* ── Main backgrounds ── */
+.bg-gray-50,
+.dark .dark\:bg-gray-900,
+.dark .dark\:bg-gray-950 {
+    background-color: var(--bg-main) !important;
+}
+
+/* ── Card / panel backgrounds ── */
+.bg-white,
+.dark .dark\:bg-gray-800,
+.dark .dark\:bg-gray-800\/50 {
+    background-color: var(--bg-card) !important;
+}
+
+/* ── Navbar & subtle surfaces ── */
+html.forest nav,
+html.sunset nav {
+    background-color: var(--bg-card) !important;
+}
+
+html.forest .dark\:bg-gray-700,
+html.sunset .dark\:bg-gray-700 {
+    background-color: color-mix(in srgb, var(--bg-card) 80%, var(--primary-custom) 20%) !important;
+}
+
+/* ── Primary text ── */
+.text-gray-900,
+.dark .dark\:text-white,
+.dark .dark\:text-gray-100,
+.dark .dark\:text-gray-200 {
+    color: var(--text-base) !important;
+}
+
+/* ── Muted / secondary text ── */
+.text-gray-600,
+.text-gray-500,
+.dark .dark\:text-gray-400,
+.dark .dark\:text-gray-300 {
+    color: var(--text-muted) !important;
+}
+
+/* ── Borders ── */
+.border-gray-200,
+.border-gray-300,
+.dark .dark\:border-gray-700,
+.dark .dark\:border-gray-600 {
+    border-color: var(--border-custom) !important;
+}
+
+/* ── Hover states for forest/sunset ── */
+html.forest .hover\:bg-gray-200:hover,
+html.forest .dark\:hover\:bg-gray-600:hover,
+html.sunset .hover\:bg-gray-200:hover,
+html.sunset .dark\:hover\:bg-gray-600:hover {
+    background-color: color-mix(in srgb, var(--bg-card) 60%, var(--primary-custom) 40%) !important;
+}
+
+/* ── Shadow tinting for themed cards ── */
+html.forest .shadow-sm,
+html.forest .shadow {
+    box-shadow: 0 1px 3px rgba(16, 185, 129, 0.08), 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+}
+
+html.sunset .shadow-sm,
+html.sunset .shadow {
+    box-shadow: 0 1px 3px rgba(245, 158, 11, 0.08), 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+}
