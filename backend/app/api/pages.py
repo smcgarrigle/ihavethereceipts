@@ -93,9 +93,9 @@ def root(request: Request, db: Session = Depends(get_db)):
     has_gemini_key = bool(os.getenv("GEMINI_API_KEY"))
 
     return templates.TemplateResponse(
+        request,
         "pages/dashboard.html",
         {
-            "request": request,
             "stores": dashboard_data,
             "total_spent": total_spent,
             "total_savings": total_savings,
@@ -146,9 +146,9 @@ def receipts_page(request: Request, db: Session = Depends(get_db)):
     sorted_stores = sorted(store_map.values())
 
     return templates.TemplateResponse(
+        request,
         "pages/receipts.html",
         {
-            "request": request,
             "ocr_usage": get_daily_usage(),
             "ocr_model": ocr_model_name,
             "ocr_backend": get_backend(),
@@ -161,10 +161,8 @@ def receipts_page(request: Request, db: Session = Depends(get_db)):
 def bulk_upload_page(request: Request):
     """Dedicated page for mass-loading receipts"""
     return templates.TemplateResponse(
+        request,
         "pages/bulk.html",
-        {
-            "request": request,
-        },
     )
 
 
@@ -620,9 +618,9 @@ def review_receipt(request: Request, receipt_id: int, db: Session = Depends(get_
     image_filename = Path(receipt.image_path).name if receipt.image_path else None
 
     return templates.TemplateResponse(
+        request,
         "pages/receipt_review.html",
         {
-            "request": request,
             "receipt_id": receipt_id,
             "ocr_data": ocr_data,
             "detection_alert": detection_alert,
@@ -638,41 +636,41 @@ def review_receipt(request: Request, receipt_id: int, db: Session = Depends(get_
 
 @router.get("/items", response_class=HTMLResponse)
 def items_page(request: Request, tab: str = "all"):
-    return templates.TemplateResponse("pages/items.html", {"request": request, "initial_tab": tab})
+    return templates.TemplateResponse(request, "pages/items.html", {"initial_tab": tab})
 
 
 @router.get("/categories", response_class=HTMLResponse)
 def categories_page(request: Request):
-    return templates.TemplateResponse("pages/categories.html", {"request": request})
+    return templates.TemplateResponse(request, "pages/categories.html")
 
 
 @router.get("/trends", response_class=HTMLResponse)
 def trends_page(request: Request):
-    return templates.TemplateResponse("pages/trends.html", {"request": request})
+    return templates.TemplateResponse(request, "pages/trends.html")
 
 
 @router.get("/xray", response_class=HTMLResponse)
 def xray_page(request: Request):
     """Receipt X-Ray — intelligence dashboard decoding hidden receipt data."""
-    return templates.TemplateResponse("pages/xray.html", {"request": request})
+    return templates.TemplateResponse(request, "pages/xray.html")
 
 
 @router.get("/styleguide", response_class=HTMLResponse)
 def styleguide_page(request: Request):
     """Internal living style guide — catalogs design tokens and UI components."""
-    return templates.TemplateResponse("pages/styleguide.html", {"request": request})
+    return templates.TemplateResponse(request, "pages/styleguide.html")
 
 
 @router.get("/demo-bi", response_class=HTMLResponse)
 def demo_bi_page(request: Request):
     """BI demo — Tufte-style budget × nutrition intelligence dashboard with synthetic data."""
-    return templates.TemplateResponse("pages/demo_bi.html", {"request": request})
+    return templates.TemplateResponse(request, "pages/demo_bi.html")
 
 
 @router.get("/restock", response_class=HTMLResponse)
 def restock_page(request: Request):
     """Restock predictions page — items due for repurchase with store price comparisons."""
-    return templates.TemplateResponse("pages/restock.html", {"request": request})
+    return templates.TemplateResponse(request, "pages/restock.html")
 
 
 @router.get("/items/{item_id}/insights", response_class=HTMLResponse)
@@ -685,9 +683,7 @@ def item_insights_page(request: Request, item_id: int, db: Session = Depends(get
 
     item = db.query(Item).filter(Item.id == item_id).first()
     if not item:
-        return templates.TemplateResponse(
-            "pages/404.html", {"request": request, "message": "Item not found"}
-        )
+        return templates.TemplateResponse(request, "pages/404.html", {"message": "Item not found"})
 
     # Load full purchase history, newest first
     purchase_history = (
@@ -816,9 +812,9 @@ def item_insights_page(request: Request, item_id: int, db: Session = Depends(get
         )
 
     return templates.TemplateResponse(
+        request,
         "pages/item_insights.html",
         {
-            "request": request,
             "item": item,
             "usda": usda_raw,
             "nutrition": unified_nutrition,
@@ -838,14 +834,15 @@ def search_page(request: Request, q: str = "", db: Session = Depends(get_db)):
     q = q.strip()
     results = _search_items(q, db, limit=50) if len(q) >= 2 else []
     return templates.TemplateResponse(
+        request,
         "pages/search_results_page.html",
-        {"request": request, "results": results, "query": q},
+        {"results": results, "query": q},
     )
 
 
 @router.get("/produce", response_class=HTMLResponse)
 def produce_page(request: Request):
-    return templates.TemplateResponse("pages/produce.html", {"request": request})
+    return templates.TemplateResponse(request, "pages/produce.html")
 
 
 @router.get("/best-value/{category_type}", response_class=HTMLResponse)
@@ -870,4 +867,4 @@ def view_best_value_page(request: Request, category_type: str):
         "unit_label": category_config[category_type]["unit"],
         "category_type": category_type,
     }
-    return templates.TemplateResponse("pages/best_value.html", context)
+    return templates.TemplateResponse(request, "pages/best_value.html", context)

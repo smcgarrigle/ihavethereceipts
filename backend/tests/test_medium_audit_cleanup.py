@@ -29,7 +29,7 @@ def test_content_length_limit_middleware(client):
     """Test that requests exceeding 15MB are rejected with 413 Payload Too Large."""
     # Send a request with Content-Length larger than 15MB
     large_headers = {"Content-Length": str(16 * 1024 * 1024)}  # 16MB
-    response = client.post("/api/receipts/upload", headers=large_headers, data=b"a" * 100)
+    response = client.post("/api/receipts/upload", headers=large_headers, content=b"a" * 100)
     assert response.status_code == 413
     assert "Payload too large" in response.text
 

@@ -1,6 +1,6 @@
 """SQLAlchemy model for OCR corrections captured from the human review sandbox."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
@@ -31,4 +31,6 @@ class OcrCorrection(Base):
     )  # item name, for field-level fixes
     ai_value: Mapped[str | None] = mapped_column(Text, nullable=True)
     approved_value: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(UTC), nullable=False
+    )

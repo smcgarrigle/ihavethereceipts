@@ -89,9 +89,9 @@ def global_search(
     results = _search_items(q, db, limit=8)
 
     return templates.TemplateResponse(
+        request,
         "fragments/search_results.html",
         {
-            "request": request,
             "results": results,
             "query": q,
         },

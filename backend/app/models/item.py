@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String
@@ -33,7 +33,7 @@ class Item(Base):
     nutrients: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     custom_nutrients: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     nutrition_source: Mapped[str | None] = mapped_column(String, default="auto")
-    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
 
     @property
     def effective_nutrients(self) -> dict[str, Any]:
@@ -57,4 +57,4 @@ class ItemMatchIgnore(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     item_id_1: Mapped[int] = mapped_column(Integer, ForeignKey("items.id"), nullable=False)
     item_id_2: Mapped[int] = mapped_column(Integer, ForeignKey("items.id"), nullable=False)
-    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=lambda: datetime.now(UTC))

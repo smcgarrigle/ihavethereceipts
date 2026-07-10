@@ -1,6 +1,6 @@
 """SQLAlchemy model for exclusion rules (analytics + prediction category exclusions)."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import DateTime, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
@@ -23,4 +23,4 @@ class ExclusionRule(Base):
     )  # 'analytics' | 'predictions'
     pattern: Mapped[str] = mapped_column(String, nullable=False)  # category name substring to match
     reason: Mapped[str | None] = mapped_column(String, nullable=True)  # optional user-facing note
-    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=lambda: datetime.now(UTC))

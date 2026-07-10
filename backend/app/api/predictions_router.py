@@ -57,9 +57,9 @@ def restock_table_fragment(request: Request, db: Session = Depends(get_db)):
     ]
 
     return templates.TemplateResponse(
+        request,
         "fragments/restock_table.html",
         {
-            "request": request,
             "items": actionable,
             "stores": top_stores,
         },
@@ -92,9 +92,9 @@ def optimized_list_fragment(request: Request, db: Session = Depends(get_db)):
     )
 
     return templates.TemplateResponse(
+        request,
         "fragments/optimized_list.html",
         {
-            "request": request,
             "store_groups": sorted_store_groups,
         },
     )

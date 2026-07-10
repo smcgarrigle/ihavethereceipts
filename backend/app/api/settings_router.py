@@ -103,9 +103,9 @@ def _render_settings_page(request: Request, db: Session) -> HTMLResponse:
     ocr = _load_ocr_filters()
     flags = _load_feature_flags()
     return templates.TemplateResponse(
+        request,
         "pages/settings.html",
         {
-            "request": request,
             "analytics_rules": analytics_rules,
             "prediction_rules": prediction_rules,
             "skip_keywords": ocr.get("skip_keywords", []),
@@ -172,8 +172,9 @@ def _render_rules_list(request: Request, db: Session, scope: str) -> HTMLRespons
         .all()
     )
     return templates.TemplateResponse(
+        request,
         "fragments/exclusion_rules_list.html",
-        {"request": request, "rules": rules, "scope": scope},
+        {"rules": rules, "scope": scope},
     )
 
 
@@ -214,8 +215,9 @@ def delete_ocr_filter(filter_type: str, request: Request, value: str = ""):
 
 def _render_ocr_list(request: Request, filter_type: str, items: list) -> HTMLResponse:
     return templates.TemplateResponse(
+        request,
         "fragments/ocr_filter_list.html",
-        {"request": request, "filter_type": filter_type, "items": items},
+        {"filter_type": filter_type, "items": items},
     )
 
 
