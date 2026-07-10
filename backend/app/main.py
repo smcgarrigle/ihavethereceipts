@@ -8,8 +8,10 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-# Load environment variables
-load_dotenv(override=True)
+# Load environment variables. Skipped under TESTING so .env cannot override
+# the test environment (see app/core/config.py for the full rationale).
+if os.getenv("TESTING") != "1":
+    load_dotenv(override=True)
 
 from contextlib import asynccontextmanager
 

@@ -8,11 +8,15 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
 env_path = BASE_DIR / ".env"
 
-# Load environment variables from the root .env file explicitly
-load_dotenv(dotenv_path=env_path, override=True)
-
 # Auto-configure secret key and database URL for local zero-config developer convenience
 is_testing = os.getenv("TESTING") == "1"
+
+# Load environment variables from the root .env file explicitly. Skipped under
+# TESTING: .env carries the live DATABASE_URL and real API keys, and with
+# override=True it would clobber the in-memory test database configured by
+# conftest.py, sending test writes (and Gemini calls) to production data.
+if not is_testing:
+    load_dotenv(dotenv_path=env_path, override=True)
 
 if not is_testing:
     # Ensure SECRET_KEY exists
