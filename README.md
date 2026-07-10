@@ -6,6 +6,7 @@ A self-hosted, AI-powered receipt tracker that builds a personal price history d
 
 ### 📄 Intelligent Receipt Processing
 - **AI OCR**: Takes images (JPG/PNG) or PDFs and extracts data using **Google Gemini 3.5** or local models like **IBM Granite 3.3 Vision** or **Qwen2-VL** via **LM Studio** or **Ollama**.
+- **Paste-Text Ingestion**: Got a digital receipt or order-confirmation email? Just paste the text — no screenshot or PDF needed. Text parsing skips vision processing entirely, using a small fraction of the tokens of image OCR, so it's faster, cheaper, and much friendlier to free-tier API limits.
 - **Local Model Support**: Run OCR entirely on your own hardware for privacy and zero API costs.
 - **Smart Parsing**: Handles discounts, varied unit types (oz, lb, etc.), and complex "2 for $X" deals.
 - **Interactive Review (Human-in-the-Loop)**: Verify and edit OCR results before saving. The AI extracts data into a safe sandbox, and your analytics charts remain completely untouched until you explicitly click "Save". *It's your data, you approve it.*
@@ -28,6 +29,16 @@ A self-hosted, AI-powered receipt tracker that builds a personal price history d
 - **Smart Merging**: Merge duplicates to keep your price history clean while preserving original receipt data.
 - **Auto-Categorization**: AI automatically tags items into categories (Produce, Dairy, Snacks, etc.).
 - **Dismissal Memory**: "Dismiss" incorrect duplicate suggestions, and the system remembers to ignore them in the future.
+
+### 🥦 Nutrition Insights
+- **Automatic Enrichment**: Items are matched against the **USDA FoodData Central** database to pull nutrition facts, brands, and categories.
+- **User-Entered Nutrition Data**: When the databases don't know a product, you can enter or correct nutrition facts yourself from any item's insights page — your values take precedence and flow into every chart.
+- **Honest Coverage**: The trends page shows exactly what share of your spending has nutrition data behind it, so charts never silently pretend to more than they know.
+- **Extensible Sources**: The enrichment layer is pluggable — an [OpenFoodFacts](https://world.openfoodfacts.org/) integration is scaffolded, and contributors are welcome to deepen it (barcode lookup, Nutri-Score) or add other food-composition databases.
+
+### 🔐 Your Data, In and Out
+- **Export Everything**: Download any single receipt or your entire purchase history as **CSV or Excel** at any time.
+- **Delete Anything**: Remove individual items, whole receipts, or — from the Settings page — wipe **all** data in one click. Self-hosted means easy exit, not just easy entry.
 
 ### 📱 Mobile-First Design
 - **Responsive UI**: Fully optimized for phones with a collapsible hamburger menu and touch-friendly controls.
@@ -71,13 +82,15 @@ A self-hosted, AI-powered receipt tracker that builds a personal price history d
 
 ## 🤖 AI Development (Ensemble Programming)
 
-This project has been developed through **Ensemble AI Programming**, leveraging a coordinated group of AI agents and models to architect, implement, and maintain the codebase:
+This project is developed through **Ensemble AI Programming** — a coordinated group of AI harnesses and models, each with a distinct role, rather than a single tool:
 
-- **AI Agent**: [Antigravity](https://github.com/google-deepmind/antigravity) (Google DeepMind)
-- **Primary Models**: Built with **Gemini 3 Flash** and **Gemini 3.5**.
-- **OCR Logic**: Orchestrated via **Gemini 3.5 Flash** and locally verified with **IBM Granite 3.3 Vision**.
+- **Primary Harness & Models**: [Antigravity](https://antigravity.google) (Google) drives the main implementation work, with **Gemini 3 Flash** and **Gemini 3.5** as the primary coding models.
+- **Review & Improvement**: **Anthropic Claude** (Opus, Sonnet, and Fable via Claude Code) runs code review, refactoring, and hardening passes over the Gemini-authored code.
+- **Terminal Work**: **Gemini CLI** handled command-line-driven tasks until it was no longer available; that role has since folded into the harnesses above.
+- **Independent Sanity Reviews**: Periodic whole-project reviews are conducted with **Z.ai (GLM)** and other models — a deliberately different model family, to catch blind spots the primary models might share.
+- **Runtime OCR**: **Gemini Flash** (cloud) or **IBM Granite 3.3 Vision / Qwen2-VL** (local) perform the actual receipt extraction in the app itself.
 
-In this ensemble approach, different models specialize in specific tasks—from high-level architectural planning to precise code execution and OCR data parsing—ensuring a robust and scalable application.
+In this ensemble approach, different models specialize in specific tasks — from high-level architectural planning to precise code execution, adversarial review, and OCR data parsing — so no single model's weaknesses go unchecked.
 
 ## ⚡ Quick Start
 
@@ -85,6 +98,14 @@ In this ensemble approach, different models specialize in specific tasks—from 
 - Python 3.11+
 - [uv](https://docs.astral.sh/uv/getting-started/installation/) (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
 - Google Gemini API Key **OR** a local model server ([LM Studio](https://lmstudio.ai/) or [Ollama](https://ollama.com/))
+
+> [!TIP]
+> **Getting a free Gemini API key** takes about a minute:
+> 1. Go to [Google AI Studio](https://aistudio.google.com/apikey) and sign in with any Google account.
+> 2. Click **Create API key** and copy the key.
+> 3. Paste it into your `.env` as `GEMINI_API_KEY=...` (see step 1 below).
+>
+> The **free tier** is plenty for personal receipt volume — the app deliberately minimizes API calls with a rule-based fast path for digital PDFs, OCR result caching, and token-light text-paste ingestion. No credit card required.
 
 ### Setup
 

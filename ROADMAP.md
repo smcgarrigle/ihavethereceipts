@@ -44,10 +44,10 @@ All three Strategic Vision phases have been delivered as of May 2026. The applic
 
 ## 🟡 Near-Term Backlog & Strategic Roadmap
 
-### 1. Taxonomy Cleanup & Category Merging
-- [ ] **Taxonomy Mapping Engine**: Define a strict list of canonical master categories (e.g., Produce, Dairy, Meat, Pantry).
-- [ ] **The Interceptor**: Intercept and funnel chaotic/ultra-specific external categories (from USDA/OpenFoodFacts) into the correct master category.
-- [ ] **Database Migration**: One-time script to collapse 163+ fragmented categories back down into the clean taxonomy.
+### 1. Taxonomy Cleanup & Category Merging ✅ (July 2026)
+- [x] **Taxonomy Mapping Engine**: Strict 13-category canonical set defined.
+- [x] **The Interceptor**: `category_mapper` funnels chaotic external categories (USDA/OpenFoodFacts) into the master taxonomy and prevents re-fragmentation.
+- [x] **Database Migration**: Fragmented categories collapsed into the clean taxonomy (see "Category Taxonomy Collapse" above).
 
 ### 2. Price History & Volatility
 - [ ] **Retailer Overlays**: Overlay multiple stores on a single item's price history chart to compare pricing.
@@ -65,7 +65,7 @@ All three Strategic Vision phases have been delivered as of May 2026. The applic
 - [ ] **Shopping Habits Gallery**: Recurring trend charts with improved signal/noise filtering.
 
 ### 5. Automation & Scalability
-- [ ] **Local Folder-Watch Ingestion**: Background service (`watchdog`) to monitor a local folder and automatically ingest dropped PDF receipts/images.
+- [x] **Local Folder-Watch Ingestion** ✅ (July 2026): Drop PDFs/images into `data/inbox` and they auto-ingest through the normal OCR + review pipeline (`FOLDER_WATCH=0` to disable).
 - [ ] **Household Support**: Individual accounts with shared or separate grocery databases.
 - [ ] **Cross-Device Sync (Offline-First)**: Robust synchronization across mobile and desktop clients. Architect as a Progressive Web App (PWA) using IndexedDB to allow scanning and viewing in low-service grocery stores, syncing back to the server later.
 
