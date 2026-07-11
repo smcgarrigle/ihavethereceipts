@@ -119,3 +119,6 @@ data/*.zip
 
 # Standalone Tailwind CLI binary (fetched by scripts/build_css.sh)
 backend/tools/
+
+# Generated static demo site (rebuild with: make demo)
+site/demo/

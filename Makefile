@@ -3,7 +3,7 @@
 
 BACKEND_DIR = backend
 
-.PHONY: setup run test lint format help
+.PHONY: setup run test lint format demo help
 
 help:
 	@echo "Grocery Tracker Dev Commands"
@@ -12,6 +12,7 @@ help:
 	@echo "  make test    — run full pytest suite"
 	@echo "  make lint    — ruff check + format check"
 	@echo "  make format  — auto-fix formatting with ruff"
+	@echo "  make demo    — build the static demo site into site/demo"
 
 setup:
 	cd $(BACKEND_DIR) && uv sync
@@ -31,3 +32,7 @@ lint:
 format:
 	cd $(BACKEND_DIR) && uv run ruff check --fix .
 	cd $(BACKEND_DIR) && uv run ruff format .
+
+demo:
+	cd $(BACKEND_DIR) && uv run python scripts/build_static_demo.py
+	@echo "Preview: python3 -m http.server -d site/demo 8080"
