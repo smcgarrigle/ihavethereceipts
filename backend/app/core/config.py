@@ -12,11 +12,15 @@ env_path = BASE_DIR / ".env"
 is_testing = os.getenv("TESTING") == "1"
 
 # Load environment variables from the root .env file explicitly. Skipped under
-# TESTING: .env carries the live DATABASE_URL and real API keys, and with
-# override=True it would clobber the in-memory test database configured by
-# conftest.py, sending test writes (and Gemini calls) to production data.
+# TESTING: .env carries the live DATABASE_URL and real API keys and would
+# clobber the in-memory test database configured by conftest.py, sending test
+# writes (and Gemini calls) to production data.
+#
+# override=False: variables already set in the caller's environment win over
+# .env. Anyone exporting DATABASE_URL (seed scripts, the static-demo builder)
+# is deliberately redirecting the app — .env only fills in what's unset.
 if not is_testing:
-    load_dotenv(dotenv_path=env_path, override=True)
+    load_dotenv(dotenv_path=env_path, override=False)
 
 if not is_testing:
     # Ensure SECRET_KEY exists
@@ -26,8 +30,8 @@ if not is_testing:
             # If .env exists, append to it, otherwise create it
             with open(env_path, "a") as f:
                 f.write(f"\nSECRET_KEY={generated_key}\n")
-            # Reload env vars
-            load_dotenv(override=True)
+            # Pick up the just-appended value (unset vars load regardless of override)
+            load_dotenv(dotenv_path=env_path, override=False)
         except Exception as e:
             raise RuntimeError(
                 "SECRET_KEY environment variable is not set and auto-generation failed. "
@@ -41,7 +45,7 @@ if not is_testing:
         try:
             with open(env_path, "a") as f:
                 f.write(f"\nDATABASE_URL=sqlite:///{BASE_DIR / 'grocery.db'}\n")
-            load_dotenv(override=True)
+            load_dotenv(dotenv_path=env_path, override=False)
         except Exception as e:
             raise RuntimeError(
                 "DATABASE_URL environment variable is not set and fallback setup failed. "

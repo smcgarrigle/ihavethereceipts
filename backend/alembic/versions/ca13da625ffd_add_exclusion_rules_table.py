@@ -45,7 +45,9 @@ def upgrade() -> None:
         op.create_table(
             "exclusion_rules",
             sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
-            sa.Column("scope", sa.String, nullable=False, index=True),
+            # index created explicitly below — index=True here would create
+            # ix_exclusion_rules_scope twice and break fresh installs
+            sa.Column("scope", sa.String, nullable=False),
             sa.Column("pattern", sa.String, nullable=False),
             sa.Column("reason", sa.String, nullable=True),
             sa.Column(
