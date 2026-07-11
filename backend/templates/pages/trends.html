@@ -15,21 +15,7 @@
 
 {% block content %}
 <div class="space-y-12">
-    <!-- Restock Predictions Banner -->
-    <a href="/restock"
-       class="block bg-gradient-to-r from-orange-500/10 via-amber-500/10 to-yellow-500/10 dark:from-orange-500/20 dark:via-amber-500/20 dark:to-yellow-500/20 border border-orange-200 dark:border-orange-800/50 rounded-2xl p-4 hover:shadow-lg transition-all group">
-        <div class="flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <span class="text-2xl">🛒</span>
-                <div>
-                    <span class="font-bold text-textBase group-hover:text-orange-600 dark:group-hover:text-orange-400 transition">Restock Predictions</span>
-                    <span class="text-textMuted text-sm ml-2">See what's running low &amp; compare store prices</span>
-                </div>
-            </div>
-            <span class="text-textSubtle group-hover:text-orange-500 transition text-xl">→</span>
-        </div>
-    </a>
-
+    {% include "components/insights_subnav.html" %}
 
     <!-- Global Chart Filters (HTMX) -->
     <div class="bg-bgCard rounded-2xl shadow p-4 flex flex-col md:flex-row gap-4 justify-between items-center border border-borderDefault">
@@ -86,6 +72,9 @@
                     <span id="nutrition-coverage-text"></span>
                 </a>
             </div>
+
+            {% include "components/nutrition_bi.html" %}
+
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <!-- Left: Macronutrient Caloric Profile -->
                 <div class="lg:col-span-2 bg-bgCard rounded-3xl shadow-xl p-6 border border-borderDefault flex flex-col justify-between">

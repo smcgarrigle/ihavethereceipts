@@ -468,6 +468,7 @@ def review_receipt(request: Request, receipt_id: int, db: Session = Depends(get_
 
             # Map database ReceiptItem back to the format the Review UI expects
             item_dict = {
+                "item_id": ri.item.id if ri.item else None,
                 "name": ri.item.name if ri.item else "Unknown Item",
                 "quantity": ri.quantity,
                 "base_price": round(item_notes.get("base_price", ri.price * ri.quantity), 2),
@@ -494,6 +495,27 @@ def review_receipt(request: Request, receipt_id: int, db: Session = Depends(get_
     # Inject image filename if missing from stored ocr_data
     if receipt.image_path and "image_filename" not in ocr_data:
         ocr_data["image_filename"] = receipt.image_path.split("/")[-1]
+
+    # Resolve sandbox item names to known library items so the review UI can
+    # deep-link each matched line to its item insights page (auto-merged items
+    # carry the canonical name but not the id).
+    if ocr_data.get("items"):
+        from app.models import Item
+        from app.services.item_matcher import normalize_item_name
+
+        unresolved = [i for i in ocr_data["items"] if not i.get("item_id") and i.get("name")]
+        if unresolved:
+            wanted = {normalize_item_name(i["name"]) for i in unresolved}
+            rows = (
+                db.query(Item.id, Item.normalized_name)
+                .filter(Item.normalized_name.in_(wanted))
+                .all()
+            )
+            by_norm = {norm: item_id for item_id, norm in rows}
+            for i in unresolved:
+                match_id = by_norm.get(normalize_item_name(i["name"]))
+                if match_id:
+                    i["item_id"] = match_id
 
     # FORCE UPDATE: Overwrite OCR data with current Database values
     # This ensures that if the user updated the store/date/total, the UI reflects it
@@ -635,8 +657,27 @@ def review_receipt(request: Request, receipt_id: int, db: Session = Depends(get_
 
 
 @router.get("/items", response_class=HTMLResponse)
-def items_page(request: Request, tab: str = "all"):
-    return templates.TemplateResponse(request, "pages/items.html", {"initial_tab": tab})
+def items_page(
+    request: Request,
+    tab: str = "all",
+    category: int | None = None,
+    db: Session = Depends(get_db),
+):
+    category_name = None
+    if category:
+        from app.models import Category
+
+        cat = db.query(Category).filter(Category.id == category).first()
+        category_name = cat.name if cat else None
+    return templates.TemplateResponse(
+        request,
+        "pages/items.html",
+        {
+            "initial_tab": tab,
+            "filter_category_id": category,
+            "filter_category_name": category_name,
+        },
+    )
 
 
 @router.get("/categories", response_class=HTMLResponse)

@@ -906,6 +906,7 @@ def get_bi_dashboard_data(db: Session = Depends(get_db)):
                     cpp = item_spend / macros["protein_g"]
                     protein_sources.append(
                         {
+                            "id": ri.item.id if ri.item else None,
                             "name": f"{ri.item.name} ({r.store.name if r.store else 'Unknown'})",
                             "cpp": cpp,
                         }

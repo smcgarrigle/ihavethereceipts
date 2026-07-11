@@ -56,16 +56,28 @@
                 :class="tab === 'dismissed' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-textMuted hover:text-textBase hover:border-gray-300 dark:hover:border-gray-600'">
                 Dismissed
             </button>
+            <button @click="tab = 'categories'" class="py-2 px-1 border-b-2 font-medium text-sm"
+                :class="tab === 'categories' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-textMuted hover:text-textBase hover:border-gray-300 dark:hover:border-gray-600'">
+                Categories
+            </button>
         </nav>
     </div>
 
     <!-- All Items Tab -->
     <div x-show="tab === 'all'" x-cloak class="bg-bgCard rounded-lg shadow dark:shadow-gray-900/50">
-        <div class="p-6 border-b border-borderDefault">
+        <div class="p-6 border-b border-borderDefault flex items-center justify-between gap-3">
             <h2 class="text-lg font-semibold text-textBase">All Items</h2>
+            {% if filter_category_id and filter_category_name %}
+            <a href="/items" title="Clear category filter"
+               class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 hover:bg-indigo-500/20 transition">
+                {{ filter_category_name }}
+                <span aria-hidden="true">✕</span>
+            </a>
+            {% endif %}
         </div>
 
-        <div class="p-6" hx-get="/api/items/list" hx-trigger="load" hx-target="this" hx-swap="innerHTML">
+        <div class="p-6" hx-get="/api/items/list{% if filter_category_id %}?category_id={{ filter_category_id }}{% endif %}"
+             hx-trigger="load" hx-target="this" hx-swap="innerHTML">
             <!-- Loading state -->
             <div class="text-center py-12 flex flex-col items-center justify-center">
                 <svg class="animate-spin h-10 w-10 text-blue-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none"
@@ -155,6 +167,74 @@
             <div class="text-center py-8">
                 <div class="animate-pulse">
                     <div class="h-4 bg-bgSkeleton rounded w-3/4 mx-auto mb-4"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Categories Tab -->
+    <div x-show="tab === 'categories'" x-cloak
+        class="bg-bgCard rounded-lg shadow dark:shadow-gray-900/50"
+        x-data="{ showAddModal: false, newCategoryName: '' }" @keydown.escape.window="showAddModal = false">
+        <div class="p-6 border-b border-borderDefault flex justify-between items-center">
+            <div>
+                <h2 class="text-lg font-semibold text-textBase">Categories</h2>
+                <p class="text-sm text-textMuted mt-1">Manage item categories and view spending by category</p>
+            </div>
+            <button @click="showAddModal = true"
+                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center space-x-2">
+                <svg aria-hidden="true" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                <span>Add Category</span>
+            </button>
+        </div>
+
+        <!-- Add Category Modal -->
+        <div x-show="showAddModal" x-cloak
+            class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+            @click.self="showAddModal = false">
+            <div class="bg-bgCard rounded-lg p-6 max-w-md w-full mx-4">
+                <h3 class="text-lg font-semibold text-textBase mb-4">Add New Category</h3>
+                <form @submit.prevent="
+                    fetch('/api/categories/create', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-Token': '{{ csrf_token(request) }}'
+                        },
+                        body: JSON.stringify({name: newCategoryName})
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            newCategoryName = '';
+                            showAddModal = false;
+                            htmx.trigger('#categories-tab-list', 'refresh');
+                        }
+                    })
+                    .catch(err => alert('Error: ' + err))
+                ">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-textMuted mb-2">Category Name</label>
+                        <input type="text" x-model="newCategoryName" required placeholder="e.g., Snacks, Pet Food"
+                            class="w-full px-3 py-2 border border-borderInput rounded-lg bg-bgInput text-textBase focus:ring-2 focus:ring-blue-500" />
+                    </div>
+                    <div class="flex space-x-2">
+                        <button type="submit" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Create</button>
+                        <button type="button" @click="showAddModal = false; newCategoryName = ''"
+                            class="flex-1 px-4 py-2 bg-bgHover text-textMuted rounded-lg hover:bg-bgHover">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div id="categories-tab-list" class="p-6" hx-get="/api/categories/list" hx-trigger="load, refresh" hx-target="this" hx-swap="innerHTML">
+            <!-- Loading state -->
+            <div class="text-center py-8">
+                <div class="animate-pulse">
+                    <div class="h-4 bg-bgSkeleton rounded w-3/4 mx-auto mb-4"></div>
+                    <div class="h-4 bg-bgSkeleton rounded w-1/2 mx-auto"></div>
                 </div>
             </div>
         </div>

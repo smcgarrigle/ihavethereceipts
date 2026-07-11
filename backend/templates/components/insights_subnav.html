@@ -1,0 +1,25 @@
+{# Shared sub-navigation for the Insights workspace: Trends · Predictions · Best Value · X-Ray.
+   Include at the top of each insights page's content block. #}
+{% set _p = request.url.path if request else '' %}
+{% set sub_on = 'border-indigo-500 text-textBase' %}
+{% set sub_off = 'border-transparent text-textMuted hover:text-textBase hover:border-gray-300 dark:hover:border-gray-600' %}
+<div class="mb-6 border-b border-borderDefault overflow-x-auto">
+    <nav class="-mb-px flex space-x-6 whitespace-nowrap" aria-label="Insights sections">
+        <a href="/trends" {% if _p.startswith('/trends') %}aria-current="page"{% endif %}
+           class="py-2 px-1 border-b-2 font-medium text-sm transition {{ sub_on if _p.startswith('/trends') else sub_off }}">
+            📈 Trends
+        </a>
+        <a href="/restock" {% if _p.startswith('/restock') %}aria-current="page"{% endif %}
+           class="py-2 px-1 border-b-2 font-medium text-sm transition {{ sub_on if _p.startswith('/restock') else sub_off }}">
+            🔮 Predictions
+        </a>
+        <a href="/best-value/produce" {% if _p.startswith('/best-value') %}aria-current="page"{% endif %}
+           class="py-2 px-1 border-b-2 font-medium text-sm transition {{ sub_on if _p.startswith('/best-value') else sub_off }}">
+            🏆 Best Value
+        </a>
+        <a href="/xray" {% if _p.startswith('/xray') %}aria-current="page"{% endif %}
+           class="py-2 px-1 border-b-2 font-medium text-sm transition {{ sub_on if _p.startswith('/xray') else sub_off }}">
+            🔬 Nutrition X-Ray
+        </a>
+    </nav>
+</div>

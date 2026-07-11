@@ -6,7 +6,7 @@ module.exports = {
   darkMode: 'class',
   content: [
     './templates/**/*.html',
-    './app/api/pages.py', // processing page HTML is embedded in Python
+    './app/api/*.py', // several routers emit HTML fragments from Python f-strings
     './static/js/**/*.js',
   ],
   theme: {

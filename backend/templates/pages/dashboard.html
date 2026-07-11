@@ -146,187 +146,30 @@
         </div>
     </div>
 
-    <!-- ── Budget × Nutrition BI Section ──────────────────────────────────── -->
-    <div class="space-y-6 mb-10">
-
-      <!-- KPI Row -->
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div class="bg-bgCard border border-borderDefault rounded-2xl p-5">
-          <p class="text-[10px] font-mono uppercase tracking-wider text-textSubtle">Monthly Spend</p>
-          <p class="text-3xl font-bold text-textBase mt-1">$487<span class="text-lg font-normal text-textMuted">.32</span></p>
-          <p class="text-xs text-emerald-500 mt-1">↓ 6.2% vs last month</p>
-        </div>
-        <div class="bg-bgCard border border-borderDefault rounded-2xl p-5">
-          <p class="text-[10px] font-mono uppercase tracking-wider text-textSubtle">Avg $/Day</p>
-          <p class="text-3xl font-bold text-textBase mt-1">$16<span class="text-lg font-normal text-textMuted">.24</span></p>
-          <p class="text-xs text-textMuted mt-1">Budget: $18.00/day</p>
-        </div>
-        <div class="bg-bgCard border border-borderDefault rounded-2xl p-5">
-          <p class="text-[10px] font-mono uppercase tracking-wider text-textSubtle">Best Protein Value</p>
-          <p class="text-3xl font-bold text-emerald-500 mt-1">$0.08<span class="text-sm font-normal text-textMuted">/g</span></p>
-          <p class="text-xs text-textMuted mt-1">Eggs · Costco</p>
-        </div>
-        <div class="bg-bgCard border border-borderDefault rounded-2xl p-5">
-          <p class="text-[10px] font-mono uppercase tracking-wider text-textSubtle">Nutrition Score</p>
-          <p class="text-3xl font-bold text-indigo-400 mt-1">74<span class="text-lg font-normal text-textMuted">/100</span></p>
-          <p class="text-xs text-amber-500 mt-1">↑ 3 pts — protein improving</p>
-        </div>
-      </div>
-
-      <!-- Row 1: Macro Breakdown + Protein ROI -->
-      <div class="grid grid-cols-1 lg:grid-cols-5 gap-6"
-           x-data="{
-                 showMissing: true,
-                 biData: null,
-                 init() {
-                     fetch('/api/analytics/bi-dashboard')
-                       .then(r => r.json())
-                       .then(data => this.biData = data);
-                 },
-                 get macros() {
-                     if (!this.biData) return [];
-                     if (this.showMissing) {
-                         return this.biData.macro_breakdown;
-                     }
-                     let filtered = this.biData.macro_breakdown.filter(m => m.label !== 'Missing USDA Data');
-                     let total = filtered.reduce((acc, m) => acc + m.spend, 0);
-                     if (total === 0) return [];
-                     return filtered.map(m => ({...m, pct: Math.round((m.spend / total) * 100)}));
-                 },
-                 get roi() {
-                     if (!this.biData) return [];
-                     return this.biData.protein_roi;
-                 },
-                 get maxCpp() {
-                     if (!this.roi.length) return 1;
-                     return Math.max(...this.roi.map(r => r.cpp));
-                 }
-             }">
-        <!-- Dollar-Weighted Macro Breakdown -->
-        <div class="lg:col-span-3 bg-bgCard border border-borderDefault rounded-2xl p-6">
-          <div class="flex items-center justify-between mb-1">
-              <h2 class="text-[10px] font-mono font-bold uppercase tracking-widest text-textSubtle">WHERE YOUR DOLLAR GOES — BY NUTRITIONAL PROFILE</h2>
-              <!-- Toggle Switch -->
-              <label class="flex items-center cursor-pointer gap-2 group">
-                  <span class="text-[10px] text-textMuted uppercase tracking-widest group-hover:text-textBase transition">Show Missing Data</span>
-                  <div class="relative">
-                      <input type="checkbox" x-model="showMissing" class="sr-only">
-                      <div class="block bg-bgSkeleton w-8 h-4 rounded-full border border-borderDefault transition-colors" :class="showMissing ? 'bg-red-500/20 border-red-500/50' : ''"></div>
-                      <div class="dot absolute left-1 top-1 bg-textMuted w-2 h-2 rounded-full transition transform" :class="showMissing ? 'translate-x-4 bg-red-500' : ''"></div>
-                  </div>
-              </label>
-          </div>
-
-          <p class="text-sm text-textMuted mb-4">Of your <strong class="text-textBase" x-text="biData ? `$${biData.kpis.monthly_spend.toFixed(0)}` : '...'"></strong> this month, how much went to each macro-dominant food group.</p>
-
-          <!-- Stacked Bar Chart -->
-          <div class="flex h-7 w-full rounded-lg overflow-hidden text-[10px] font-bold text-white mb-4">
-             <template x-for="m in macros" :key="m.label">
-                 <div class="flex items-center justify-center transition-all duration-500 ease-in-out whitespace-nowrap overflow-hidden"
-                      :style="`width:${m.pct}%; background:${m.color}`"
-                      x-text="m.pct > 5 ? `${m.label.split(' ')[0]} ${m.pct}%` : ''"></div>
-             </template>
-          </div>
-
-          <!-- Detail Rows -->
-          <div class="space-y-3">
-             <template x-for="m in macros" :key="m.label">
-                 <div class="flex items-center gap-3">
-                     <div class="w-3 h-3 rounded-sm flex-shrink-0 transition-colors duration-500" :style="`background:${m.color}`"></div>
-                     <div class="flex-1 min-w-0">
-                         <div class="flex justify-between items-baseline mb-0.5">
-                             <span class="text-xs font-semibold text-textBase transition-colors duration-500" :class="m.label.includes('Missing') ? 'text-red-500' : ''">
-                                 <span x-text="m.label"></span>
-                             </span>
-                             <span class="text-xs font-mono text-textMuted ml-2 flex-shrink-0" x-text="`$${m.spend.toFixed(2)} · ${m.pct}%`"></span>
-                         </div>
-                         <div class="w-full bg-bgSkeleton h-1.5 rounded-full overflow-hidden">
-                             <div class="h-1.5 rounded-full transition-all duration-500 ease-in-out" :style="`width:${m.pct * (100/40)}%; background:${m.color}`"></div>
-                         </div>
-                         <p class="text-[10px] text-textSubtle mt-0.5" x-text="m.examples"></p>
-                     </div>
-                 </div>
-             </template>
-          </div>
-          <p class="text-[10px] text-textSubtle mt-3">&ldquo;Macro-dominant&rdquo; = the macro providing &gt;40% of a food's calories.</p>
-        </div>
-        <!-- Protein ROI -->
-        <div class="lg:col-span-2 bg-bgCard border border-borderDefault rounded-2xl p-6">
-          <h2 class="text-[10px] font-mono font-bold uppercase tracking-widest text-textSubtle mb-1">PROTEIN ROI RANKING</h2>
-          <p class="text-sm text-textMuted mb-4">Cost per gram of protein. Lower = better value.</p>
-          <div id="dash-protein-roi" class="space-y-2.5"></div>
-          <p class="text-[10px] text-textSubtle mt-3">Red line = $0.20/g target.</p>
-        </div>
-      </div>
-
-      <!-- Row 2: Dual-Axis Spend + Protein -->
-      <div class="bg-bgCard border border-borderDefault rounded-2xl p-6">
-        <div class="flex items-start justify-between gap-4 flex-wrap mb-4">
-          <div>
-            <h2 class="text-[10px] font-mono font-bold uppercase tracking-widest text-textSubtle mb-1">SPEND vs PROTEIN INTAKE — 12-WEEK TREND</h2>
-            <p class="text-sm text-textMuted">Does spending more actually buy more protein? The gap reveals inefficiency.</p>
-          </div>
-          <div class="flex items-center gap-4 text-xs text-textMuted">
-            <span class="flex items-center gap-1.5"><span class="inline-block w-6 h-0.5 bg-indigo-500 rounded"></span>Weekly Spend ($)</span>
-            <span class="flex items-center gap-1.5"><span class="inline-block w-6 h-0.5 bg-emerald-500 rounded"></span>Protein (g)</span>
-          </div>
-        </div>
-        <div class="h-[240px] relative">
-            <canvas id="dash-dual-axis"
-                    role="img"
-                    aria-label="Dual-axis chart: weekly spend versus protein intake over 12 weeks"
-                    aria-describedby="dash-dual-axis-desc">
-            </canvas>
-            <p id="dash-dual-axis-desc" class="sr-only">Line chart comparing weekly grocery spend in dollars against weekly protein intake in grams over the past 12 weeks.</p>
-        </div>
-      </div>
-
-      <!-- Row 3: Category Efficiency Table + Basket Donut -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div class="lg:col-span-2 bg-bgCard border border-borderDefault rounded-2xl p-6 overflow-x-auto">
-          <h2 class="text-[10px] font-mono font-bold uppercase tracking-widest text-textSubtle mb-1">CATEGORY EFFICIENCY MATRIX</h2>
-          <p class="text-sm text-textMuted mb-4">$/g protein · $/g carbs · $/kcal. Cells thermally coded — green = efficient.</p>
-          <table class="w-full text-xs">
-            <thead><tr class="text-left border-b border-borderDefault">
-              <th class="pb-2 font-semibold text-textMuted pr-4">Category</th>
-              <th class="pb-2 font-semibold text-textMuted text-right pr-3">$/g protein</th>
-              <th class="pb-2 font-semibold text-textMuted text-right pr-3">$/g carbs</th>
-              <th class="pb-2 font-semibold text-textMuted text-right pr-3">$/kcal</th>
-              <th class="pb-2 font-semibold text-textMuted text-right">Mo. spend</th>
-            </tr></thead>
-            <tbody id="dash-efficiency-table" class="divide-y divide-borderDefault"></tbody>
-          </table>
-        </div>
-        <div class="bg-bgCard border border-borderDefault rounded-2xl p-6">
-          <h2 class="text-[10px] font-mono font-bold uppercase tracking-widest text-textSubtle mb-1">BASKET COMPOSITION</h2>
-          <p class="text-sm text-textMuted mb-3">Spend share by category this month.</p>
-          <div class="h-[210px] relative">
-              <canvas id="dash-basket"
-                      role="img"
-                      aria-label="Basket composition donut chart"
-                      aria-describedby="dash-basket-desc">
-              </canvas>
-              <p id="dash-basket-desc" class="sr-only">Donut chart showing spending share by grocery category this month.</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Row 4: Nutrition Small Multiples by Store -->
-      <div class="bg-bgCard border border-borderDefault rounded-2xl p-6">
-        <h2 class="text-[10px] font-mono font-bold uppercase tracking-widest text-textSubtle mb-1">NUTRITION SMALL MULTIPLES — BY STORE</h2>
-        <p class="text-sm text-textMuted mb-5">Weekly protein &amp; fat from each store's purchases.</p>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-8" id="dash-small-multiples"></div>
-      </div>
-
-      <!-- Row 5: Bullet Charts -->
-      <div class="bg-bgCard border border-borderDefault rounded-2xl p-6">
-        <h2 class="text-[10px] font-mono font-bold uppercase tracking-widest text-textSubtle mb-1">BUDGET vs ACTUAL — BULLET CHART</h2>
-        <p class="text-sm text-textMuted mb-5">Actual spend vs. budget cap per category. Red line = cap.</p>
-        <div class="space-y-4" id="dash-bullets"></div>
-      </div>
-
+    <!-- Insights jump-offs: deep analytics live in the Insights section
+         (NAVIGATION.md: a chart appears on exactly one page; the dashboard advertises it) -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+        <a href="/trends" class="bg-bgCard border border-borderDefault rounded-2xl p-5 hover:shadow-lg hover:border-indigo-500/50 transition-all group">
+            <p class="text-2xl mb-1">📈</p>
+            <p class="font-bold text-textBase group-hover:text-indigo-400 transition-colors">Trends</p>
+            <p class="text-xs text-textMuted mt-0.5">Price, spend &amp; nutrition analytics</p>
+        </a>
+        <a href="/restock" class="bg-bgCard border border-borderDefault rounded-2xl p-5 hover:shadow-lg hover:border-orange-500/50 transition-all group">
+            <p class="text-2xl mb-1">🔮</p>
+            <p class="font-bold text-textBase group-hover:text-orange-400 transition-colors">Predictions</p>
+            <p class="text-xs text-textMuted mt-0.5">What's running low &amp; where to buy it</p>
+        </a>
+        <a href="/best-value/produce" class="bg-bgCard border border-borderDefault rounded-2xl p-5 hover:shadow-lg hover:border-emerald-500/50 transition-all group">
+            <p class="text-2xl mb-1">🏆</p>
+            <p class="font-bold text-textBase group-hover:text-emerald-400 transition-colors">Best Value</p>
+            <p class="text-xs text-textMuted mt-0.5">Cheapest per unit, by category</p>
+        </a>
+        <a href="/xray" class="bg-bgCard border border-borderDefault rounded-2xl p-5 hover:shadow-lg hover:border-sky-500/50 transition-all group">
+            <p class="text-2xl mb-1">🔬</p>
+            <p class="font-bold text-textBase group-hover:text-sky-400 transition-colors">Nutrition X-Ray</p>
+            <p class="text-xs text-textMuted mt-0.5">Coverage &amp; unmatched items</p>
+        </a>
     </div>
-    <!-- ── End BI Section ───────────────────────────────────────────────────── -->
 
     <!-- Summary Tables Grid (Moved Below) -->
     <div class="bg-bgCard rounded-xl shadow-lg border border-borderDefault p-6 mb-10">
@@ -545,7 +388,7 @@
                             {% for receipt in store.receipts %}
                             <!-- The loop index is 1-based. We want to show 2 items by default.
                                      Alpine will handle the height constraint. -->
-                            <a href="/receipts/{{ receipt.id }}/review" class="block group">
+                            <a href="/receipts/{{ receipt.id }}/review?from=/" class="block group">
                                 <div
                                     class="bg-bgHover rounded-lg p-3 border border-transparent hover:border-blue-300 dark:hover:border-blue-500 hover:shadow-md transition-all duration-200">
                                     <div class="flex justify-between items-start">
@@ -898,64 +741,6 @@
                 });
         }
 
-        // --- Shopping Basket Cost Over Time Chart ---
-        function initBasketChart() {
-            fetch('/api/analytics/basket-over-time?limit=10')
-                .then(response => {
-                    if (!response.ok) throw new Error('Network response was not ok');
-                    return response.json();
-                })
-                .then(data => {
-                    // Hide loading indicator
-                    const loader = document.getElementById('basketLoadingIndicator');
-                    if (loader) loader.style.display = 'none';
-
-                    if (!data.labels || data.labels.length === 0) {
-                        return; // No data yet
-                    }
-
-                    // Inject Basket Items
-                    const listEl = document.getElementById('basketItemsList');
-                    if (listEl && data.items) {
-                        listEl.innerHTML = data.items.map(item => `
-                            <span class="px-2.5 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-[10px] font-bold rounded-lg border border-indigo-100 dark:border-indigo-900/50">
-                                ${item}
-                            </span>
-                        `).join('');
-                    }
-
-                    const ctx = document.getElementById('basketOverTimeChart').getContext('2d');
-                    const bOpts = getTufteDefaults();
-                    bOpts.scales.y.ticks.callback = v => '$' + v;
-                    bOpts.plugins.tooltip.callbacks = { label: c => ' $' + c.parsed.y.toFixed(2) };
-                    new Chart(ctx, {
-                        type: 'line',
-                        data: {
-                            labels: data.labels,
-                            datasets: [{
-                                label: 'Top 10 Items Basket Cost ($)',
-                                data: data.data,
-                                borderColor: '#6366f1',
-                                backgroundColor: 'rgba(99,102,241,0.07)',
-                                tension: 0.3,
-                                fill: true,
-                                borderWidth: 1.5,
-                                pointRadius: 0,
-                                pointHoverRadius: 4
-                            }]
-                        },
-                        options: bOpts
-                    });
-                })
-                .catch(error => {
-                    console.error('Error fetching basket data:', error);
-                    const loader = document.getElementById('basketLoadingIndicator');
-                    if (loader) {
-                        loader.innerHTML = '<span class="text-red-500 text-sm">Error loading data</span>';
-                    }
-                });
-        }
-
         // --- Randomized Category Charts ---
         function initRandomCategoryCharts() {
             fetch('/api/analytics/random-category-item-trends')
@@ -1142,127 +927,9 @@
         }
 
         // Initialize when DOM is ready
-        // ── BI Section Data (synthetic — wire to live API endpoints to ship) ──
-        const BI_MACRO = [
-          { label: 'Protein-dominant foods', color: '#10b981', pct: 18, spend: 87.72, examples: 'Eggs, Greek Yogurt, Chicken' },
-          { label: 'Carb-dominant foods',    color: '#f59e0b', pct: 29, spend: 141.32, examples: 'Bread, Rice, Pasta, Fruit' },
-          { label: 'Fat-dominant foods',     color: '#3b82f6', pct: 16, spend: 77.97,  examples: 'Cheese, Nuts, Olive Oil' },
-          { label: 'Mixed macro foods',      color: '#8b5cf6', pct: 21, spend: 102.34, examples: 'Avocado, Whole Milk, Salmon' },
-          { label: 'Non-nutritive / Other',  color: '#6b7280', pct: 16, spend: 77.97,  examples: 'Coffee, Spices, Paper Goods' },
-        ];
-        const BI_ROI = [
-          { name: 'Eggs (Costco)',          cpp: 0.08 },
-          { name: 'Chicken Breast',         cpp: 0.11 },
-          { name: 'Greek Yogurt',           cpp: 0.13 },
-          { name: 'Canned Tuna',            cpp: 0.14 },
-          { name: 'Black Beans',            cpp: 0.15 },
-          { name: 'Whole Milk',             cpp: 0.22 },
-          { name: 'Salmon (WF)',            cpp: 0.29 },
-          { name: 'Cheese (Sharp Cheddar)', cpp: 0.34 },
-          { name: 'Protein Bar (iHerb)',    cpp: 0.41 },
-        ];
-        const BI_WEEKS   = ['W1','W2','W3','W4','W5','W6','W7','W8','W9','W10','W11','W12'];
-        const BI_SPEND   = [98,112,87,145,93,108,121,89,134,97,115,103];
-        const BI_PROTEIN = [310,295,340,260,380,315,290,405,270,350,320,295];
-        const BI_CATS = [
-          { name: 'Dairy & Eggs',    cpp: 0.13, cpc: 0.02, cpcal: 0.006, spend: 82 },
-          { name: 'Meat & Seafood',  cpp: 0.20, cpc: 0.08, cpcal: 0.008, spend: 95 },
-          { name: 'Produce',         cpp: 0.55, cpc: 0.03, cpcal: 0.018, spend: 68 },
-          { name: 'Grains & Bakery', cpp: 0.80, cpc: 0.01, cpcal: 0.003, spend: 54 },
-          { name: 'Snacks',          cpp: 0.45, cpc: 0.04, cpcal: 0.009, spend: 41 },
-          { name: 'Beverages',       cpp: 1.20, cpc: 0.06, cpcal: 0.014, spend: 37 },
-          { name: 'Supplements',     cpp: 0.35, cpc: null,  cpcal: 0.040, spend: 62 },
-          { name: 'Pantry',          cpp: 0.90, cpc: 0.02, cpcal: 0.005, spend: 48 },
-        ];
-        const BI_STORES = [
-          { name: 'Whole Foods',  protein:[42,38,51,35,48,40,36,53,39,44,41,38], fat:[55,60,48,65,52,58,62,46,61,54,57,59] },
-          { name: 'Costco',       protein:[85,90,78,95,88,82,91,76,93,87,84,89], fat:[72,68,80,65,75,70,67,82,64,74,71,69] },
-          { name: 'Amazon Fresh', protein:[28,32,25,35,30,27,33,24,36,29,31,26], fat:[35,38,32,40,36,34,39,31,41,37,35,33] },
-          { name: 'iHerb',        protein:[18,15,21,14,19,17,16,22,13,20,18,15], fat:[10,12,9,13,11,10,12,8,14,11,10,12]  },
-        ];
-        const BI_BULLETS = [
-          { cat: 'Groceries (Total)', budget: 500, actual: 487, good: 450 },
-          { cat: 'Meat & Seafood',    budget: 100, actual: 95,  good: 80  },
-          { cat: 'Supplements',       budget: 50,  actual: 62,  good: 45  },
-          { cat: 'Snacks',            budget: 40,  actual: 41,  good: 30  },
-          { cat: 'Beverages',         budget: 35,  actual: 37,  good: 25  },
-        ];
-        const BI_BASKET_COLORS = ['#6366f1','#10b981','#f59e0b','#3b82f6','#ef4444','#8b5cf6','#14b8a6','#f97316'];
-
-        function biHeat(val, lo, hi) {
-          const t = Math.min(1, Math.max(0, (val - lo) / (hi - lo)));
-          return `rgba(${Math.round(16+t*223)},${Math.round(185-t*117)},${Math.round(129-t*61)},0.18)`;
-        }
-
-        function initBISection() {
-          // Macro rows (now handled by Alpine.js)
-
-          // Protein ROI bars (now handled by Alpine.js)
-          // Efficiency table (now handled by Alpine.js)
-
-          // Basket donut
-          const basketCtx = document.getElementById('dash-basket');
-          if (basketCtx) new Chart(basketCtx.getContext('2d'), {
-            type:'doughnut',
-            data:{ labels: BI_CATS.map(c=>c.name), datasets:[{ data: BI_CATS.map(c=>c.spend), backgroundColor: BI_BASKET_COLORS, borderWidth:0, hoverOffset:4 }] },
-            options:{ responsive:true, maintainAspectRatio:false, cutout:'68%', plugins:{ legend:{ position:'bottom', labels:{ color:isDark()?'#9ca3af':'#6b7280', font:{size:9}, usePointStyle:true, boxWidth:6, padding:8 } } } }
-          });
-
-          // Small multiples
-          const smEl = document.getElementById('dash-small-multiples');
-          if (smEl) BI_STORES.forEach(s => {
-            const col = document.createElement('div');
-            col.className = 'space-y-1';
-            const safeId = s.name.replace(/\s+/g,'-');
-            col.innerHTML = `<div class="flex justify-between items-baseline">
-              <span class="text-xs font-bold text-textBase">${s.name}</span>
-              <span class="text-[9px] font-mono text-textSubtle">g/wk</span>
-            </div>
-            <div class="h-14 w-full"><canvas id="dash-sm-${safeId}"></canvas></div>
-            <div class="flex gap-3 text-[9px] text-textSubtle"><span><span class="text-emerald-500">●</span> Protein</span><span><span class="text-amber-500">●</span> Fat</span></div>`;
-            smEl.appendChild(col);
-            new Chart(document.getElementById(`dash-sm-${safeId}`).getContext('2d'), {
-              type:'line',
-              data:{ labels:BI_WEEKS, datasets:[
-                { data:s.protein, borderColor:'#10b981', borderWidth:1.5, pointRadius:0, tension:0.3, fill:false },
-                { data:s.fat,     borderColor:'#f59e0b', borderWidth:1.5, pointRadius:0, tension:0.3, fill:false }
-              ]},
-              options:{ responsive:true, maintainAspectRatio:false, scales:{x:{display:false},y:{display:false}}, plugins:{legend:{display:false},tooltip:{enabled:false}} }
-            });
-          });
-
-          // Bullet charts
-          const bulEl = document.getElementById('dash-bullets');
-          if (bulEl) {
-            BI_BULLETS.forEach(b => {
-              const actualPct = (b.actual / b.budget) * 100;
-              const goodPct   = (b.good   / b.budget) * 100;
-              const over = b.actual > b.budget;
-              const d = document.createElement('div');
-              d.className = 'flex items-center gap-4';
-              d.innerHTML = `<span class="w-36 text-xs font-medium text-textMuted text-right flex-shrink-0">${b.cat}</span>
-                <div class="flex-1 relative h-5 flex items-center">
-                  <div class="absolute inset-0 rounded bg-bgSkeleton"></div>
-                  <div class="absolute left-0 h-full rounded bg-bgHover" style="width:${goodPct}%"></div>
-                  <div class="absolute top-1 bottom-1 rounded ${over?'bg-red-500':'bg-textBase'}" style="width:${Math.min(actualPct,110)}%"></div>
-                  <div class="absolute top-0 bottom-0 w-[2px] bg-red-600 z-20" style="left:100%"></div>
-                </div>
-                <div class="w-24 flex-shrink-0 flex gap-2 text-xs font-mono">
-                  <span class="${over?'text-red-400':'text-emerald-500'}">$${b.actual}</span>
-                  <span class="text-textSubtle">/ $${b.budget}</span>
-                </div>`;
-              bulEl.appendChild(d);
-            });
-            const leg = document.createElement('div');
-            leg.className = 'flex gap-6 text-[10px] text-textSubtle mt-2 pl-40';
-            leg.innerHTML = `<span><span class="inline-block w-3 h-1 bg-bgSkeleton rounded mr-1"></span>Poor</span><span><span class="inline-block w-3 h-1 bg-bgHover rounded mr-1"></span>Satisfactory</span><span><span class="inline-block w-3 h-2 bg-textBase rounded mr-1"></span>Actual</span><span><span class="inline-block w-0.5 h-3 bg-red-600 mr-1"></span>Budget cap</span>`;
-            bulEl.appendChild(leg);
-          }
-        }
-        // ── End BI init ─────────────────────────────────────────────────────────
 
         document.addEventListener('DOMContentLoaded', () => {
-             initBISection();
+             initTrendsChart();
              initRandomCategoryCharts();
              initWeeklySpendingChart();
              initMonthlySpendingChart();

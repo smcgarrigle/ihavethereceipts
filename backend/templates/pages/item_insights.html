@@ -27,7 +27,7 @@
                 {% for ri in purchase_history %}
                 {% set receipt = ri.receipt %}
                 {% set store = receipt.store if receipt else none %}
-                <a href="/receipts/{{ receipt.id }}/review"
+                <a href="/receipts/{{ receipt.id }}/review?from=/items/{{ item.id }}/insights"
                    class="flex-shrink-0 flex flex-col gap-1.5 p-4 rounded-2xl border border-borderDefault bg-bgMain hover:border-indigo-500/50 hover:bg-indigo-500/5 transition-all group w-44">
                     <!-- Date -->
                     <span class="text-[10px] font-semibold text-textMuted uppercase tracking-wider">

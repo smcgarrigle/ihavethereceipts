@@ -23,6 +23,17 @@
 {{ categories | map(attribute='name') | list | tojson | safe }}
 </script>
 
+<script>
+    /* Referrer-aware exit: honor a same-site ?from= path so review returns to
+       wherever the user came from (item insights, dashboard) instead of
+       unconditionally to /receipts. */
+    function grocBackUrl() {
+        const from = new URLSearchParams(window.location.search).get('from');
+        if (from && from.startsWith('/') && !from.startsWith('//')) return from;
+        return '/receipts';
+    }
+</script>
+
 <!-- Validation Warning Modal -->
 <div x-data="{
     open: false,
@@ -125,7 +136,7 @@
                 <span class="text-xs sm:text-base font-medium">Original</span>
             </button>
             {% endif %}
-            <button @click="window.location.href='/receipts'"
+            <button @click="window.location.href = grocBackUrl()"
                 class="flex-1 md:flex-none justify-center px-2 sm:px-4 py-2 bg-bgHover text-textMuted rounded-lg hover:bg-bgHover text-xs sm:text-base font-medium flex items-center">
                 Cancel
             </button>
@@ -223,6 +234,16 @@
                                     <template x-if="item.fdc_match">
                                         <span class="ml-2 inline-flex items-center rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 ring-1 ring-inset ring-indigo-700/10 dark:bg-indigo-900/30 dark:text-indigo-300 dark:ring-indigo-400/20"
                                               :title="'USDA Match: ' + item.fdc_match.description + (item.fdc_match.brand ? ' (' + item.fdc_match.brand + ')' : '')">✨ USDA Match</span>
+                                    </template>
+                                    <template x-if="item.item_id">
+                                        <a :href="'/items/' + item.item_id + '/insights?from=' + encodeURIComponent(window.location.pathname)"
+                                           class="ml-2 inline-flex items-center gap-0.5 text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
+                                           title="Open this item's insights page (price history & nutrition)">
+                                            View item
+                                            <svg aria-hidden="true" class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                                            </svg>
+                                        </a>
                                     </template>
                                 </div>
                                 <input type="text" x-model="item.name"
@@ -481,7 +502,7 @@
 
 <!-- Save Button (Bottom) -->
 <div class="flex w-full md:w-auto md:justify-end space-x-3 pb-8">
-    <button @click="window.location.href='/receipts'"
+    <button @click="window.location.href = grocBackUrl()"
         class="flex-1 md:flex-none justify-center px-4 py-2 bg-bgHover text-textMuted rounded-lg hover:bg-bgHover">
         Cancel
     </button>

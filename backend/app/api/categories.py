@@ -84,7 +84,10 @@ def list_categories(db: Session = Depends(get_db)):
                     <div class='w-12 h-12 rounded-full {color_class} flex items-center justify-center font-bold text-lg'>
                         {escaped_category_name[0]}
                     </div>
-                    <h3 class='text-lg font-semibold text-gray-900 dark:text-white'>{escaped_category_name}</h3>
+                    <h3 class='text-lg font-semibold'>
+                        <a href='/items?category={category.id}' title='View all items in this category'
+                           class='text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors'>{escaped_category_name}</a>
+                    </h3>
                 </div>
                 {delete_button}
             </div>

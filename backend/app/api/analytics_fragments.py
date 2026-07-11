@@ -26,6 +26,7 @@ def get_top_categories_html(limit: int = 8, db: Session = Depends(get_db)):
     """Get HTML table for top categories"""
     results = (
         db.query(
+            Category.id,
             Category.name,
             func.sum(ReceiptItem.price * ReceiptItem.quantity).label("total"),
         )
@@ -54,10 +55,12 @@ def get_top_categories_html(limit: int = 8, db: Session = Depends(get_db)):
             <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
     """
 
-    for name, total in results:
+    for cat_id, name, total in results:
         html += f"""
             <tr>
-                <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white truncate max-w-[150px]" title="{name}">{name}</td>
+                <td class="px-4 py-2 whitespace-nowrap text-sm font-medium truncate max-w-[150px]" title="{name}">
+                    <a href="/items?category={cat_id}" class="text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors">{name}</a>
+                </td>
                 <td class="px-4 py-2 whitespace-nowrap text-sm text-right text-gray-500 dark:text-gray-400">${total:.2f}</td>
             </tr>
         """
@@ -228,7 +231,9 @@ def get_category_breakdown_widget(db: Session = Depends(get_db)):
 def get_top_items_html(limit: int = 8, db: Session = Depends(get_db)):
     """Get HTML table for top items"""
     results = (
-        db.query(Item.name, func.sum(ReceiptItem.price * ReceiptItem.quantity).label("total"))
+        db.query(
+            Item.id, Item.name, func.sum(ReceiptItem.price * ReceiptItem.quantity).label("total")
+        )
         .join(ReceiptItem, Item.id == ReceiptItem.item_id)
         .outerjoin(Category, Item.category_id == Category.id)
         .filter(
@@ -257,10 +262,12 @@ def get_top_items_html(limit: int = 8, db: Session = Depends(get_db)):
             <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
     """
 
-    for name, total in results:
+    for item_id, name, total in results:
         html += f"""
             <tr>
-                <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white truncate max-w-[150px]" title="{name}">{name}</td>
+                <td class="px-4 py-2 whitespace-nowrap text-sm font-medium truncate max-w-[150px]" title="{name}">
+                    <a href="/items/{item_id}/insights" class="text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors">{name}</a>
+                </td>
                 <td class="px-4 py-2 whitespace-nowrap text-sm text-right text-gray-500 dark:text-gray-400">${total:.2f}</td>
             </tr>
         """

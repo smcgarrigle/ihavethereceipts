@@ -4,6 +4,12 @@
 
 {% block content %}
 <div class="max-w-5xl mx-auto px-4 py-8" x-data="bulkLoader()">
+    <!-- Breadcrumb -->
+    <nav class="mb-6 flex items-center space-x-2 text-sm font-medium text-textMuted">
+        <a href="/receipts" class="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Receipts</a>
+        <svg aria-hidden="true" focusable="false" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+        <span class="text-textBase">Bulk import</span>
+    </nav>
     <!-- Header Section -->
     <div class="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>

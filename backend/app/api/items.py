@@ -212,14 +212,13 @@ def list_items(category_id: int | None = None, db: Session = Depends(get_db)):
                 </span>
                 """
 
-        # Show category
-        category_badge = ""
-        category_name = "Other"
-        if item.category:
-            category_name = item.category.name
-            category_badge = f"<span class='text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-1 rounded'>{category_name}</span>"
-        else:
-            category_badge = "<span class='text-xs bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-2 py-1 rounded'>Uncategorized</span>"
+        # Category pill doubles as the editor: a styled <select> that PATCHes
+        # the item in place (no page reload, no separate edit form)
+        cat_pill_cls = (
+            "text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
+            if item.category
+            else "text-xs bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
+        )
 
         # Show FDC/GTIN badges
         fdc_badge = (
@@ -244,12 +243,16 @@ def list_items(category_id: int | None = None, db: Session = Depends(get_db)):
 
         html += f"""
         <div class='bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md transition overflow-hidden'
-             x-data='{{expanded: false, editing: false, categoryId: {item.category_id or "null"}}}'>
+             x-data='{{expanded: false, categoryId: {item.category_id or "null"}}}'>
 
             <!-- Header (Always Visible) -->
             <div @click="expanded = !expanded" class="p-4 flex justify-between items-center cursor-pointer bg-gray-50/50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors">
                 <div class="flex-1 min-w-0">
-                    <h3 class='font-semibold text-gray-900 dark:text-white truncate pr-2'>{escaped_item_name}</h3>
+                    <h3 class='font-semibold truncate pr-2'>
+                        <a href='/items/{item.id}/insights' @click.stop
+                           class='text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors'
+                           title='Open item page'>{escaped_item_name}</a>
+                    </h3>
                     <div class="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                         <span>{purchase_count} pur.</span>
                         <span>•</span>
@@ -269,8 +272,8 @@ def list_items(category_id: int | None = None, db: Session = Depends(get_db)):
             <div x-show="expanded" x-collapse class="border-t border-gray-100 dark:border-gray-700">
                 <div class="p-4 space-y-4">
 
-                    <!-- View Mode Details -->
-                    <div x-show='!editing'>
+                    <!-- Item Details -->
+                    <div>
                         <!-- Stats Grid -->
                         <div class="grid grid-cols-2 gap-4 text-sm mb-4">
                              <div>
@@ -287,7 +290,18 @@ def list_items(category_id: int | None = None, db: Session = Depends(get_db)):
 
                         <div class="flex justify-between items-center mb-4">
                              <div class="flex items-center space-x-2">
-                                 {category_badge}
+                                 <select x-model='categoryId' @click.stop title='Change category'
+                                         @change='fetch("/api/items/{item.id}", {{
+                                             method: "PUT",
+                                             headers: {{
+                                                 "Content-Type": "application/json",
+                                                 "X-CSRF-Token": document.querySelector("meta[name=csrf-token]")?.content || ""
+                                             }},
+                                             body: JSON.stringify({{category_id: categoryId ? parseInt(categoryId) : null}})
+                                         }})'
+                                         class='{cat_pill_cls} px-2 py-1 rounded border-0 cursor-pointer focus:ring-2 focus:ring-blue-500'>
+                                     {category_options}
+                                 </select>
                                  {fdc_badge}
                                  {gtin_badge}
                              </div>
@@ -296,7 +310,7 @@ def list_items(category_id: int | None = None, db: Session = Depends(get_db)):
                         </div>
 
                         <!-- Action Buttons -->
-                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-gray-100 dark:border-gray-700">
+                        <div class="grid grid-cols-3 gap-2 pt-2 border-t border-gray-100 dark:border-gray-700">
                              <button onclick="showPriceHistory(this)"
                                      data-item-id="{item.id}"
                                      data-item-name="{escaped_name}"
@@ -317,41 +331,6 @@ def list_items(category_id: int | None = None, db: Session = Depends(get_db)):
                                 USDA Match
                             </button>
 
-                            <button @click='editing = true'
-                                    class="py-2 px-3 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded-lg text-xs font-medium hover:bg-blue-100 dark:hover:bg-blue-900/40 border border-transparent flex items-center justify-center transition-all">
-                                <svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                                Edit
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Edit Mode Form -->
-                    <div x-show='editing' x-cloak class='space-y-4 bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg'>
-                        <div>
-                            <label class='block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1'>Category</label>
-                            <select x-model='categoryId'
-                                    class='w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-blue-500 focus:border-blue-500'>
-                                {category_options}
-                            </select>
-                        </div>
-
-                        <div class='flex space-x-3'>
-                            <button
-                                @click='fetch("/api/items/{item.id}", {{
-                                    method: "PUT",
-                                    headers: {{
-                                        "Content-Type": "application/json",
-                                        "X-CSRF-Token": document.querySelector("meta[name=csrf-token]")?.content || ""
-                                    }},
-                                    body: JSON.stringify({{category_id: categoryId ? parseInt(categoryId) : null}})
-                                }}).then(() => {{editing = false; location.reload()}})'
-                                class='flex-1 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold uppercase tracking-wide hover:bg-blue-700 shadow-sm'>
-                                Save Changes
-                            </button>
-                            <button @click='editing = false'
-                                    class='flex-1 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-xs font-bold uppercase tracking-wide hover:bg-gray-50 dark:hover:bg-gray-600'>
-                                Cancel
-                            </button>
                         </div>
                     </div>
 

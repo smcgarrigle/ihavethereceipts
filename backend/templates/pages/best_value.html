@@ -2,16 +2,17 @@
 
 {% block content %}
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <div class="mb-6 flex justify-between items-center">
-        <div class="flex items-center">
-            <a href="/"
-                class="mr-4 p-2 rounded-lg hover:bg-bgHover text-textMuted">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
-                </svg>
+    {% include "components/insights_subnav.html" %}
+    <div class="mb-6 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+        <h1 class="text-3xl font-bold text-textBase">{{ title }}</h1>
+        <!-- Category switcher -->
+        <div class="flex flex-wrap gap-2">
+            {% for ct, label in [('produce', '🥦 Produce'), ('meat', '🥩 Meat'), ('dairy', '🥛 Dairy'), ('pantry', '🥫 Pantry'), ('beverages', '🥤 Beverages')] %}
+            <a href="/best-value/{{ ct }}"
+               class="px-3 py-1.5 rounded-full text-xs font-semibold transition {{ 'bg-indigo-600 text-white' if category_type == ct else 'bg-bgCard border border-borderDefault text-textMuted hover:text-textBase' }}">
+                {{ label }}
             </a>
-            <h1 class="text-3xl font-bold text-textBase">{{ title }}</h1>
+            {% endfor %}
         </div>
     </div>
 

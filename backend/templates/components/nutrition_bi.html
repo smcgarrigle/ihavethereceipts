@@ -1,0 +1,111 @@
+{# Dollar-weighted macro breakdown + protein ROI, fed by /api/analytics/bi-dashboard.
+   Moved here from the dashboard (NAVIGATION.md Phase C: a chart appears on exactly one
+   page, and deep analytics live on Trends). The protein ROI list renders API data the
+   old dashboard shell never displayed. #}
+<div class="grid grid-cols-1 lg:grid-cols-5 gap-8"
+     x-data="{
+           showMissing: true,
+           biData: null,
+           init() {
+               fetch('/api/analytics/bi-dashboard')
+                 .then(r => r.json())
+                 .then(data => this.biData = data);
+           },
+           get macros() {
+               if (!this.biData) return [];
+               if (this.showMissing) {
+                   return this.biData.macro_breakdown;
+               }
+               let filtered = this.biData.macro_breakdown.filter(m => m.label !== 'Missing USDA Data');
+               let total = filtered.reduce((acc, m) => acc + m.spend, 0);
+               if (total === 0) return [];
+               return filtered.map(m => ({...m, pct: Math.round((m.spend / total) * 100)}));
+           },
+           get roi() {
+               if (!this.biData) return [];
+               return this.biData.protein_roi;
+           },
+           get maxCpp() {
+               if (!this.roi.length) return 1;
+               return Math.max(...this.roi.map(r => r.cpp));
+           }
+       }">
+    <!-- Dollar-Weighted Macro Breakdown -->
+    <div class="lg:col-span-3 bg-bgCard border border-borderDefault rounded-3xl shadow-xl p-6">
+        <div class="flex items-center justify-between mb-1">
+            <h3 class="text-[10px] font-mono font-bold uppercase tracking-widest text-textSubtle">WHERE YOUR DOLLAR GOES — BY NUTRITIONAL PROFILE</h3>
+            <!-- Toggle Switch -->
+            <label class="flex items-center cursor-pointer gap-2 group">
+                <span class="text-[10px] text-textMuted uppercase tracking-widest group-hover:text-textBase transition">Show Missing Data</span>
+                <div class="relative">
+                    <input type="checkbox" x-model="showMissing" class="sr-only">
+                    <div class="block bg-bgSkeleton w-8 h-4 rounded-full border border-borderDefault transition-colors" :class="showMissing ? 'bg-red-500/20 border-red-500/50' : ''"></div>
+                    <div class="dot absolute left-1 top-1 bg-textMuted w-2 h-2 rounded-full transition transform" :class="showMissing ? 'translate-x-4 bg-red-500' : ''"></div>
+                </div>
+            </label>
+        </div>
+
+        <p class="text-sm text-textMuted mb-4">Of your <strong class="text-textBase" x-text="biData ? `$${biData.kpis.monthly_spend.toFixed(0)}` : '...'"></strong> this month, how much went to each macro-dominant food group.</p>
+
+        <!-- Stacked Bar Chart -->
+        <div class="flex h-7 w-full rounded-lg overflow-hidden text-[10px] font-bold text-white mb-4">
+           <template x-for="m in macros" :key="m.label">
+               <div class="flex items-center justify-center transition-all duration-500 ease-in-out whitespace-nowrap overflow-hidden"
+                    :style="`width:${m.pct}%; background:${m.color}`"
+                    x-text="m.pct > 5 ? `${m.label.split(' ')[0]} ${m.pct}%` : ''"></div>
+           </template>
+        </div>
+
+        <!-- Detail Rows -->
+        <div class="space-y-3">
+           <template x-for="m in macros" :key="m.label">
+               <div class="flex items-center gap-3">
+                   <div class="w-3 h-3 rounded-sm flex-shrink-0 transition-colors duration-500" :style="`background:${m.color}`"></div>
+                   <div class="flex-1 min-w-0">
+                       <div class="flex justify-between items-baseline mb-0.5">
+                           <span class="text-xs font-semibold text-textBase transition-colors duration-500" :class="m.label.includes('Missing') ? 'text-red-500' : ''">
+                               <span x-text="m.label"></span>
+                           </span>
+                           <span class="text-xs font-mono text-textMuted ml-2 flex-shrink-0" x-text="`$${m.spend.toFixed(2)} · ${m.pct}%`"></span>
+                       </div>
+                       <div class="w-full bg-bgSkeleton h-1.5 rounded-full overflow-hidden">
+                           <div class="h-1.5 rounded-full transition-all duration-500 ease-in-out" :style="`width:${m.pct * (100/40)}%; background:${m.color}`"></div>
+                       </div>
+                       <p class="text-[10px] text-textSubtle mt-0.5" x-text="m.examples"></p>
+                   </div>
+               </div>
+           </template>
+        </div>
+        <p class="text-[10px] text-textSubtle mt-3">&ldquo;Macro-dominant&rdquo; = the macro providing &gt;40% of a food's calories.</p>
+    </div>
+
+    <!-- Protein ROI -->
+    <div class="lg:col-span-2 bg-bgCard border border-borderDefault rounded-3xl shadow-xl p-6">
+        <h3 class="text-[10px] font-mono font-bold uppercase tracking-widest text-textSubtle mb-1">PROTEIN ROI RANKING</h3>
+        <p class="text-sm text-textMuted mb-4">Cost per gram of protein. Lower = better value.</p>
+        <div class="space-y-2.5">
+            <template x-for="r in roi" :key="r.name">
+                <div>
+                    <div class="flex justify-between items-baseline mb-0.5 gap-2">
+                        <template x-if="r.id">
+                            <a :href="`/items/${r.id}/insights`"
+                               class="text-xs font-semibold text-textBase hover:text-indigo-400 transition-colors truncate"
+                               x-text="r.name"></a>
+                        </template>
+                        <template x-if="!r.id">
+                            <span class="text-xs font-semibold text-textBase truncate" x-text="r.name"></span>
+                        </template>
+                        <span class="text-xs font-mono text-textMuted flex-shrink-0" x-text="`$${r.cpp.toFixed(2)}/g`"></span>
+                    </div>
+                    <div class="w-full bg-bgSkeleton h-1.5 rounded-full overflow-hidden">
+                        <div class="h-1.5 rounded-full transition-all duration-500"
+                             :class="r.cpp <= 0.20 ? 'bg-emerald-500' : 'bg-amber-500'"
+                             :style="`width:${Math.min(100, (r.cpp / maxCpp) * 100)}%`"></div>
+                    </div>
+                </div>
+            </template>
+            <p x-show="biData && !roi.length" class="text-xs text-textMuted">No protein data yet — match more items in the <a href="/xray" class="text-indigo-400 hover:underline">X-Ray queue</a>.</p>
+        </div>
+        <p class="text-[10px] text-textSubtle mt-3">Green = at or under the $0.20/g target.</p>
+    </div>
+</div>

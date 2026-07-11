@@ -92,7 +92,6 @@ exclude = [
 [[tool.mypy.overrides]]
 module = [
     "app.api.analytics",
-    "app.api.analytics_bi_injection",
     "app.api.analytics_fragments",
     "app.api.items",
     "app.api.pages",

@@ -392,7 +392,9 @@
     </div>
 </div>
 <!-- Paste Receipt Text Modal -->
-<div x-data="{ open: false, submitting: false, errorMsg: '' }" @open-paste-modal.window="open = true; errorMsg = ''"
+<div x-data="{ open: false, submitting: false, errorMsg: '' }"
+    x-init="if (new URLSearchParams(window.location.search).has('paste')) open = true"
+    @open-paste-modal.window="open = true; errorMsg = ''"
     @keydown.escape.window="if(!submitting) open = false" x-show="open" x-trap="open" x-cloak class="fixed inset-0 z-50 overflow-y-auto"
     aria-labelledby="paste-modal-title" role="dialog" aria-modal="true">
 
