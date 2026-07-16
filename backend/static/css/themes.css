@@ -17,10 +17,11 @@
     --bg-overlay:      rgba(0,0,0,0.5); /* modal backdrop */
     --text-base:       #111827;   /* gray-900 — primary text */
     --text-muted:      #4b5563;   /* gray-600 — secondary / labels */
-    --text-subtle:     #9ca3af;   /* gray-400 — placeholder / de-emphasised */
+    --text-subtle:     #6b7280;   /* gray-500 — placeholder / de-emphasised (4.6:1 AA) */
+    --text-code:       #4b5563;   /* inline code / debug badges on bg-skeleton */
     --border-default:  #e5e7eb;   /* gray-200 — standard border */
     --border-light:    #f3f4f6;   /* gray-100 — hairline / divider */
-    --border-input:    #d1d5db;   /* gray-300 — form input border */
+    --border-input:    #8a93a3;   /* form input border (3.1:1 non-text contrast) */
     --shadow-card:     0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
 }
 
@@ -34,10 +35,11 @@ html.dark {
     --bg-overlay:      rgba(0,0,0,0.75);
     --text-base:       #f9fafb;   /* gray-50 */
     --text-muted:      #9ca3af;   /* gray-400 */
-    --text-subtle:     #6b7280;   /* gray-500 */
+    --text-subtle:     #8a93a4;   /* placeholder / de-emphasised (4.8:1 AA, below muted) */
+    --text-code:       #c2c9d6;   /* inline code / debug badges on bg-skeleton (6.2:1) */
     --border-default:  #374151;   /* gray-700 */
     --border-light:    #374151;   /* gray-700 */
-    --border-input:    #4b5563;   /* gray-600 */
+    --border-input:    #8a93a4;   /* form input border (3.3:1 non-text contrast) */
     --shadow-card:     0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
 }
 
@@ -52,9 +54,10 @@ html.forest {
     --text-base:       #ecfdf5;   /* emerald-50 */
     --text-muted:      #a7f3d0;   /* emerald-200 */
     --text-subtle:     #6ee7b7;   /* emerald-300 — slightly dimmer */
+    --text-code:       #a7f3d0;   /* inline code / debug badges on bg-skeleton */
     --border-default:  #1f2d23;
     --border-light:    #1a2e1d;
-    --border-input:    #2d4a31;
+    --border-input:    #55805e;   /* form input border (3.2:1 non-text contrast) */
     --shadow-card:     0 1px 3px rgba(16,185,129,0.08), 0 1px 2px rgba(0,0,0,0.4);
 }
 
@@ -69,9 +72,10 @@ html.sunset {
     --text-base:       #fef3c7;   /* amber-100 */
     --text-muted:      #fbbf24;   /* amber-400 */
     --text-subtle:     #d97706;   /* amber-600 — slightly dimmer */
+    --text-code:       #fbbf24;   /* inline code / debug badges on bg-skeleton */
     --border-default:  #3d2517;
     --border-light:    #2a1a10;
-    --border-input:    #5c3820;
+    --border-input:    #9c6c3a;   /* form input border (3.1:1 non-text contrast) */
     --shadow-card:     0 1px 3px rgba(245,158,11,0.08), 0 1px 2px rgba(0,0,0,0.4);
 }
 
@@ -101,7 +105,7 @@ body {
 /* ── Inline code tags ─── */
 code {
     background-color: var(--bg-skeleton);
-    color: var(--text-muted);
+    color: var(--text-code);
     padding: 0.1em 0.35em;
     border-radius: 0.25rem;
     font-size: 0.85em;
@@ -119,7 +123,7 @@ code {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
                  "Liberation Mono", "Courier New", monospace;
     background-color: var(--bg-skeleton);
-    color: var(--text-muted);
+    color: var(--text-code);
     border: 1px solid var(--border-input);
 }
 
