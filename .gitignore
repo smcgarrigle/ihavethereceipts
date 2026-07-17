@@ -45,7 +45,6 @@ backend/static/uploads/
 # (personal dev artifacts — kept locally, not for public repo)
 # ============================================================
 scratch/
-site/
 temp_crop.png
 backend/temp_crop.png
 usda_report_output.txt

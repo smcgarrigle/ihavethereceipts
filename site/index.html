@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grocery Tracker — Self-hosted AI receipt intelligence</title>
+<meta name="description" content="A self-hosted grocery receipt tracker that turns OCR'd receipts into price history, nutrition insights, and shopping predictions — open source native, AI native.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="wrap">
+    <div class="nav-logo">🛒 Grocery Tracker</div>
+    <div class="nav-links">
+      <a href="#what-it-does">What it does</a>
+      <a href="#open-source">Open source native</a>
+      <a href="ai-native.html">AI-native &amp; clever</a>
+      <a class="btn btn-ghost" href="#open-source" style="padding:7px 14px;">View source</a>
+    </div>
+    <button class="nav-toggle" aria-label="Toggle navigation">☰</button>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <span class="eyebrow">● Self-hosted · Single SQLite file · Your data stays yours</span>
+      <h1>Know exactly where your grocery money goes.</h1>
+      <p class="lead">
+        Snap a photo of a receipt. An AI vision model (cloud or fully local) reads it,
+        fuzzy-matching cleans it up, and a Tufte-style dashboard tells you where your
+        money actually went — store by store, item by item, week by week.
+      </p>
+      <div class="btn-row">
+        <a href="#what-it-does" class="btn btn-primary">See what it can do</a>
+        <a href="ai-native.html" class="btn btn-ghost">How it's built →</a>
+      </div>
+    </div>
+    <div class="terminal">
+      <div class="terminal-bar">
+        <span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span>
+      </div>
+      <div class="terminal-body">
+        <div class="line"><span class="prompt">$</span> cd backend &amp;&amp; uv sync</div>
+        <div class="line comment"># installs deps into a local .venv — no Docker required</div>
+        <div class="line"><span class="prompt">$</span> uv run uvicorn app.main:app --reload</div>
+        <div class="line ok">✓ Uvicorn running on http://localhost:8000</div>
+        <div class="line ok">✓ SQLite — zero config, file lives on your machine</div>
+        <div class="line ok">✓ OCR_BACKEND=local → Gemini never sees your receipts</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section class="stats">
+  <div class="wrap stats-grid">
+    <div>
+      <div class="stat-num">~11K</div>
+      <div class="stat-label">lines of Python, hand-written</div>
+    </div>
+    <div>
+      <div class="stat-num">46</div>
+      <div class="stat-label">automated tests across 19 files</div>
+    </div>
+    <div>
+      <div class="stat-num">4</div>
+      <div class="stat-label">swappable OCR backends</div>
+    </div>
+    <div>
+      <div class="stat-num">6 mo+</div>
+      <div class="stat-label">in active daily-driver use</div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="what-it-does">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="tag tag-oss">What it does</span>
+      <h2>From receipt photo to spending intelligence</h2>
+      <p>Every feature below ships in the app today — this isn't a roadmap slide, it's what's running.</p>
+    </div>
+    <div class="grid">
+      <div class="card">
+        <span class="icon">📄</span>
+        <h3>Intelligent receipt processing</h3>
+        <p>AI OCR extracts items, discounts, CRV/bottle deposits, and "2-for-$X" deals from photos or PDFs. A review screen lets you correct anything before it's saved, with bi-directional price math — edit quantity, total, or unit price and the others recalculate.</p>
+      </div>
+      <div class="card">
+        <span class="icon">📊</span>
+        <h3>Real analytics, not vanity charts</h3>
+        <p>A dashboard of monthly spend and top categories, a trends page with per-item price history, and store-comparison pricing so you can see who actually sells your usual basket cheapest.</p>
+      </div>
+      <div class="card">
+        <span class="icon">🧠</span>
+        <h3>Smart item management</h3>
+        <p>Fuzzy matching catches "Bananas" vs. "Banana Organic" as the same item, suggests merges, auto-tags categories, and remembers which suggestions you've already dismissed.</p>
+      </div>
+      <div class="card">
+        <span class="icon">🥗</span>
+        <h3>Nutrition &amp; health insights</h3>
+        <p>Items are enriched with Nutriscore, ingredients, and macronutrients via OpenFoodFacts and USDA FoodData Central — so your spending data doubles as a household nutrition log.</p>
+      </div>
+      <div class="card">
+        <span class="icon">🔁</span>
+        <h3>Restock predictions</h3>
+        <p>A purchase-cadence engine learns how often you buy each item, predicts when you'll run out, and builds a store-grouped shopping list pointing at the cheapest place to buy it.</p>
+      </div>
+      <div class="card">
+        <span class="icon">📱</span>
+        <h3>Mobile-first, four themes</h3>
+        <p>Fully responsive with a collapsible nav and touch-friendly controls, plus Dark, Light, Forest, and Sunset themes — all driven by a single CSS-variable design system.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section alt-bg" id="open-source">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="tag tag-oss">Open source native</span>
+      <h2>No black boxes, no required SaaS</h2>
+      <p>Every layer of the stack is a well-known, inspectable open source project. The architecture treats self-hosting and data ownership as first-class requirements, not an afterthought.</p>
+    </div>
+
+    <div class="grid cols-2" style="margin-bottom:48px;">
+      <div class="checklist">
+        <div class="check-item">
+          <span class="mark">✓</span>
+          <div>
+            <h4>Built entirely on open tools</h4>
+            <p>FastAPI, SQLAlchemy, Alembic, Pydantic, HTMX, Alpine.js, Tailwind, and Chart.js — every dependency is a project you can read the source of, not a managed API you have to trust blindly.</p>
+          </div>
+        </div>
+        <div class="check-item">
+          <span class="mark">✓</span>
+          <div>
+            <h4>Offline-first by design</h4>
+            <p>All frontend dependencies are vendored locally under <code>/static/js/vendor</code> — zero CDN calls at runtime. A hardened Content-Security-Policy permits scripts and styles from <code>'self'</code> only.</p>
+          </div>
+        </div>
+        <div class="check-item">
+          <span class="mark">✓</span>
+          <div>
+            <h4>No vendor lock-in on AI</h4>
+            <p>Swap cloud OCR (Gemini 2.5 Flash) for a fully local vision model (IBM Granite 3.3, Qwen2-VL) via Ollama or LM Studio with one environment variable. Your receipts never have to leave your machine.</p>
+          </div>
+        </div>
+      </div>
+      <div class="checklist">
+        <div class="check-item">
+          <span class="mark">✓</span>
+          <div>
+            <h4>Your data is a file, not a tenant row</h4>
+            <p>The whole database is a single SQLite file. Copy it, back it up, open it with <code>sqlite3</code> — there's no multi-tenant schema or managed cloud database standing between you and your own receipts.</p>
+          </div>
+        </div>
+        <div class="check-item">
+          <span class="mark">✓</span>
+          <div>
+            <h4>Documented dependencies</h4>
+            <p>A maintained Software Bill of Materials tracks every dependency and its license, so "what's actually in this thing" is always a one-file answer.</p>
+          </div>
+        </div>
+        <div class="check-item">
+          <span class="mark">✓</span>
+          <div>
+            <h4>Runs on commodity hardware</h4>
+            <p>Zero-config SQLite by default, single-user-first architecture, and local AI inference benchmarked down to a consumer GPU (RTX 2060) — no cluster required.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stack-badges">
+      <span class="stack-badge">FastAPI</span>
+      <span class="stack-badge">SQLAlchemy</span>
+      <span class="stack-badge">Alembic</span>
+      <span class="stack-badge">Pydantic v2</span>
+      <span class="stack-badge">SQLite</span>
+      <span class="stack-badge">HTMX</span>
+      <span class="stack-badge">Alpine.js</span>
+      <span class="stack-badge">Tailwind CSS</span>
+      <span class="stack-badge">Chart.js</span>
+      <span class="stack-badge">Ollama / LM Studio</span>
+      <span class="stack-badge">pytest</span>
+      <span class="stack-badge">Ruff + Mypy</span>
+    </div>
+
+    <div style="margin-top:40px;">
+      <button class="btn btn-disabled" disabled>⧉ View on GitHub</button>
+      <div class="cta-note">public repo coming soon — ask the author for early access</div>
+    </div>
+  </div>
+</section>
+
+<section class="section tight">
+  <div class="wrap">
+    <div class="cta-banner">
+      <div>
+        <h3>Curious how the AI side works?</h3>
+        <p>Multi-model OCR orchestration, agent-friendly APIs, and a handful of genuinely odd engineering decisions that paid off — covered on the next page.</p>
+      </div>
+      <a href="ai-native.html" class="btn btn-primary">See AI-native &amp; clever things →</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap footer-row">
+    <p>Grocery Tracker — built with FastAPI, SQLite, HTMX, and Google Gemini. In active development since Dec 2025.</p>
+    <div class="footer-links">
+      <a href="#what-it-does">What it does</a>
+      <a href="#open-source">Open source</a>
+      <a href="ai-native.html">AI-native &amp; clever</a>
+    </div>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>
