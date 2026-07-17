@@ -22,6 +22,7 @@ All three Strategic Vision phases have been delivered as of May 2026. The applic
 ---
 
 ## 🟢 Recently Completed (Q3 2026)
+- [x] **WCAG AA Contrast Compliance (July 2026)**: All four themes (Light/Dark/Forest/Sunset) plus the marketing site now satisfy WCAG 2.1 SC 1.4.3 *Contrast (Minimum)* — every text token ≥ 4.5:1 on its surfaces — and SC 1.4.11 *Non-text Contrast* for form input borders (≥ 3:1, Option A: card borders remain decorative and rely on shadows). Changes: `--text-subtle` raised in light (2.4→4.6:1) and dark (3.0→4.8:1); new `--text-code` token for inline code/debug badges in dark (4.1→6.2:1); `--border-input` raised in all themes (3.1–3.3:1); button hover states no longer dip below AA (`hover:bg-blue-500` → `700`). Guarded by `scripts/check_contrast.py`, which parses the tokens from CSS and fails on any violation. *Deferred: chart-fill label contrast and SC 1.4.1 Use of Color (color-only signaling).*
 - [x] **OCR Feedback Loop (Self-Improving Extraction)**: Human corrections from the review sandbox are persisted (`ocr_corrections` table) and injected into future OCR prompts as few-shot examples. The OCR cache is keyed on image + prompt, so learned corrections invalidate stale results on reprocess.
 - [x] **Gemini Structured Outputs**: The API path now passes a response schema (`_ReceiptSchema`), contractually guaranteeing valid JSON; `json-repair` remains as the local-model fallback. Fails soft to prompt-only JSON if a model rejects the schema.
 - [x] **OCR Eval Harness**: `scripts/ocr_eval.py` scores extraction accuracy against human-approved receipts — `--stored` for a zero-cost baseline, `--live` to measure prompt/model changes. Baseline: 91% item recall, 100% precision, 47% price accuracy (the current improvement target).
@@ -70,6 +71,7 @@ All three Strategic Vision phases have been delivered as of May 2026. The applic
 - [ ] **Cross-Device Sync (Offline-First)**: Robust synchronization across mobile and desktop clients. Architect as a Progressive Web App (PWA) using IndexedDB to allow scanning and viewing in low-service grocery stores, syncing back to the server later.
 
 ### 6. UI/UX Refinements (Post-Launch)
+- [ ] **Reorderable Item Columns (Broker-Style)**: Table view for the Items page with drag-to-reorder column headers (Category, qty, total spent, weight/vol, unit, $/unit), persisted in localStorage — plus show/hide toggles and click-to-sort. Prerequisite: extract the `list_items` f-string HTML into a Jinja fragment. Full scope: `scratch/TODO_items_column_reorder.md` (est. 1.5–2 days).
 - [ ] **Mobile Slide-out Drawers**: Replace heavy full-page navigations for Item Insights on mobile with HTMX-powered slide-up drawers to preserve the user's context on the main Dashboard.
 - [ ] **PDF Viewer 'Esc' Key Fix**: The native PDF `<embed>` swallows the 'Esc' key when focused, preventing the receipt review modal from closing.
   - *Option A (Lightweight)*: Auto-focus the modal's "Close" button upon opening so 'Esc' works immediately until the user clicks into the PDF.
@@ -121,7 +123,7 @@ All three Strategic Vision phases have been delivered as of May 2026. The applic
 </details>
 
 ---
-*Last Updated: June 7, 2026*
+*Last Updated: July 17, 2026*
 
 <!-- Search UX options considered (Option A implemented May 2026):
   Option B — Dedicated /search full-page (Enter key navigates to results page; table view with all purchase history)
