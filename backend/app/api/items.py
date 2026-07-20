@@ -946,6 +946,81 @@ def enrich_item_fdc(item_id: int, db: Session = Depends(get_db)):
         return {"success": False, "message": "No high-confidence match found in FDC"}
 
 
+class SetFdcMatchRequest(BaseModel):
+    fdc_ref: str
+
+
+def _parse_fdc_ref(ref: str) -> int | None:
+    """Extract an FDC ID from a fdc.nal.usda.gov URL or a bare numeric ID."""
+    import re
+
+    ref = ref.strip()
+    if re.fullmatch(r"\d{3,10}", ref):
+        return int(ref)
+    # Handles both URL shapes:
+    #   https://fdc.nal.usda.gov/food-details/2003586/nutrients
+    #   https://fdc.nal.usda.gov/fdc-app.html#/food-details/2003586/nutrients
+    match = re.search(r"food-details/(\d+)", ref)
+    if match:
+        return int(match.group(1))
+    return None
+
+
+@router.put("/{item_id}/fdc")
+def set_item_fdc_match(item_id: int, request: SetFdcMatchRequest, db: Session = Depends(get_db)):
+    """Manually pin an item to a specific USDA FDC food (paste a URL or FDC ID).
+
+    Replaces the automatic match, refreshes canonical nutrients from the chosen
+    food, and flags the item so auto-enrichment won't overwrite the choice.
+    Field-level custom_nutrients edits are preserved and still win.
+    """
+    item = db.query(Item).filter(Item.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    fdc_id = _parse_fdc_ref(request.fdc_ref)
+    if not fdc_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Couldn't find an FDC ID in that input. Paste a fdc.nal.usda.gov "
+            "food-details URL or the numeric FDC ID itself.",
+        )
+
+    from app.services.fdc_service import fdc_service
+
+    food = fdc_service.get_food_details(fdc_id)
+    if not food:
+        raise HTTPException(
+            status_code=502,
+            detail=f"USDA FDC returned no data for ID {fdc_id}. "
+            "Check the URL, or try again if the API is unavailable.",
+        )
+
+    item.fdc_id = fdc_id
+    item.fdc_override = True
+    item.gtin = food.get("gtinUpc") or item.gtin
+    item.ingredients = food.get("ingredients") or None
+
+    # Manual pin is authoritative: replace canonical nutrients with the chosen
+    # food's values. Field-level custom_nutrients still override on top.
+    nutrients = fdc_service.extract_nutrients_100g(food)
+    if nutrients:
+        item.nutrients = nutrients
+
+    db.commit()
+
+    description = food.get("description") or f"FDC #{fdc_id}"
+    logger.info(f"Manual FDC override for item {item_id} ({item.name}) -> {fdc_id} ({description})")
+    return {
+        "success": True,
+        "fdc_id": fdc_id,
+        "description": description,
+        "data_type": food.get("dataType"),
+        "nutrients_found": len(nutrients),
+        "message": f"Matched to {description}",
+    }
+
+
 @router.delete("/{item_id}/fdc")
 def clear_item_fdc(item_id: int, db: Session = Depends(get_db)):
     """Clear an incorrect FDC association from an item."""
@@ -954,6 +1029,7 @@ def clear_item_fdc(item_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Item not found")
 
     item.fdc_id = None
+    item.fdc_override = False
     item.gtin = None
     item.ingredients = None
     item.nutrients = None

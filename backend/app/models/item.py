@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
 from sqlalchemy.dialects.sqlite import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -24,6 +24,7 @@ class Item(Base):
         Integer, ForeignKey("categories.id"), nullable=True
     )
     fdc_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    fdc_override: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     gtin: Mapped[str | None] = mapped_column(String, nullable=True)
     off_code: Mapped[str | None] = mapped_column(String, nullable=True)
     image_url: Mapped[str | None] = mapped_column(String, nullable=True)

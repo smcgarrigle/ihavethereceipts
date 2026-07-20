@@ -175,7 +175,32 @@
 
 
     <!-- Header Section -->
-    <div class="bg-bgCard rounded-3xl shadow-xl border border-borderDefault p-8 mb-8 overflow-hidden relative">
+    <div class="bg-bgCard rounded-3xl shadow-xl border border-borderDefault p-8 mb-8 overflow-hidden relative"
+         x-data="{
+            showOverride: false,
+            overriding: false,
+            overrideError: '',
+            fdcRef: '',
+            applyOverride() {
+                if (!this.fdcRef.trim()) { this.overrideError = 'Paste a USDA FDC URL or ID first.'; return; }
+                this.overriding = true;
+                this.overrideError = '';
+                fetch('/api/items/{{ item.id }}/fdc', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': document.querySelector('meta[name=csrf-token]')?.content || ''
+                    },
+                    body: JSON.stringify({ fdc_ref: this.fdcRef })
+                })
+                .then(async r => {
+                    const data = await r.json();
+                    if (!r.ok) throw new Error(data.detail || 'Override failed');
+                    window.location.reload();
+                })
+                .catch(e => { this.overrideError = e.message; this.overriding = false; });
+            }
+         }">
         <!-- Background Decoration -->
         <div class="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl pointer-events-none"></div>
 
@@ -183,6 +208,9 @@
             <div class="flex-grow">
                 <div class="flex items-center space-x-3 mb-2">
                     <span class="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[10px] font-black uppercase tracking-widest rounded-full">USDA Certified Data</span>
+                    {% if item.fdc_override %}
+                    <span class="px-3 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-[10px] font-black uppercase tracking-widest rounded-full" title="This USDA match was set manually and won't be changed by automatic enrichment">Manual Override</span>
+                    {% endif %}
                     {% if item.gtin %}
                     <span class="text-[10px] font-mono text-textSubtle uppercase tracking-widest">GTIN: {{ item.gtin }}</span>
                     {% endif %}
@@ -224,6 +252,12 @@
                                 {% if item.category %}<span class="text-indigo-500 dark:text-indigo-400 font-bold mr-2">{{ item.category.name }}</span>{% endif %}
                                 {{ usda.brandOwner if usda else "Information provided by USDA Food Data Central" }}
                             </p>
+                            {% if item.fdc_id %}
+                            <p class="text-sm text-textMuted mt-1">
+                                Matched to: <span class="font-semibold text-textBase">{{ usda.description if usda and usda.description else 'FDC #' ~ item.fdc_id }}</span>
+                                <span class="text-textSubtle">· FDC {{ item.fdc_id }}{% if usda and usda.dataType %} · {{ usda.dataType }}{% endif %}</span>
+                            </p>
+                            {% endif %}
                         </div>
                         <button @click="editing = true" class="absolute top-1 right-0 opacity-0 group-hover:opacity-100 p-2 text-textSubtle hover:text-blue-500 transition-all rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30" title="Edit Item Details">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
@@ -259,6 +293,14 @@
             </div>
 
             <div class="flex-shrink-0 flex items-center space-x-3" x-data="{ clearing: false, searching: false }">
+                 <!-- Override match (paste FDC URL/ID) — available with or without an existing match -->
+                 <button @click="showOverride = !showOverride; if (showOverride) $nextTick(() => $refs.fdcRefInput.focus())"
+                    class="p-3 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-800/30 rounded-2xl transition-all border border-transparent hover:border-amber-200 dark:hover:border-amber-500/50"
+                    :class="showOverride ? 'ring-2 ring-amber-400' : ''"
+                    title="Manually set the USDA match — paste an FDC URL or ID">
+                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                 </button>
+
                  {% if item.fdc_id %}
                  <!-- View on USDA -->
                  <a href="https://fdc.nal.usda.gov/fdc-app.html#/food-details/{{ item.fdc_id }}/nutrients" target="_blank"
@@ -307,6 +349,33 @@
                  {% endif %}
             </div>
         </div>
+
+        <!-- Manual Match Override Panel -->
+        <div x-show="showOverride" style="display: none;" x-transition.opacity
+             class="relative mt-6 bg-bgMain border border-borderDefault rounded-2xl p-5">
+            <label for="fdc-override-input" class="block text-xs font-bold text-textSubtle uppercase tracking-wider mb-2">Override USDA Match</label>
+            <p class="text-sm text-textMuted mb-3">
+                Paste a USDA FoodData Central link (e.g.
+                <code class="text-xs">fdc.nal.usda.gov/food-details/2003586/nutrients</code>)
+                or a bare FDC ID. Nutrition data refreshes from that food, and the match is
+                marked as a manual override so automatic enrichment won't replace it.
+            </p>
+            <div class="flex flex-col sm:flex-row gap-3">
+                <input id="fdc-override-input" x-ref="fdcRefInput" type="text" x-model="fdcRef"
+                    @keydown.enter="applyOverride()"
+                    placeholder="https://fdc.nal.usda.gov/food-details/…/nutrients or FDC ID"
+                    class="flex-grow bg-bgCard border border-borderInput text-textBase rounded-xl px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm">
+                <button @click="applyOverride()" :disabled="overriding"
+                    class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center whitespace-nowrap">
+                    <svg x-show="overriding" style="display: none;" class="w-4 h-4 mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    <span x-text="overriding ? 'Matching…' : 'Apply Override'">Apply Override</span>
+                </button>
+                <button @click="showOverride = false; overrideError = ''"
+                    class="px-4 py-2 bg-bgHover text-textBase font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">Cancel</button>
+            </div>
+            <p x-show="overrideError" x-text="overrideError" style="display: none;"
+               class="text-sm text-red-500 dark:text-red-400 mt-2"></p>
+        </div>
     </div>
 
     {% if not usda and not nutrition %}
@@ -335,6 +404,11 @@
         <div class="lg:col-span-2 relative">
 
             <div class="absolute -top-4 -right-4 flex flex-col items-end space-y-2 z-10">
+                {% if item.fdc_override %}
+                <span class="px-3 py-1 bg-amber-100 text-amber-800 text-[10px] font-black uppercase tracking-widest rounded-full shadow-sm border border-amber-200 flex items-center" title="USDA match pinned manually">
+                    <span class="w-2 h-2 bg-amber-500 rounded-full mr-1"></span> Manual Match
+                </span>
+                {% endif %}
                 {% if source == 'usda' or usda %}
                 <span class="px-3 py-1 bg-green-100 text-green-800 text-[10px] font-black uppercase tracking-widest rounded-full shadow-sm border border-green-200 flex items-center">
                     <span class="w-2 h-2 bg-green-500 rounded-full mr-1"></span> USDA Canonical

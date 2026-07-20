@@ -252,6 +252,11 @@ class FDCService:
             # Identify items to update
             to_update = []
             for other in all_items:
+                # Never clobber a manually pinned FDC match (the target item
+                # itself is exempt: an explicit re-enrich clears the pin first)
+                if other.fdc_override and other.id != db_item.id:
+                    continue
+
                 # Same normalized name is an automatic match
                 if other.normalized_name == target_normalized:
                     to_update.append(other)
@@ -265,8 +270,9 @@ class FDCService:
             # 3. Apply changes to all identified items
             updated_count = 0
             for item in to_update:
-                # Update FDC metadata
+                # Update FDC metadata (auto match — clears any stale manual flag)
                 item.fdc_id = enriched_data["fdc_id"]
+                item.fdc_override = False
                 item.gtin = enriched_data["gtin"]
                 item.ingredients = enriched_data["ingredients"]
 
