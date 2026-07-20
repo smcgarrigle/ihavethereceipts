@@ -119,6 +119,55 @@ class TestManualOverrideEndpoint:
         assert item.fdc_override is False
 
 
+class TestInsightsPageFoundationFood:
+    def test_insights_renders_foundation_payload(self, client, db):
+        """Foundation payloads (dict foodCategory, grouping rows without amount,
+        Atwater energy naming) must not 500 the insights page. Regression for
+        the crash after manually pinning FDC 2003586."""
+        item = _make_item(db, fdc_id=2003586, fdc_override=True)
+
+        foundation_detail = {
+            "fdcId": 2003586,
+            "description": "Flour, 00",
+            "dataType": "Foundation",
+            "foodCategory": {"id": 20, "code": "2000", "description": "Cereal Grains and Pasta"},
+            "foodNutrients": [
+                # Grouping row with no amount — used to crash the template
+                {"type": "FoodNutrient", "nutrient": {"name": "Proximates"}},
+                {
+                    "nutrient": {
+                        "number": "957",
+                        "name": "Energy (Atwater General Factors)",
+                        "unitName": "kcal",
+                    },
+                    "amount": 357.06,
+                },
+                {
+                    "nutrient": {"number": "203", "name": "Protein", "unitName": "g"},
+                    "amount": 11.4,
+                },
+                {
+                    "nutrient": {"number": "304", "name": "Magnesium, Mg", "unitName": "mg"},
+                    "amount": 27.1,
+                },
+            ],
+        }
+        with patch(
+            "app.services.fdc_service.fdc_service.get_food_details",
+            return_value=foundation_detail,
+        ):
+            resp = client.get(f"/items/{item.id}/insights")
+
+        assert resp.status_code == 200
+        assert "Flour, 00" in resp.text
+        assert "Manual Override" in resp.text
+        # dict foodCategory flattened to its description
+        assert "Cereal Grains and Pasta" in resp.text
+        assert "{&#39;id&#39;" not in resp.text and "{'id'" not in resp.text
+        # Atwater energy recognized as calories
+        assert ">357<" in resp.text
+
+
 class TestEnrichmentRespectsOverride:
     def test_propagation_skips_pinned_items(self, db):
         """Auto-enrichment of one item must not clobber another item's manual pin."""

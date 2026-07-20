@@ -600,7 +600,8 @@
                     {% for n in usda.foodNutrients %}
                         {% set n_name = n.nutrient.name if n.nutrient else n.nutrientName %}
                         {% set n_unit = n.nutrient.unitName if n.nutrient else n.unitName %}
-                        {% set n_amount = n.amount if n.amount is defined else n.value %}
+                        {# Foundation payloads include grouping rows (e.g. "Proximates") with no amount #}
+                        {% set n_amount = n.get('amount', n.get('value', 0)) or 0 %}
 
                         {% if n_unit in ['MG', 'UG', 'IU', 'mg', 'ug', 'mcg'] and n_name not in ['Sodium, Na', 'Cholesterol'] and n_amount > 0 %}
                             {% set ns.found = true %}

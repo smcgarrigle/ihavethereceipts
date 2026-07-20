@@ -751,6 +751,11 @@ def item_insights_page(request: Request, item_id: int, db: Session = Depends(get
             # Fallback to cached
             usda_raw = {"foodNutrients": item.nutrients.get("foodNutrients", [])}
 
+        # Foundation/SR Legacy payloads nest the category as an object;
+        # flatten so the template can treat it as a plain string
+        if usda_raw and isinstance(usda_raw.get("foodCategory"), dict):
+            usda_raw["foodCategory"] = usda_raw["foodCategory"].get("description")
+
     # Get the effective nutrients (canonical + manual overrides)
     effective = item.effective_nutrients
 
@@ -810,11 +815,9 @@ def item_insights_page(request: Request, item_id: int, db: Session = Depends(get
                 val = n.get("amount") if n.get("amount") is not None else n.get("value")
                 if not val:
                     continue
-                if (
-                    n_name == "Energy"
-                    and (n.get("nutrient", {}).get("unitName") or n.get("unitName")).upper()
-                    == "KCAL"
-                ):
+                n_unit = (n.get("nutrient", {}).get("unitName") or n.get("unitName") or "").upper()
+                # Foundation foods report "Energy (Atwater General Factors)" etc.
+                if n_name and n_name.startswith("Energy") and n_unit == "KCAL":
                     unified_nutrition["calories"] = unified_nutrition["calories"] or val
                 elif n_name == "Total lipid (fat)":
                     unified_nutrition["fat"] = unified_nutrition["fat"] or val
