@@ -25,7 +25,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd backend
-          uv sync
+          uv sync --extra dev
 
       - name: Run Ruff Check
         run: |
