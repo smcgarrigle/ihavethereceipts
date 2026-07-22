@@ -58,6 +58,7 @@ All three Strategic Vision phases have been delivered as of May 2026. The applic
 ### 3. AI & Data Enrichment
 - [x] **Dynamic AI Few-Shot Learning** ✅ (July 2026): Every review-sandbox save is diffed against the AI's original extraction; corrections are stored in `ocr_corrections` and injected into the OCR prompt (store-scoped on reprocess, global on first pass). See "OCR Feedback Loop" below.
 - [x] **Full USDA FDC Sweep** ✅ (July 2026): Checkpointed backfill (`scripts/backfill_nutrients.py`) matched 498 items via FDC + 24 via OpenFoodFacts — nutrient coverage rose from 8% to 49% of items (45.9% of spend).
+- [ ] **Store-Scoped Matching Context**: Enhance `item_matcher.py` auto-merge logic to boost fuzzy-match scores (+10-15%) for items previously purchased at the current receipt's store, preventing cross-contamination of store brands (e.g., Whole Foods "365" vs Safeway "O Organics").
 - [ ] **Barcode Scanning Support**: Mobile camera integration to pull global product metadata from OpenFoodFacts.
 
 ### 4. Dynamic Trends & Dashboards

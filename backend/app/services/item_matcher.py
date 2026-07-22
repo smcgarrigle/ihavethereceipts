@@ -3,7 +3,27 @@ from typing import Any
 from rapidfuzz import fuzz
 from sqlalchemy.orm import Session
 
-from app.models import Item
+from app.models import Item, Receipt, ReceiptItem
+
+# Max raw-score gap a same-store item may close via ranking. Affects ordering
+# only — never whether an item passes the threshold, and never the reported score.
+STORE_CONTEXT_RANK_BOOST = 10
+
+
+def get_store_item_ids(db: Session, store_id: int) -> set[int]:
+    """Ids of all items previously purchased at the given store.
+
+    Query this once per receipt and pass the result to find_similar_items /
+    get_best_match, mirroring the existing_items pre-fetch pattern.
+    """
+    rows = (
+        db.query(ReceiptItem.item_id)
+        .join(Receipt)
+        .filter(Receipt.store_id == store_id)
+        .distinct()
+        .all()
+    )
+    return {row[0] for row in rows}
 
 
 def normalize_item_name(name: str) -> str:
@@ -23,6 +43,7 @@ def find_similar_items(
     threshold: int = 80,
     limit: int = 5,
     existing_items: list[Item] | None = None,
+    store_item_ids: set[int] | None = None,
 ) -> list[dict[str, Any]]:
     """
     Find items similar to the given name using rapidfuzz
@@ -33,6 +54,9 @@ def find_similar_items(
         threshold: Minimum similarity score (0-100)
         limit: Maximum number of results
         existing_items: Optional list of pre-fetched items to search within
+        store_item_ids: Optional pre-fetched purchase history for the current
+            store (see get_store_item_ids); ranks same-store items ahead of
+            others within STORE_CONTEXT_RANK_BOOST points of raw similarity
 
     Returns:
         List of dicts with: {item: Item, score: int}
@@ -55,8 +79,16 @@ def find_similar_items(
         if score >= threshold:
             matches.append({"item": item, "score": score})
 
-    # Sort by score descending
-    matches.sort(key=lambda x: float(str(x["score"])), reverse=True)
+    # Sort by score descending. Store context influences ranking only:
+    # a same-store item can outrank a slightly better text match, but the
+    # threshold check above and the reported scores use raw similarity.
+    def rank_key(match: dict[str, Any]) -> float:
+        score = float(str(match["score"]))
+        if store_item_ids and match["item"].id in store_item_ids:
+            score += STORE_CONTEXT_RANK_BOOST
+        return score
+
+    matches.sort(key=rank_key, reverse=True)
 
     return matches[:limit]
 
@@ -66,12 +98,18 @@ def get_best_match(
     db: Session,
     threshold: int = 85,
     existing_items: list[Item] | None = None,
+    store_item_ids: set[int] | None = None,
 ) -> Item | None:
     """
     Get the best matching item, or None if no good match
     """
     matches = find_similar_items(
-        item_name, db, threshold=threshold, limit=1, existing_items=existing_items
+        item_name,
+        db,
+        threshold=threshold,
+        limit=1,
+        existing_items=existing_items,
+        store_item_ids=store_item_ids,
     )
 
     if matches:
