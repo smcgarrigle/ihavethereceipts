@@ -15,12 +15,29 @@ router = APIRouter()
 
 
 def _get_analytics_exclusions(db: Session) -> list[str]:
-    """Return lowercase category patterns excluded from analytics."""
+    """Return lowercase patterns excluded from analytics.
+
+    Patterns are matched as case-insensitive substrings against both
+    category names *and* item names (see ``_is_excluded``).
+    """
     rules = db.query(ExclusionRule).filter(ExclusionRule.scope == "analytics").all()
     if rules:
         return [r.pattern.lower() for r in rules]
     # Fallback to defaults if table is empty
     return ["excluded", "other", "taxes & fees"]
+
+
+def _is_excluded(exclusions: list[str], cat_name: str, item_name: str = "") -> bool:
+    """Return True if *cat_name* or *item_name* matches any exclusion pattern.
+
+    Matching is case-insensitive substring (same rule the Settings UI
+    describes).  This ensures patterns that are item names — e.g.
+    ``"CRV"`` — work even when the item's category is something generic
+    like "Other" or "Fees & Taxes".
+    """
+    cat_lower = cat_name.lower()
+    item_lower = item_name.lower()
+    return any(ex in cat_lower or (item_lower and ex in item_lower) for ex in exclusions)
 
 
 @router.get("/ingredient-stats")
@@ -881,7 +898,8 @@ def get_bi_dashboard_data(db: Session = Depends(get_db)):
         for ri in r.items:
             # Skip exclusions
             cat_name = ri.item.category.name if ri.item and ri.item.category else "Uncategorized"
-            if any(ex in cat_name.lower() for ex in exclusions):
+            item_name = ri.item.name if ri.item else ""
+            if _is_excluded(exclusions, cat_name, item_name):
                 continue
 
             item_spend = ri.price

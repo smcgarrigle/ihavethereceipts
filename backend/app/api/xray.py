@@ -15,7 +15,7 @@ from app.database import get_db
 from app.models import Item, Receipt, ReceiptItem, Store
 
 logger = logging.getLogger(__name__)
-from app.api.analytics import _get_analytics_exclusions  # noqa: E402
+from app.api.analytics import _get_analytics_exclusions, _is_excluded  # noqa: E402
 
 router = APIRouter()
 
@@ -50,7 +50,8 @@ def receipt_xray_data(db: Session = Depends(get_db)):
         valid_total = 0.0
         for ri in r.items:
             cat_name = ri.item.category.name if ri.item and ri.item.category else "Uncategorized"
-            if any(ex in cat_name.lower() for ex in exclusions):
+            item_name = ri.item.name if ri.item else ""
+            if _is_excluded(exclusions, cat_name, item_name):
                 continue
             if ri.price:
                 valid_total += ri.price
@@ -62,7 +63,8 @@ def receipt_xray_data(db: Session = Depends(get_db)):
     for r in receipts:
         for ri in r.items:
             cat_name = ri.item.category.name if ri.item and ri.item.category else "Uncategorized"
-            if any(ex in cat_name.lower() for ex in exclusions):
+            item_name = ri.item.name if ri.item else ""
+            if _is_excluded(exclusions, cat_name, item_name):
                 continue
             if ri.item and ri.price and ri.price > 0:
                 item_prices[ri.item.name].append(ri.price)
@@ -99,7 +101,8 @@ def receipt_xray_data(db: Session = Depends(get_db)):
         store_name = r.store.name if r.store else "Unknown"
         for ri in r.items:
             cat_name = ri.item.category.name if ri.item and ri.item.category else "Uncategorized"
-            if any(ex in cat_name.lower() for ex in exclusions):
+            item_name = ri.item.name if ri.item else ""
+            if _is_excluded(exclusions, cat_name, item_name):
                 continue
             if ri.item and ri.price:
                 store_categories[store_name][cat_name] += ri.price
@@ -137,7 +140,8 @@ def receipt_xray_data(db: Session = Depends(get_db)):
         store_name = r.store.name if r.store else "Unknown"
         for ri in r.items:
             cat_name = ri.item.category.name if ri.item and ri.item.category else "Uncategorized"
-            if any(ex in cat_name.lower() for ex in exclusions):
+            item_name = ri.item.name if ri.item else ""
+            if _is_excluded(exclusions, cat_name, item_name):
                 continue
             if ri.item and ri.price:
                 entry = item_frequency[ri.item.name]
@@ -212,7 +216,8 @@ def receipt_xray_data(db: Session = Depends(get_db)):
         item_count = 0
         for ri in r.items:
             cat_name = ri.item.category.name if ri.item and ri.item.category else "Uncategorized"
-            if any(ex in cat_name.lower() for ex in exclusions):
+            item_name = ri.item.name if ri.item else ""
+            if _is_excluded(exclusions, cat_name, item_name):
                 continue
             item_count += 1
             if ri.item and ri.item.category:

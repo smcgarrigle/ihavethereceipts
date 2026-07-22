@@ -32,18 +32,17 @@ The following strings are stripped from item names (primarily for Amazon/iHerb):
 ## 3. Analytics & Dashboard Exclusions
 
 *   **Purpose**: Suppresses non-grocery costs (taxes, shipping, service fees) from spending charts and totals.
-*   **Mechanism**: `exclude_list` in `backend/app/api/analytics.py`.
+*   **Mechanism**: `_is_excluded()` in `backend/app/api/analytics.py`, driven by `ExclusionRule` table entries with `scope='analytics'`.
+*   **Matching**: Case-insensitive substring against both **category names** and **item names**. For example, a pattern `crv` will hide items named "CRV 6PK UNDER 240Z AB" even if they are categorized as "Fees & Taxes" or "Other".
 *   **View Excluded From**:
     - **Dashboard**: "Total Spent" summary card.
     - **Dashboard**: "Spend by Category" charts.
     - **Dashboard**: Category Drilldown modals.
-*   **Logic**: Any item assigned to a category containing the following strings (case-insensitive) is hidden from analytics:
-    - `excluded`
-    - `other`
-    - `taxes & fees`
+    - **X-Ray**: All 5 visualizations (Volatility, Store DNA, Phantom Items, Rhythm, Complexity).
+*   **Default patterns** (when no rules are configured): `excluded`, `other`, `taxes & fees`.
 
 > [!TIP]
-> To hide a specific item from your spending totals, assign it to a category named **"Excluded - [Reason]"**.
+> To hide a specific item from your spending totals, add its name (or a substring of it) to Settings → Analytics Exclusions — e.g. adding `crv` will hide all CRV items.
 
 ---
-*Last Updated: May 8, 2026*
+*Last Updated: July 21, 2026*
