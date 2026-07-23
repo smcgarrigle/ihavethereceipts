@@ -282,7 +282,7 @@ class ProduceReceiptRequest(BaseModel):
 def create_produce_receipt(request: ProduceReceiptRequest, db: Session = Depends(get_db)):
     """Streamlined endpoint for bulk-adding produce hauls"""
     from app.models import Category, Item, ReceiptItem
-    from app.services.item_matcher import get_best_match
+    from app.services.item_matcher import get_best_match, get_store_item_ids
     from app.services.store_utils import normalize_store_name
 
     # 1. Store Setup
@@ -317,9 +317,12 @@ def create_produce_receipt(request: ProduceReceiptRequest, db: Session = Depends
 
     # 3. Item Processing
     all_items = db.query(Item).all()
+    store_item_ids = get_store_item_ids(db, store.id)
     for p_item in request.items:
         norm_name = p_item.name.lower().strip()
-        item = get_best_match(p_item.name, db, threshold=85, existing_items=all_items)
+        item = get_best_match(
+            p_item.name, db, threshold=85, existing_items=all_items, store_item_ids=store_item_ids
+        )
 
         if not item:
             # Auto-categorize as 'Produce' or find/create Produce category

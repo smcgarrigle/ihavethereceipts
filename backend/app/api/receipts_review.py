@@ -16,6 +16,7 @@ from app.models import Receipt
 from app.services.item_matcher import (
     find_merge_candidates,
     get_best_match,
+    get_store_item_ids,
 )
 from app.utils.item_parsing import extract_weight
 
@@ -150,8 +151,9 @@ def save_reviewed_items(
         # Clear existing items to prevent duplication (Idempotency fix)
         db.query(ReceiptItem).filter(ReceiptItem.receipt_id == receipt.id).delete()
 
-        # OPTIMIZATION: Fetch all items once to avoid N+1 queries
+        # OPTIMIZATION: Fetch all items and store history once to avoid N+1 queries
         all_items = db.query(Item).all()
+        store_item_ids = get_store_item_ids(db, receipt.store_id)
 
         for reviewed_item in request.items:
             item_name = reviewed_item.name
@@ -164,7 +166,13 @@ def save_reviewed_items(
 
             # If no exact match, try fuzzy matching using pre-fetched list
             if not item:
-                item = get_best_match(item_name, db, threshold=85, existing_items=all_items)
+                item = get_best_match(
+                    item_name,
+                    db,
+                    threshold=85,
+                    existing_items=all_items,
+                    store_item_ids=store_item_ids,
+                )
 
             # If still not found, create new item with user-provided category
             if not item:

@@ -372,9 +372,36 @@ STORE_CATALOG: dict[str, list[str]] = {
 }
 
 
-def vary(price: float, pct: float = 0.09) -> float:
-    """Apply small random price variation to simulate real-world price changes."""
-    return round(price * random.uniform(1 - pct, 1 + pct), 2)
+# Each item gets a price-trend personality so history graphs (and the X-Ray
+# Price Volatility Radar) show distinct shapes instead of uniform noise.
+TREND_SHAPES = ("steady", "noisy", "inflation", "sale", "volatile")
+_TREND_WEIGHTS = (35, 30, 15, 12, 8)
+_item_trends: dict[str, str] = {}
+
+
+def _trend(item_name: str) -> str:
+    if item_name not in _item_trends:
+        _item_trends[item_name] = random.choices(TREND_SHAPES, weights=_TREND_WEIGHTS)[0]
+    return _item_trends[item_name]
+
+
+def priced(item_name: str, base_price: float, on: date) -> float:
+    """Price for an item on a date, following the item's assigned trend shape."""
+    weeks_ago = (date.today() - on).days / 7
+    shape = _trend(item_name)
+    if shape == "steady":
+        factor = random.uniform(0.97, 1.03)
+    elif shape == "noisy":
+        factor = random.uniform(0.91, 1.09)
+    elif shape == "inflation":
+        # ~1.0 at the oldest receipts (15 weeks back) ramping to ~1.18 today
+        factor = (1.18 - 0.012 * weeks_ago) * random.uniform(0.98, 1.02)
+    elif shape == "sale":
+        on_sale = int(weeks_ago) % 4 == 0
+        factor = (0.75 if on_sale else 1.0) * random.uniform(0.96, 1.04)
+    else:  # volatile
+        factor = random.uniform(0.80, 1.20)
+    return round(base_price * factor, 2)
 
 
 def build_schedule() -> list[tuple[str, date, list[str]]]:
@@ -484,7 +511,7 @@ def seed() -> None:
 
             for item_name in item_names:
                 cat_name, base_price, mode, pkg_oz, _profile = ITEM_CATALOG[item_name]
-                unit_price = vary(base_price)
+                unit_price = priced(item_name, base_price, receipt_date)
 
                 if mode == "lb":
                     # Sold by weight: the line carries an explicit weight in lb
@@ -550,6 +577,10 @@ def seed() -> None:
             print(f"  📅 Date range: {schedule[0][1]} → {schedule[-1][1]}")
         print(f"  🏪 Stores: {', '.join(s['name'] for s in STORES)}")
         print(f"  🛒 {len(ITEM_CATALOG)} unique products across {len(CATEGORIES)} categories")
+        shape_counts = {s: 0 for s in TREND_SHAPES}
+        for shape in _item_trends.values():
+            shape_counts[shape] += 1
+        print(f"  📈 Price-trend shapes: {shape_counts}")
         print("\n🚀 Demo data ready! Start the server and open http://127.0.0.1:8000\n")
 
     except Exception as e:

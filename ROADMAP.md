@@ -58,6 +58,7 @@ All three Strategic Vision phases have been delivered as of May 2026. The applic
 ### 3. AI & Data Enrichment
 - [x] **Dynamic AI Few-Shot Learning** ✅ (July 2026): Every review-sandbox save is diffed against the AI's original extraction; corrections are stored in `ocr_corrections` and injected into the OCR prompt (store-scoped on reprocess, global on first pass). See "OCR Feedback Loop" below.
 - [x] **Full USDA FDC Sweep** ✅ (July 2026): Checkpointed backfill (`scripts/backfill_nutrients.py`) matched 498 items via FDC + 24 via OpenFoodFacts — nutrient coverage rose from 8% to 49% of items (45.9% of spend).
+- [x] **Store-Scoped Matching Context** ✅ (July 2026): `item_matcher.py` now ranks items previously purchased at the current receipt's store ahead of near-tied text matches (raw-score gap ≤ 10), preventing cross-contamination of store brands (e.g., Whole Foods "365" vs Safeway "O Organics"). Ranking-only by design — store history never lowers the match threshold and never alters reported similarity scores, so it cannot promote a weak match into an auto-merge. Store purchase history is fetched once per receipt (`get_store_item_ids`). See `PLAN_STORE_CONTEXT.md`.
 - [ ] **Barcode Scanning Support**: Mobile camera integration to pull global product metadata from OpenFoodFacts.
 
 ### 4. Dynamic Trends & Dashboards
@@ -76,6 +77,34 @@ All three Strategic Vision phases have been delivered as of May 2026. The applic
 - [ ] **PDF Viewer 'Esc' Key Fix**: The native PDF `<embed>` swallows the 'Esc' key when focused, preventing the receipt review modal from closing.
   - *Option A (Lightweight)*: Auto-focus the modal's "Close" button upon opening so 'Esc' works immediately until the user clicks into the PDF.
   - *Option B (Heavy)*: Migrate from native `<embed>` to `PDF.js` to render PDFs as flat canvases that do not steal keyboard focus.
+
+### 7. Custom Category Lenses (Proposed — July 2026)
+
+Let users create personally meaningful categories — e.g. **"Protein-Maxxing"** — and route items into them across canonical lines (chicken out of Meat, eggs out of Dairy, Greek yogurt out of Dairy), turning the category system from a fixed taxonomy into a motivational lens that can dominate charts and trends.
+
+**Already true today** (verified July 2026): all analytics group by `Category.name` generically, so a user-created category flows into every chart with zero code changes; user-created categories pass the `category_mapper` interceptor untouched (only *unknown* machine-sourced names are canonicalized to the 13-set); item-level FDC nutrition aggregates cleanly under any category; and matched repurchases inherit their item's category, so a routed item *stays* routed.
+
+**Pros**
+- **Motivation & engagement**: a self-named goal category ("Protein-Maxxing") is a reason to open the app; watching it dominate the spending chart is the reward.
+- **Expresses what the canonical taxonomy can't**: goal-oriented buckets that cut across Meat/Dairy/Frozen (chicken + eggs + yogurt + protein bars).
+- **Near-zero build cost**: the data model and charts already support it; the work is UX (bulk move, create-from-selection), not schema.
+- **Nutrition synergy**: protein-per-dollar and similar views come free once the lens exists, since nutrition lives on items.
+- **AI synergy (later)**: the Phase 3 correction-capture loop could learn the user's personal taxonomy so new chicken SKUs land in "Protein-Maxxing" automatically.
+
+**Cons / risks**
+- **Exclusive membership rewrites history**: an item has one `category_id`, and re-categorizing re-buckets **all of its past purchases**, not just future ones — moving eggs to "Protein-Maxxing" retroactively bends the Dairy trend line. (Deliberate design call: stay with exclusive categories rather than a many-to-many tag system, which would double charting complexity for a lens toggle few users need. Revisit only if users demand items counted in two places at once.)
+- **Hard-coded canonical surfaces go blind**: `/best-value/{category_type}` keys off a fixed dict of canonical names (`pages.py`), so moved items silently drop out of best-value views. Any future canonical-keyed feature inherits this hazard — audit before shipping.
+- **Re-fragmentation pressure**: the July 2026 taxonomy collapse (92 → 13) exists because category sprawl destroyed the charts once. User-created lenses reopen that door intentionally; the interceptor still guards machine-sourced names, but nothing stops a user creating twelve near-duplicate lenses.
+- **Maintenance drift**: AI categorization only knows the canonical 13, so *new* item variants land in canonical categories and must be swept into the lens manually (until the feedback-loop synergy above lands).
+- **Order-of-operations trap**: a custom name must be created (Add Category) *before* it is typed at review time, or `map_category_name` flattens it to "Other". Needs a UI affordance so users never hit this silently.
+
+**Soft-warning UX** — re-categorization is lossless and fully reversible (a `category_id` repoint), so warn, don't block. Proposed copy for the bulk-move confirmation:
+> *"Moving 12 items to 'Protein-Maxxing' also moves their entire purchase history — your Meat and Dairy charts will change retroactively. Nothing is deleted: moving items back restores the old charts exactly."*
+
+And a one-time nudge on custom-category creation:
+> *"Custom categories are exclusive — an item lives in one category at a time. Items you move here leave their current category in all charts and trends."*
+
+**Prerequisites / build order**: (1) retire or redirect the orphaned `/categories` page (nav redesign left it unlinked; it duplicates the Items-page Categories tab), (2) per-category item list with checkboxes + bulk "move to…" + "create category from selection" (~half day), (3) warning copy above, (4) *later*: feedback-loop taxonomy learning, and grow the Categories surface into a motivational per-lens dashboard.
 
 ---
 
@@ -123,7 +152,7 @@ All three Strategic Vision phases have been delivered as of May 2026. The applic
 </details>
 
 ---
-*Last Updated: July 17, 2026*
+*Last Updated: July 22, 2026*
 
 <!-- Search UX options considered (Option A implemented May 2026):
   Option B — Dedicated /search full-page (Enter key navigates to results page; table view with all purchase history)

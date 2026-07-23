@@ -173,6 +173,9 @@ def entity_urls() -> list[str]:
     try:
         urls = [f"/items/{item_id}/insights" for (item_id,) in db.query(Item.id)]
         urls += [f"/receipts/{receipt_id}/review" for (receipt_id,) in db.query(Receipt.id)]
+        # JSON consumed by the price-history modal's runtime fetch() — the URL is
+        # built in a JS template literal, so the crawler's regexes never see it.
+        urls += [f"/api/analytics/price-trends/{item_id}" for (item_id,) in db.query(Item.id)]
         return urls
     finally:
         db.close()
@@ -247,7 +250,9 @@ def rewrite_base_path(out: Path, base_path: str) -> int:
     base = "/" + base_path.strip("/")
     prefixes = sorted({p.name for p in out.iterdir() if p.name != "index.html"} | {"favicon.ico"})
     alternation = "|".join(map(re.escape, prefixes))
-    pattern = re.compile(rf"""(?P<q>["'(])/(?P<path>(?:{alternation})(?:[/?"'#)]|$))""")
+    # Opening delimiters include the backtick so template-literal URLs
+    # (e.g. fetch(`/api/analytics/price-trends/${itemId}`)) are rewritten too.
+    pattern = re.compile(rf"""(?P<q>["'(`])/(?P<path>(?:{alternation})(?:[/?"'#)`]|$))""")
     rewritten = 0
     for file in out.rglob("*"):
         if file.is_dir() or file.suffix in {".png", ".svg", ".woff", ".woff2", ".ico"}:

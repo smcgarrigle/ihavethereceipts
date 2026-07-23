@@ -18,7 +18,7 @@ from app.models import Category, Item, Receipt, ReceiptItem, Store
 router = APIRouter()
 
 
-from app.api.analytics import _get_analytics_exclusions, _get_top_items  # noqa: E402
+from app.api.analytics import _get_analytics_exclusions, _get_top_items, _is_excluded  # noqa: E402
 
 
 @router.get("/tables/top-categories", response_class=HTMLResponse)
@@ -815,7 +815,7 @@ def get_category_store_stack_widget(db: Session = Depends(get_db)):
     exclude_list = _get_analytics_exclusions(db)
 
     for cat_id, cat_name, store_id, store_name, price, qty, weight, unit, _receipt_id in results:
-        if any(ex in cat_name.lower() for ex in exclude_list):
+        if _is_excluded(exclude_list, cat_name):
             continue
 
         if cat_id not in categories:
