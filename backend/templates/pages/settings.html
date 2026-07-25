@@ -78,6 +78,33 @@
         </div>
     </div>
 
+    <!-- Data Export Section -->
+    <div class="rounded-2xl border border-borderDefault bg-bgCard p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-blue-500/15 flex items-center justify-center text-xl">📊</div>
+            <div>
+                <h2 class="text-base font-semibold text-textBase">Export Data</h2>
+                <p class="text-xs text-textMuted mt-0.5">Download your complete receipt and purchase item history.</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-2">
+            <a href="/api/export/all/csv"
+               class="px-3.5 py-2 bg-bgSkeleton hover:bg-bgHover text-textMuted hover:text-textBase rounded-xl transition-all text-xs font-mono border border-borderDefault flex items-center gap-2 font-semibold no-underline shadow-sm">
+                <svg class="w-4 h-4 text-textSubtle" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                CSV Export
+            </a>
+            <a href="/api/export/all/excel"
+               class="px-3.5 py-2 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 rounded-xl transition-all text-xs font-mono border border-emerald-500/30 flex items-center gap-2 font-semibold no-underline shadow-sm">
+                <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                Excel (XLSX)
+            </a>
+        </div>
+    </div>
+
     <!-- Tab Navigation (Alpine.js) -->
     <div x-data="{ tab: 'analytics' }">
         <div role="tablist" aria-label="Settings sections" class="flex gap-1 p-1 rounded-xl bg-bgMain border border-borderDefault">

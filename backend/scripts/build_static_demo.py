@@ -291,9 +291,14 @@ def main() -> int:
         help="URL prefix the demo will be hosted under, e.g. /grocery-tracker/demo",
     )
     args = parser.parse_args()
-    out = Path(args.out).resolve()
+    final_out = Path(args.out).resolve()
 
-    print(f"🏗️  Building static demo → {out}")
+    # Build into a sibling staging dir and swap in only on success, so a
+    # crashed build (missing deps, broken venv, ...) never destroys the
+    # previous good snapshot.
+    out = final_out.parent / (final_out.name + ".building")
+
+    print(f"🏗️  Building static demo → {final_out}")
     print(f"🗄️  Throwaway database: {DEMO_DB}")
     if out.exists():
         shutil.rmtree(out)
@@ -318,8 +323,12 @@ def main() -> int:
             for ref in broken[:20]:
                 print(f"      {ref}")
 
+    if final_out.exists():
+        shutil.rmtree(final_out)
+    out.rename(final_out)
+
     shutil.rmtree(_TMP_DIR, ignore_errors=True)
-    print(f"\n🚀 Preview:  python3 -m http.server -d {out} 8080")
+    print(f"\n🚀 Preview:  python3 -m http.server -d {final_out} 8080")
     return 0
 
 

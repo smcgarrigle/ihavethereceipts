@@ -19,6 +19,11 @@ from app.models.receipt import Receipt, ReceiptItem
 # Minimum number of distinct purchase dates required to compute a cadence
 MIN_PURCHASES = 3
 
+# Only the most recent N purchase intervals feed the cadence average. Items
+# with little history use everything they have; items with long history adapt
+# to habit changes instead of being anchored by months-old intervals.
+MAX_CADENCE_INTERVALS = 8
+
 # Items not purchased in this many days are marked stale
 STALE_THRESHOLD_DAYS = 180
 
@@ -125,6 +130,10 @@ def get_item_cadences(db: Session) -> list[dict[str, Any]]:
         intervals = [iv for iv in intervals if iv > 0]
         if not intervals:
             continue
+
+        # Trailing window: recent behavior describes the current habit better
+        # than the full archive once enough history has accumulated.
+        intervals = intervals[-MAX_CADENCE_INTERVALS:]
 
         avg_interval = statistics.mean(intervals)
         std_interval = statistics.stdev(intervals) if len(intervals) >= 2 else 0.0

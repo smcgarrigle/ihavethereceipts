@@ -25,6 +25,8 @@ class FDCService:
 
         # 1. Lowercase and strip
         q = query.lower().strip()
+        # Remove parenthetical details
+        q = re.sub(r"\([^)]*\)", " ", q)
 
         # 2. Remove common OCR prefixes (e.g., "2@", "1@", "2X")
         q = re.sub(r"^\d+\s*[@x]\s*", "", q)
@@ -54,17 +56,45 @@ class FDCService:
             r"\byog\b": "yogurt",
             r"\bckn\b": "chicken",
             r"\bb/s\b": "boneless skinless",
+            r"\bb/i\b": "bone in",
             r"\bat[ \.]?na\b": "athena",
             r"\bvty\b": "variety",
             r"\bgrnd\b": "ground",
             r"\borg\b": "organic",
+            r"\bog\b": "organic",
+            r"\bicd\b": "iced",
+            r"\bjc\b": "juice",
+            r"\bpch\b": "peach",
+            r"\bkmbcha\b": "kombucha",
+            r"\bkombuch\b": "kombucha",
+            r"\bdrscl\b": "driscoll's",
+            r"\bshrmp\b": "shrimp",
+            r"\bbrst\b": "breast",
+            r"\bbby\b": "baby",
+            r"\bsmk\b": "smoked",
+            r"\bsmked\b": "smoked",
+            r"\bchdr\b": "cheddar",
+            r"\bmozz\b": "mozzarella",
+            r"\bmozzrella\b": "mozzarella",
+            r"\brstd\b": "roasted",
+            r"\bgrlc\b": "garlic",
+            r"\bmtbl\b": "meatball",
+            r"\bmtblls\b": "meatballs",
+            r"\bna\b": "non alcoholic",
         }
         for abbr, full in abbreviation_map.items():
             q = re.sub(abbr, full, q)
 
-        # 7. Final cleanup
-        q = re.sub(r"[,|/]", " ", q)
+        # 7. Remove product item codes (e.g. BTA-12121, ENZ-13051)
+        q = re.sub(r"\b[a-z]{2,5}-\d{3,8}\b", "", q)
+
+        # 8. Final cleanup: strip non-alphanumeric special characters, multiple spaces
+        q = re.sub(r"[^\w\s]", " ", q)
         q = re.sub(r"\s+", " ", q).strip()
+
+        # 9. Cap length to 80 chars to avoid FDC 400 Bad Request
+        if len(q) > 80:
+            q = q[:80].rsplit(" ", 1)[0]
 
         return q
 
@@ -73,7 +103,7 @@ class FDCService:
     ) -> list[dict[str, Any]]:
         """Search for items in USDA FDC."""
         if data_type is None:
-            data_type = ["Branded"]
+            data_type = ["Branded", "Foundation", "SR Legacy"]
         if not self.api_key:
             logger.warning("FDC_API_KEY not set")
             return []
@@ -117,12 +147,13 @@ class FDCService:
             return None
 
     def get_best_match(
-        self, query: str, items: list[dict[str, Any]], threshold: int = 70
+        self, query: str, items: list[dict[str, Any]], threshold: int = 60
     ) -> dict[str, Any] | None:
         """Find the best fuzzy match from a list of FDC items."""
         if not items:
             return None
 
+        cleaned = self._clean_query(query)
         scored_items: list[dict[str, Any]] = []
         for item in items:
             description = item.get("description", "")
@@ -131,12 +162,17 @@ class FDCService:
             # Combine brand and description for matching
             full_name = f"{brand} {description}".strip()
 
-            # Use multiple matching strategies
-            score_token_set = fuzz.token_set_ratio(query.lower(), full_name.lower())
-            score_partial = fuzz.partial_ratio(query.lower(), full_name.lower())
+            # Use multiple matching strategies against cleaned and raw query
+            score_token_set_cleaned = fuzz.token_set_ratio(cleaned.lower(), full_name.lower())
+            score_partial_cleaned = fuzz.partial_ratio(cleaned.lower(), full_name.lower())
+            score_token_set_raw = fuzz.token_set_ratio(query.lower(), full_name.lower())
 
-            # Weighted score
-            final_score = (score_token_set * 0.7) + (score_partial * 0.3)
+            # Weighted / best score calculation
+            final_score = max(
+                (score_token_set_cleaned * 0.7) + (score_partial_cleaned * 0.3),
+                score_token_set_raw,
+                score_token_set_cleaned,
+            )
 
             scored_items.append({"score": final_score, "item": item})
 

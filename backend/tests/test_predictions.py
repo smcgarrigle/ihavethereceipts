@@ -115,6 +115,29 @@ class TestCadenceCalculation:
         shopping = get_shopping_list(db)
         assert len(shopping) == 0
 
+    def test_cadence_adapts_to_habit_change(self, db):
+        """A long-history item that shifts cadence should predict from recent
+        behavior (trailing MAX_CADENCE_INTERVALS window), not the full archive."""
+        from app.services.predictions import MAX_CADENCE_INTERVALS, get_item_cadences
+
+        base = datetime(2025, 6, 1)
+        # Ten months of monthly purchases...
+        dates = [base + timedelta(days=30 * i) for i in range(11)]
+        # ...then the habit changes: eight weekly purchases
+        weekly_start = dates[-1]
+        dates += [weekly_start + timedelta(days=7 * i) for i in range(1, MAX_CADENCE_INTERVALS + 1)]
+        _create_item_with_purchases(db, "Oat Milk", "TestMart", dates)
+
+        cadences = get_item_cadences(db)
+        assert len(cadences) == 1
+
+        c = cadences[0]
+        assert c["purchase_count"] == len(dates)
+        # Full-history mean would be ~19.8 days; the trailing window sees only
+        # the eight weekly intervals.
+        assert c["avg_interval"] == 7.0
+        assert c["std_interval"] == 0.0
+
     def test_store_prices_present(self, db):
         """Each cadence entry should have store price comparisons."""
         from app.services.predictions import get_item_cadences

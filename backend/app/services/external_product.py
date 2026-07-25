@@ -65,26 +65,15 @@ class OpenFoodFactsService:
         return q
 
     @staticmethod
-    def _fetch(url: str, retries: int = 5) -> dict[str, Any] | None:
-        """Helper to perform GET request using urllib with simple retry"""
-        import time
-
-        for attempt in range(retries + 1):
-            req = urllib.request.Request(
-                url, headers={"User-Agent": OpenFoodFactsService.USER_AGENT}
-            )
-            try:
-                with urllib.request.urlopen(req, timeout=15) as response:
-                    if response.status == 200:
-                        return dict(json.loads(response.read().decode("utf-8")))
-            except Exception as e:
-                logger.warning(f"Attempt {attempt + 1} failed: {e}")
-                if attempt < retries:
-                    # Exponential backoff: 5s, 10s, 20s...
-                    time.sleep(5 * (2**attempt))
-                else:
-                    logger.error(f"Error fetching from OFF after {retries} retries: {e}")
-
+    def _fetch(url: str) -> dict[str, Any] | None:
+        """Helper to perform GET request using urllib with fast timeout"""
+        req = urllib.request.Request(url, headers={"User-Agent": OpenFoodFactsService.USER_AGENT})
+        try:
+            with urllib.request.urlopen(req, timeout=4) as response:
+                if response.status == 200:
+                    return dict(json.loads(response.read().decode("utf-8")))
+        except Exception as e:
+            logger.debug(f"OFF fetch error for {url}: {e}")
         return None
 
     @classmethod

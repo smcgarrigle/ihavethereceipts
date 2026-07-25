@@ -60,6 +60,13 @@ kill -9 <PID>
 fuser -k 8000/tcp
 ```
 
+### Broken venv / Wrong Python (ImportError: cannot import name 'UTC')
+Dev tools (pytest/ruff/mypy) live in the `dev` **extra** — plain `uv sync` removes them, and `uv run pytest` then silently falls back to system Python 3.10, which fails on `datetime.UTC` imports. A crashed/interrupted `uv` can also leave `.venv/bin` with only `activate` scripts. Either way:
+```bash
+cd backend
+rm -rf .venv && uv sync --extra dev
+```
+
 ---
 
 ## 🔍 Diagnostics
@@ -82,6 +89,39 @@ Rebuild after adding/changing Tailwind classes in templates (new classes render 
 cd backend
 ./scripts/build_css.sh          # fetches the pinned CLI on first run, writes static/css/tailwind.css
 ```
+
+## 📸 Static Demo Site
+
+### Build the Demo Snapshot
+Seeds a throwaway DB (never touches `grocery.db`) and bakes the whole app into `site/demo`. Builds are atomic — a crashed build leaves the previous snapshot intact.
+```bash
+make demo                      # from repo root
+# equivalent: cd backend && uv run python scripts/build_static_demo.py
+```
+
+For subdirectory hosting (e.g. GitHub Pages project site at `/repo-name/`):
+```bash
+cd backend
+uv run python scripts/build_static_demo.py --base-path /repo-name
+```
+
+### Serve It Locally
+```bash
+python3 -m http.server -d site/demo 8080   # from repo root → http://localhost:8080
+```
+
+### Share It via Tailscale
+This machine already proxies `/ → 127.0.0.1:8080` at `https://ubuntu-desktop-15faep6-1.tail7b7656.ts.net` — starting the local server above makes the demo live there instantly.
+```bash
+tailscale serve status                     # check current mode first
+```
+⚠️ As of July 2026 that proxy is **Funnel = public internet**, not tailnet-only. To restrict to your tailnet:
+```bash
+tailscale funnel off && tailscale serve --bg 8080
+```
+To go public again: `tailscale funnel --bg 8080`
+
+---
 
 ## 🧠 Local AI & OCR (LM Studio / Ollama)
 

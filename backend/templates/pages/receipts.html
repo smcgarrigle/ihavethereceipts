@@ -25,7 +25,8 @@
                 <a href="/receipts/bulk"
                     class="text-sm px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded hover:bg-blue-200 dark:hover:bg-blue-900/50 transition flex items-center gap-1 no-underline font-medium">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
                     </svg>
                     Bulk Upload
                 </a>
@@ -47,19 +48,11 @@
                     </svg>
                     Paste Text
                 </button>
-                <div class="h-8 w-px bg-bgSkeleton mx-1"></div>
-                <div class="flex gap-1">
-                    <a href="/api/export/all/csv"
-                       class="text-xs px-2 py-1.5 bg-bgSkeleton text-textMuted rounded hover:bg-bgHover transition font-mono border border-borderDefault">CSV</a>
-                    <a href="/api/export/all/excel"
-                       class="text-xs px-2 py-1.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded hover:bg-green-200 dark:hover:bg-green-900/50 transition font-mono border border-green-200 dark:border-green-800">XLSX</a>
-                </div>
             </div>
         </div>
 
         <form hx-post="/api/receipts/upload" hx-encoding="multipart/form-data" hx-target="#upload-result"
-            @submit="startProgress()" class="relative"
-            x-data="{
+            @submit="startProgress()" class="relative" x-data="{
                 selectedFile: null,
                 uploading: false,
                 isDragging: false,
@@ -83,16 +76,13 @@
                         }
                     }, 100);
                 }
-            }"
-            @htmx:before-request="$dispatch('process-start', { message: 'Uploading and Processing Receipt...' })"
+            }" @htmx:before-request="$dispatch('process-start', { message: 'Uploading and Processing Receipt...' })"
             @htmx:after-request="uploading = false; if(progressInterval) clearInterval(progressInterval); progress = 100; selectedFile = null;">
             <!-- Improved Drag & Drop Zone - ENTIRE AREA IS CLICKABLE -->
-            <label for="receipt-file" class="block cursor-pointer"
-                   @dragover.prevent="isDragging = true"
-                   @dragleave.prevent="isDragging = false"
-                   @drop.prevent="isDragging = false; document.getElementById('receipt-file').files = $event.dataTransfer.files; selectedFile = $event.dataTransfer.files[0]">
-                <div
-                    class="border-2 border-dashed border-borderInput rounded-lg p-8 text-center transition-all duration-200"
+            <label for="receipt-file" class="block cursor-pointer" @dragover.prevent="isDragging = true"
+                @dragleave.prevent="isDragging = false"
+                @drop.prevent="isDragging = false; document.getElementById('receipt-file').files = $event.dataTransfer.files; selectedFile = $event.dataTransfer.files[0]">
+                <div class="border-2 border-dashed border-borderInput rounded-lg p-8 text-center transition-all duration-200"
                     :class="isDragging ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20'">
                     <svg class="mx-auto h-12 w-12 text-textSubtle" stroke="currentColor" fill="none"
                         viewBox="0 0 48 48">
@@ -127,8 +117,8 @@
                     <span x-show="!uploading">Upload & Process</span>
                     <span x-show="uploading">Processing...</span>
                     <!-- Spinner -->
-                    <svg x-show="uploading" class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg"
-                        fill="none" viewBox="0 0 24 24">
+                    <svg x-show="uploading" class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none"
+                        viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
                         </circle>
                         <path class="opacity-75" fill="currentColor"
@@ -139,13 +129,14 @@
             </div>
 
             <!-- Progress Bar -->
-            <div x-show="uploading" x-transition.opacity class="w-full bg-bgSkeleton rounded-full h-2.5 mt-4 overflow-hidden">
+            <div x-show="uploading" x-transition.opacity
+                class="w-full bg-bgSkeleton rounded-full h-2.5 mt-4 overflow-hidden">
                 <div class="bg-green-600 h-2.5 rounded-full transition-all duration-100 ease-linear"
-                     :style="'width: ' + progress + '%'"></div>
+                    :style="'width: ' + progress + '%'"></div>
             </div>
             <!-- Progress Text -->
             <p x-show="uploading" class="text-sm text-center mt-2 text-textMuted">
-               Analyzing receipt... <span x-text="Math.round(progress)"></span>%
+                Analyzing receipt... <span x-text="Math.round(progress)"></span>%
             </p>
 
             <!-- Upload Result -->
@@ -165,8 +156,7 @@
                 <div class="flex flex-wrap gap-2 items-center">
                     <div class="text-sm font-medium text-textMuted py-1">Filter by Store:</div>
                     <template x-for="store in allStores" :key="store">
-                        <button @click="toggleStore(store)"
-                            :class="selectedStores.includes(store)
+                        <button @click="toggleStore(store)" :class="selectedStores.includes(store)
                                 ? 'bg-blue-600 text-white hover:bg-blue-700'
                                 : 'bg-bgSkeleton text-textMuted hover:bg-bgHover'"
                             class="px-3 py-1 rounded-full text-xs font-semibold transition-colors" x-text="store">
@@ -239,7 +229,8 @@
             }
         </script>
 
-        <div id="receipts-container" class="p-6 min-h-[200px]" hx-get="/api/receipts/list" hx-trigger="load" hx-swap="innerHTML">
+        <div id="receipts-container" class="p-6 min-h-[200px]" hx-get="/api/receipts/list" hx-trigger="load"
+            hx-swap="innerHTML">
             <!-- Loading state skeleton -->
             <div class="text-center py-8">
                 <div class="animate-pulse space-y-4">
@@ -339,20 +330,22 @@
                     })
                 ">
                 <div class="bg-bgCard px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
-                    <h3 class="text-base font-semibold leading-6 text-textBase mb-4"
-                        id="manual-modal-title">
+                    <h3 class="text-base font-semibold leading-6 text-textBase mb-4" id="manual-modal-title">
                         Add Receipt Manually
                     </h3>
 
                     <div class="space-y-4">
                         <div>
-                            <label for="manual-store-name" class="block text-sm font-medium text-textMuted">Store Name</label>
-                            <input id="manual-store-name" type="text" name="store_name" required placeholder="e.g. Farmer's Market"
+                            <label for="manual-store-name" class="block text-sm font-medium text-textMuted">Store
+                                Name</label>
+                            <input id="manual-store-name" type="text" name="store_name" required
+                                placeholder="e.g. Farmer's Market"
                                 class="mt-1 block w-full rounded-md border-borderInput bg-bgInput text-textBase shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
                         </div>
 
                         <div>
-                            <label for="manual-purchase-date" class="block text-sm font-medium text-textMuted">Date</label>
+                            <label for="manual-purchase-date"
+                                class="block text-sm font-medium text-textMuted">Date</label>
                             <input id="manual-purchase-date" type="date" name="purchase_date" :value="today" required
                                 class="mt-1 block w-full rounded-md border-borderInput bg-bgInput text-textBase shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
                         </div>
@@ -394,9 +387,9 @@
 <!-- Paste Receipt Text Modal -->
 <div x-data="{ open: false, submitting: false, errorMsg: '' }"
     x-init="if (new URLSearchParams(window.location.search).has('paste')) open = true"
-    @open-paste-modal.window="open = true; errorMsg = ''"
-    @keydown.escape.window="if(!submitting) open = false" x-show="open" x-trap="open" x-cloak class="fixed inset-0 z-50 overflow-y-auto"
-    aria-labelledby="paste-modal-title" role="dialog" aria-modal="true">
+    @open-paste-modal.window="open = true; errorMsg = ''" @keydown.escape.window="if(!submitting) open = false"
+    x-show="open" x-trap="open" x-cloak class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="paste-modal-title"
+    role="dialog" aria-modal="true">
 
     <!-- Backdrop -->
     <div x-show="open" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0"
@@ -446,8 +439,7 @@
                     })
                 ">
                 <div class="bg-bgCard px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
-                    <h3 class="text-base font-semibold leading-6 text-textBase mb-2"
-                        id="paste-modal-title">
+                    <h3 class="text-base font-semibold leading-6 text-textBase mb-2" id="paste-modal-title">
                         📋 Paste Receipt Text
                     </h3>
                     <p class="text-xs text-textMuted mb-4">
@@ -456,13 +448,13 @@
                     </p>
 
                     <!-- Error Display -->
-                    <div x-show="errorMsg" x-transition class="mb-3 p-2 rounded bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-sm">
+                    <div x-show="errorMsg" x-transition
+                        class="mb-3 p-2 rounded bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-sm">
                         <span x-text="errorMsg"></span>
                     </div>
 
                     <div>
-                        <textarea name="receipt_text" rows="12"
-                            placeholder="Paste your receipt text here...
+                        <textarea name="receipt_text" rows="12" placeholder="Paste your receipt text here...
 
 Example:
 Thanks for shopping with Safeway!
@@ -470,28 +462,28 @@ Order Details
 Campbells Soup Chicken & Rice $0.99
 Quantity: 1
 Regular Price $2.49
-..."
-                            :disabled="submitting"
-                            class="block w-full rounded-md border-borderInput bg-bgInput text-textBase shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm font-mono text-xs leading-relaxed resize-y"
+..." :disabled="submitting" class="block w-full rounded-md border-borderInput bg-bgInput text-textBase shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm font-mono text-xs leading-relaxed resize-y"
                             style="min-height: 200px;"></textarea>
                     </div>
                 </div>
 
                 <div class="bg-bgHover px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6 gap-2">
-                    <button type="submit"
-                        :disabled="submitting"
+                    <button type="submit" :disabled="submitting"
                         class="inline-flex w-full justify-center rounded-md bg-purple-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed sm:w-auto gap-2">
                         <span x-show="!submitting">Analyze Text</span>
                         <span x-show="submitting" class="flex items-center gap-2">
-                            <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                    stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor"
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                </path>
                             </svg>
                             Analyzing...
                         </span>
                     </button>
-                    <button type="button" @click="if(!submitting) open = false"
-                        :disabled="submitting"
+                    <button type="button" @click="if(!submitting) open = false" :disabled="submitting"
                         class="mt-3 inline-flex w-full justify-center rounded-md bg-bgInput px-3 py-2 text-sm font-semibold text-textBase shadow-sm ring-1 ring-inset ring-borderInput hover:bg-bgHover disabled:opacity-50 sm:mt-0 sm:w-auto">
                         Cancel
                     </button>
