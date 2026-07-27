@@ -64,6 +64,7 @@ SEED_URLS = [
     "/restock",
     "/produce",
     "/settings",
+    "/help/api-keys",
     "/styleguide",
     "/demo-bi",
     "/search",

@@ -1,0 +1,130 @@
+{% extends "layouts/base.html" %}
+{% block title %}Getting API Keys — Grocery Tracker{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-8 space-y-8">
+
+    <!-- Header -->
+    <div class="flex items-center gap-4">
+        <div class="w-12 h-12 rounded-2xl bg-indigo-500/15 flex items-center justify-center text-2xl">🔑</div>
+        <div>
+            <h1 class="text-2xl font-bold text-textBase">Getting Your API Keys</h1>
+            <p class="text-sm text-textMuted mt-0.5">A step-by-step guide to the three data services Grocery Tracker uses. All of them are free.</p>
+        </div>
+    </div>
+
+    <!-- What & why -->
+    <div class="rounded-2xl border border-blue-500/30 bg-blue-500/5 p-5 text-sm text-textMuted space-y-2">
+        <p><strong class="text-textBase">What is an API key?</strong> It's like a password that lets Grocery Tracker talk to an outside service on your behalf. Each service issues you your own key when you sign up.</p>
+        <p>Grocery Tracker uses up to three services: <strong class="text-textBase">USDA FoodData Central</strong> for nutrition data, <strong class="text-textBase">Open Food Facts</strong> for product lookups (no key needed!), and <strong class="text-textBase">Google Gemini</strong> for reading your receipt photos.</p>
+    </div>
+
+    <!-- USDA FDC -->
+    <div class="rounded-2xl border border-borderDefault bg-bgCard p-6 space-y-4">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-emerald-500/15 flex items-center justify-center text-xl">🔬</div>
+            <div>
+                <h2 class="text-lg font-semibold text-textBase">USDA FoodData Central</h2>
+                <p class="text-xs text-textMuted mt-0.5">Powers nutrition facts (calories, protein, sodium…) for your grocery items.</p>
+            </div>
+        </div>
+
+        <ol class="list-decimal list-inside space-y-2 text-sm text-textMuted">
+            <li>Open the signup page:
+                <a href="https://fdc.nal.usda.gov/api-key-signup" target="_blank" rel="noopener noreferrer"
+                   class="text-indigo-400 hover:text-indigo-300 underline">fdc.nal.usda.gov/api-key-signup</a>
+            </li>
+            <li>Enter your <strong class="text-textBase">first name, last name, and email address</strong>. That's all — no credit card, no account password.</li>
+            <li>Click <strong class="text-textBase">Signup</strong>. Your key appears on screen and is also emailed to you. It looks like a long string of random letters and numbers.</li>
+            <li>Copy the key and save it somewhere safe (you'll paste it into your <code class="bg-bgMain px-1.5 py-0.5 rounded text-xs">.env</code> file — see below).</li>
+        </ol>
+
+        <div class="text-xs text-textSubtle bg-bgMain rounded-xl px-4 py-3">
+            💡 The free key allows <strong>1,000 requests per hour</strong> — far more than Grocery Tracker will ever need for a household.
+        </div>
+    </div>
+
+    <!-- Open Food Facts -->
+    <div class="rounded-2xl border border-borderDefault bg-bgCard p-6 space-y-4">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-amber-500/15 flex items-center justify-center text-xl">🥫</div>
+            <div>
+                <h2 class="text-lg font-semibold text-textBase">Open Food Facts</h2>
+                <p class="text-xs text-textMuted mt-0.5">A free, community-run product database used for barcode and product lookups.</p>
+            </div>
+        </div>
+
+        <div class="rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 text-sm text-textMuted">
+            ✅ <strong class="text-emerald-400">Good news — no API key needed.</strong>
+            Open Food Facts is an open database, free for everyone to read. Grocery Tracker simply identifies itself politely when it asks for data, and that's it. There is nothing for you to sign up for or configure.
+        </div>
+
+        <p class="text-sm text-textMuted">
+            If you'd ever like to <em>contribute</em> product data back to the community (photos, corrections), you can create a free account at
+            <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener noreferrer"
+               class="text-indigo-400 hover:text-indigo-300 underline">world.openfoodfacts.org</a>
+            — but Grocery Tracker doesn't require it.
+        </p>
+    </div>
+
+    <!-- Google Gemini -->
+    <div class="rounded-2xl border border-borderDefault bg-bgCard p-6 space-y-4">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-blue-500/15 flex items-center justify-center text-xl">✨</div>
+            <div>
+                <h2 class="text-lg font-semibold text-textBase">Google Gemini</h2>
+                <p class="text-xs text-textMuted mt-0.5">The AI that reads your receipt photos and helps categorize items.</p>
+            </div>
+        </div>
+
+        <ol class="list-decimal list-inside space-y-2 text-sm text-textMuted">
+            <li>You'll need a regular (free) Google account — the same kind used for Gmail.</li>
+            <li>Go to <a href="https://aistudio.google.com" target="_blank" rel="noopener noreferrer"
+                   class="text-indigo-400 hover:text-indigo-300 underline">Google AI Studio</a> and sign in.</li>
+            <li>Click <strong class="text-textBase">Get API key</strong> (top left), then <strong class="text-textBase">Create API key</strong>.</li>
+            <li>A key beginning with <code class="bg-bgMain px-1.5 py-0.5 rounded text-xs">AIza…</code> is generated. Click the copy icon and save it somewhere safe.</li>
+        </ol>
+
+        <div class="text-xs text-textSubtle bg-bgMain rounded-xl px-4 py-3 space-y-1">
+            <p>💡 Gemini has a <strong>free tier</strong> that is plenty for scanning household receipts.</p>
+            <p>⚠️ Treat this key like a password — anyone who has it can use AI services billed to your Google account if you later enable paid usage.</p>
+        </div>
+    </div>
+
+    <!-- Where the keys go -->
+    <div class="rounded-2xl border border-borderDefault bg-bgCard p-6 space-y-4">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-indigo-500/15 flex items-center justify-center text-xl">📄</div>
+            <div>
+                <h2 class="text-lg font-semibold text-textBase">Where do the keys go?</h2>
+                <p class="text-xs text-textMuted mt-0.5">Both keys live in a plain-text file called <code class="bg-bgMain px-1 rounded">.env</code> in the project's root folder.</p>
+            </div>
+        </div>
+
+        <p class="text-sm text-textMuted">Open (or create) the <code class="bg-bgMain px-1.5 py-0.5 rounded text-xs">.env</code> file next to <code class="bg-bgMain px-1.5 py-0.5 rounded text-xs">grocery.db</code> and add one line per key:</p>
+
+        <pre class="bg-bgMain rounded-xl px-4 py-3 text-xs font-mono text-textBase overflow-x-auto"><code>FDC_API_KEY=paste-your-usda-key-here
+GEMINI_API_KEY=paste-your-gemini-key-here</code></pre>
+
+        <ul class="text-xs text-textSubtle space-y-1 list-disc list-inside">
+            <li>No quotes, no spaces around the <code class="bg-bgMain px-1 rounded">=</code> sign.</li>
+            <li>Restart the app after editing the file — keys are read at startup.</li>
+            <li>Never share this file or commit it to version control. It's your keys' home, and it should stay private.</li>
+        </ul>
+    </div>
+
+    <!-- Back link -->
+    <a href="/settings"
+       class="flex items-center justify-between gap-4 rounded-2xl border border-borderDefault bg-bgCard p-5 hover:bg-bgHover transition-colors group">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center text-xl bg-indigo-500/15">⚙️</div>
+            <div>
+                <h2 class="text-base font-semibold text-textBase">Back to Settings</h2>
+                <p class="text-xs text-textMuted mt-0.5">Return to exclusions, rules, and data management.</p>
+            </div>
+        </div>
+        <span class="text-textSubtle group-hover:text-indigo-500 transition text-xl">←</span>
+    </a>
+
+</div>
+{% endblock %}

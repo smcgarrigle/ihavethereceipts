@@ -705,6 +705,12 @@ def styleguide_page(request: Request):
     return templates.TemplateResponse(request, "pages/styleguide.html")
 
 
+@router.get("/help/api-keys", response_class=HTMLResponse)
+def api_keys_help_page(request: Request):
+    """Novice-friendly guide to acquiring USDA FDC, Open Food Facts, and Gemini API keys."""
+    return templates.TemplateResponse(request, "pages/api_keys_help.html")
+
+
 @router.get("/demo-bi", response_class=HTMLResponse)
 def demo_bi_page(request: Request):
     """BI demo — Tufte-style budget × nutrition intelligence dashboard with synthetic data."""
