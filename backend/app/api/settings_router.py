@@ -112,6 +112,7 @@ def _render_settings_page(request: Request, db: Session) -> HTMLResponse:
             "junk_filters": ocr.get("junk_filters", []),
             "usda_lookup_enabled": flags.get("usda_lookup_enabled", True),
             "nutrition_outlier_percentile": flags.get("nutrition_outlier_percentile", 95),
+            "protein_roi_target": flags.get("protein_roi_target", 0.20),
         },
     )
 
@@ -261,6 +262,22 @@ def set_nutrition_outlier_percentile(percentile: int) -> JSONResponse:
     _save_feature_flags(flags)
     logger.info("Nutrition outlier percentile set to %s via settings.", percentile)
     return JSONResponse({"success": True, "nutrition_outlier_percentile": percentile})
+
+
+@router.post("/flags/protein-roi-target")
+def set_protein_roi_target(target: float) -> JSONResponse:
+    """Set the cost-per-gram-of-protein target used to color the Protein ROI ranking."""
+    if not (0.01 <= target <= 5.00):
+        return JSONResponse(
+            {"success": False, "error": "Target must be between $0.01 and $5.00 per gram."},
+            status_code=422,
+        )
+    target = round(target, 2)
+    flags = _load_feature_flags()
+    flags["protein_roi_target"] = target
+    _save_feature_flags(flags)
+    logger.info("Protein ROI target set to $%s/g via settings.", target)
+    return JSONResponse({"success": True, "protein_roi_target": target})
 
 
 # ---------------------------------------------------------------------------

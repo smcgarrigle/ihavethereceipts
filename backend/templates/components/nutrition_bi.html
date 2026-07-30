@@ -28,6 +28,9 @@
            get maxCpp() {
                if (!this.roi.length) return 1;
                return Math.max(...this.roi.map(r => r.cpp));
+           },
+           get proteinRoiTarget() {
+               return this.biData ? this.biData.protein_roi_target : 0.20;
            }
        }">
     <!-- Dollar-Weighted Macro Breakdown -->
@@ -99,13 +102,13 @@
                     </div>
                     <div class="w-full bg-bgSkeleton h-1.5 rounded-full overflow-hidden">
                         <div class="h-1.5 rounded-full transition-all duration-500"
-                             :class="r.cpp <= 0.20 ? 'bg-emerald-500' : 'bg-amber-500'"
+                             :class="r.cpp <= proteinRoiTarget ? 'bg-emerald-500' : 'bg-amber-500'"
                              :style="`width:${Math.min(100, (r.cpp / maxCpp) * 100)}%`"></div>
                     </div>
                 </div>
             </template>
             <p x-show="biData && !roi.length" class="text-xs text-textMuted">No protein data yet — match more items in the <a href="/xray" class="text-indigo-400 hover:underline">X-Ray queue</a>.</p>
         </div>
-        <p class="text-[10px] text-textSubtle mt-3">Green = at or under the $0.20/g target.</p>
+        <p class="text-[10px] text-textSubtle mt-3" x-text="`Green = at or under the $${proteinRoiTarget.toFixed(2)}/g target.`"></p>
     </div>
 </div>

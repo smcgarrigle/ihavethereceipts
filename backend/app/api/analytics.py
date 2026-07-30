@@ -992,6 +992,10 @@ def get_bi_dashboard_data(db: Session = Depends(get_db)):
 
     bi_cats.sort(key=lambda x: x["spend"], reverse=True)
 
+    from app.api.settings_router import _load_feature_flags
+
+    protein_roi_target = _load_feature_flags().get("protein_roi_target", 0.20)
+
     return {
         "kpis": {
             "monthly_spend": round(total_spend, 2),
@@ -1000,6 +1004,7 @@ def get_bi_dashboard_data(db: Session = Depends(get_db)):
         },
         "macro_breakdown": sorted(bi_macro, key=lambda x: x["pct"], reverse=True),
         "protein_roi": bi_roi,
+        "protein_roi_target": protein_roi_target,
         "efficiency": bi_cats[:8],
         "categories": bi_cats,
     }
