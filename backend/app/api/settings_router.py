@@ -111,6 +111,7 @@ def _render_settings_page(request: Request, db: Session) -> HTMLResponse:
             "skip_keywords": ocr.get("skip_keywords", []),
             "junk_filters": ocr.get("junk_filters", []),
             "usda_lookup_enabled": flags.get("usda_lookup_enabled", True),
+            "nutrition_outlier_percentile": flags.get("nutrition_outlier_percentile", 95),
         },
     )
 
@@ -240,6 +241,26 @@ def toggle_usda_lookup(enabled: bool) -> JSONResponse:
     _save_feature_flags(flags)
     logger.info("USDA lookup %s via settings toggle.", "enabled" if enabled else "disabled")
     return JSONResponse({"success": True, "usda_lookup_enabled": enabled})
+
+
+@router.post("/flags/nutrition-outlier-percentile")
+def set_nutrition_outlier_percentile(percentile: int) -> JSONResponse:
+    """Set the percentile cutoff for nutrition outlier capping (0 = off)."""
+    from app.api.trends_nutrition import ALLOWED_PERCENTILES
+
+    if percentile not in ALLOWED_PERCENTILES:
+        return JSONResponse(
+            {
+                "success": False,
+                "error": f"Percentile must be one of {sorted(ALLOWED_PERCENTILES)}.",
+            },
+            status_code=422,
+        )
+    flags = _load_feature_flags()
+    flags["nutrition_outlier_percentile"] = percentile
+    _save_feature_flags(flags)
+    logger.info("Nutrition outlier percentile set to %s via settings.", percentile)
+    return JSONResponse({"success": True, "nutrition_outlier_percentile": percentile})
 
 
 # ---------------------------------------------------------------------------

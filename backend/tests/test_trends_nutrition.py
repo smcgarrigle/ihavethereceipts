@@ -26,6 +26,8 @@ def test_trends_nutrition_page_integrity(client):
         "chart-sm-sugar",
         "chart-sm-protein",
         "nutritionChart",  # Collapsible detail
+        "nutrition-normalization-badge",
+        "nutrition-normalization-text",
     ]
     for element_id in expected_ids:
         assert soup.find(id=element_id) is not None, f"Missing {element_id} on Trends page"

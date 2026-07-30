@@ -13,6 +13,14 @@ from app.models import Item, Receipt, ReceiptItem
 
 router = APIRouter()
 
+# Outlier winsorization for nutrition charts. 0 disables capping.
+ALLOWED_PERCENTILES = {0, 80, 85, 90, 95}
+DEFAULT_PERCENTILE = 95
+# Below this many positive data points per nutrient, the percentile is too
+# noisy to be a meaningful cap, so capping is skipped for that nutrient.
+MIN_WINSORIZE_POINTS = 8
+_NUTRIENT_KEYS = ("fat", "saturated_fat", "sugar", "protein", "sodium")
+
 
 @router.get("/usda-product-types")
 def get_usda_product_types(time_range: str = "all", db: Session = Depends(get_db)):
@@ -201,6 +209,62 @@ def _get_raw_nutrition_data(time_range: str, db: Session):
     return parsed_records
 
 
+def _get_outlier_percentile() -> int:
+    from app.api.settings_router import _load_feature_flags
+
+    raw = _load_feature_flags().get("nutrition_outlier_percentile", DEFAULT_PERCENTILE)
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_PERCENTILE
+    return value if value in ALLOWED_PERCENTILES else DEFAULT_PERCENTILE
+
+
+def _winsorize_rows(rows: list[dict], percentile: int) -> tuple[list[dict], dict]:
+    """Cap per-purchase nutrient values above the Nth percentile.
+
+    Each nutrient is capped independently against its own distribution of
+    positive values within the rows; zeros mean "nutrient absent" and would
+    collapse the cap if included. The cap is a floor-rank order statistic
+    clamped to at most the second-largest value: with ceil (true nearest-rank)
+    the p95 of fewer than 20 points is the max itself, which would leave a
+    lone salt-bomb purchase uncapped on sparse data. Values equal to the cap
+    are never modified. Mutates rows in place.
+    """
+    import math
+
+    meta: dict = {
+        "enabled": bool(percentile),
+        "percentile": percentile,
+        "capped_points": 0,
+        "per_nutrient": {},
+    }
+    if not percentile or not rows:
+        return rows, meta
+
+    for key in _NUTRIENT_KEYS:
+        vals = sorted(r[key] for r in rows if r[key] > 0)
+        if len(vals) < MIN_WINSORIZE_POINTS:
+            continue
+        rank = max(1, min(math.floor(percentile / 100.0 * len(vals)), len(vals) - 1))
+        cap = vals[rank - 1]
+        capped = 0
+        for r in rows:
+            if r[key] > cap:
+                r[key] = cap
+                capped += 1
+        if capped:
+            meta["per_nutrient"][key] = {"cap": round(cap, 1), "capped": capped}
+            meta["capped_points"] += capped
+
+    return rows, meta
+
+
+def _get_nutrition_data(time_range: str, db: Session) -> tuple[list[dict], dict]:
+    """Raw nutrition rows with the user's outlier capping applied."""
+    return _winsorize_rows(_get_raw_nutrition_data(time_range, db), _get_outlier_percentile())
+
+
 def get_nutrition_coverage(time_range: str, db: Session) -> dict:
     """
     How much of the purchase data actually backs the nutrition charts:
@@ -255,7 +319,7 @@ def get_macronutrient_calories_data(time_range: str, db: Session):
     """
     Returns weekly macronutrient caloric intake (Fat, Sugar, Protein) stacked.
     """
-    results = _get_raw_nutrition_data(time_range, db)
+    results, _ = _get_nutrition_data(time_range, db)
     from collections import defaultdict
 
     weekly_calories: defaultdict[str, dict[str, float]] = defaultdict(
@@ -310,7 +374,7 @@ def get_nutrition_multiples_data(time_range: str, db: Session):
     Returns weekly trend lines for Sodium, Fat, Sugar, and Protein.
     Used for Tufte small multiples.
     """
-    results = _get_raw_nutrition_data(time_range, db)
+    results, _ = _get_nutrition_data(time_range, db)
     from collections import defaultdict
 
     weekly_totals: defaultdict[str, dict[str, float]] = defaultdict(
@@ -353,7 +417,7 @@ def get_nutrition_density_data(time_range: str, db: Session):
     Returns average daily purchased amounts vs Daily Reference Values,
     and overall caloric ratios.
     """
-    results = _get_raw_nutrition_data(time_range, db)
+    results, _ = _get_nutrition_data(time_range, db)
 
     from datetime import datetime
 
@@ -446,7 +510,7 @@ def get_nutrition_trends(
     """
     from collections import defaultdict
 
-    results = _get_raw_nutrition_data(time_range, db)
+    results, _ = _get_nutrition_data(time_range, db)
 
     # Intermediate storage: {week: {item_name: total_value}}
     data_map: defaultdict[str, defaultdict[str, float]] = defaultdict(lambda: defaultdict(float))

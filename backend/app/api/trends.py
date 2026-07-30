@@ -4,6 +4,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.api.trends_nutrition import (
+    _get_nutrition_data,
     get_macronutrient_calories_data,
     get_nutrition_coverage,
     get_nutrition_density_data,
@@ -774,6 +775,7 @@ def get_all_charts_fragment(
     nutrition_multiples = get_nutrition_multiples_data(time_range, db)
     nutrition_density = get_nutrition_density_data(time_range, db)
     nutrition_coverage = get_nutrition_coverage(time_range, db)
+    _, nutrition_normalization = _get_nutrition_data(time_range, db)
 
     script = f"""
     <script>
@@ -792,7 +794,8 @@ def get_all_charts_fragment(
                 calorie_profile: {json.dumps(calorie_profile)},
                 nutrition_multiples: {json.dumps(nutrition_multiples)},
                 nutrition_density: {json.dumps(nutrition_density)},
-                nutrition_coverage: {json.dumps(nutrition_coverage)}
+                nutrition_coverage: {json.dumps(nutrition_coverage)},
+                nutrition_normalization: {json.dumps(nutrition_normalization)}
             }});
         }}
     </script>

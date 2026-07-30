@@ -78,6 +78,57 @@
         </div>
     </div>
 
+    <!-- Nutrition Outlier Capping -->
+    <div class="rounded-2xl border border-borderDefault bg-bgCard p-5"
+         x-data="{
+             percentile: {{ nutrition_outlier_percentile }},
+             loading: false,
+             save() {
+                 this.loading = true;
+                 fetch('/settings/flags/nutrition-outlier-percentile?percentile=' + this.percentile, { method: 'POST', headers: { 'X-CSRF-Token': document.querySelector('meta[name=csrf-token]')?.content || '' } })
+                     .then(r => r.json())
+                     .then(d => { if (d.success) this.percentile = d.nutrition_outlier_percentile; })
+                     .finally(() => this.loading = false);
+             }
+         }">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
+                     :class="percentile > 0 ? 'bg-indigo-500/15' : 'bg-amber-500/15'">📉</div>
+                <div>
+                    <h2 class="text-base font-semibold text-textBase">Nutrition Outlier Capping</h2>
+                    <p class="text-xs text-textMuted mt-0.5">
+                        Caps extreme single-purchase nutrient values (e.g. a bulk salt box) at the
+                        chosen percentile on the Trends charts, so one pantry stock-up doesn't skew the graphs.
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 shrink-0">
+                <label for="nutrition-outlier-select" class="sr-only">Outlier percentile cutoff</label>
+                <select id="nutrition-outlier-select"
+                        x-model.number="percentile" @change="save()" :disabled="loading"
+                        class="rounded-lg border border-borderDefault bg-bgCard text-sm text-textBase px-3 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
+                    <option value="0">Off (raw values)</option>
+                    <option value="80">80th percentile (aggressive)</option>
+                    <option value="85">85th percentile</option>
+                    <option value="90">90th percentile</option>
+                    <option value="95">95th percentile (default)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="mt-3 flex items-center gap-2">
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
+                  :class="percentile > 0 ? 'bg-indigo-500/15 text-indigo-400' : 'bg-amber-500/15 text-amber-400'">
+                <span class="w-1.5 h-1.5 rounded-full inline-block"
+                      :class="percentile > 0 ? 'bg-indigo-400' : 'bg-amber-400'"></span>
+                <span x-text="percentile > 0 ? `Capping at ${percentile}th percentile` : 'Capping off — charts show raw values'"></span>
+            </span>
+            <span x-show="loading" class="text-xs text-textMuted animate-pulse">Saving…</span>
+        </div>
+    </div>
+
     <!-- Data Export Section -->
     <div class="rounded-2xl border border-borderDefault bg-bgCard p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div class="flex items-center gap-3">

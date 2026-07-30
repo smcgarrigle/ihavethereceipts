@@ -71,6 +71,12 @@
                     <span class="w-2 h-2 rounded-full" id="nutrition-coverage-dot"></span>
                     <span id="nutrition-coverage-text"></span>
                 </a>
+                <span id="nutrition-normalization-badge"
+                      class="hidden shrink-0 items-center gap-2 px-3 py-1.5 rounded-full border border-borderDefault bg-bgSkeleton text-xs font-semibold text-textMuted"
+                      title="Extreme single-purchase values (e.g. a bulk salt box) are capped at the configured percentile. Change or disable in Settings.">
+                    <span class="w-2 h-2 rounded-full bg-indigo-400"></span>
+                    <span id="nutrition-normalization-text"></span>
+                </span>
             </div>
 
             {% include "components/nutrition_bi.html" %}
@@ -624,6 +630,24 @@
                     (c.spend_pct >= 60 ? 'bg-emerald-500' : c.spend_pct >= 30 ? 'bg-amber-500' : 'bg-red-500');
                 badge.classList.remove('hidden');
                 badge.classList.add('inline-flex');
+            }
+        }
+
+        if (data.nutrition_normalization) {
+            const n = data.nutrition_normalization;
+            const badge = document.getElementById('nutrition-normalization-badge');
+            const text = document.getElementById('nutrition-normalization-text');
+            if (badge && text) {
+                if (n.enabled) {
+                    text.innerText = n.capped_points > 0
+                        ? `Outliers capped at ${n.percentile}th percentile (${n.capped_points} point${n.capped_points === 1 ? '' : 's'})`
+                        : `Outlier capping on (${n.percentile}th percentile)`;
+                    badge.classList.remove('hidden');
+                    badge.classList.add('inline-flex');
+                } else {
+                    badge.classList.add('hidden');
+                    badge.classList.remove('inline-flex');
+                }
             }
         }
     }
