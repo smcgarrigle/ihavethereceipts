@@ -768,18 +768,29 @@ def item_insights_page(request: Request, item_id: int, db: Session = Depends(get
     # Get the effective nutrients (canonical + manual overrides)
     effective = item.effective_nutrients
 
+    def _to_num(val):
+        if val is None or val == "":
+            return None
+        if isinstance(val, int | float):
+            return val
+        try:
+            val_str = str(val).strip()
+            return int(val_str) if val_str.isdigit() else float(val_str)
+        except (ValueError, TypeError):
+            return None
+
     # Unified mapping for the template to consume easily
     unified_nutrition = {
-        "calories": effective.get("calories"),
-        "fat": effective.get("fat"),
-        "saturatedFat": effective.get("saturatedFat"),
-        "transFat": effective.get("transFat"),
-        "cholesterol": effective.get("cholesterol"),
-        "sodium": effective.get("sodium"),
-        "carbohydrates": effective.get("carbohydrates"),
-        "fiber": effective.get("fiber"),
-        "sugars": effective.get("sugars"),
-        "protein": effective.get("protein"),
+        "calories": _to_num(effective.get("calories")),
+        "fat": _to_num(effective.get("fat")),
+        "saturatedFat": _to_num(effective.get("saturatedFat")),
+        "transFat": _to_num(effective.get("transFat")),
+        "cholesterol": _to_num(effective.get("cholesterol")),
+        "sodium": _to_num(effective.get("sodium")),
+        "carbohydrates": _to_num(effective.get("carbohydrates")),
+        "fiber": _to_num(effective.get("fiber")),
+        "sugars": _to_num(effective.get("sugars")),
+        "protein": _to_num(effective.get("protein")),
     }
 
     # If using auto USDA and custom overrides aren't set, try to extract from raw USDA to populate the unified dict
