@@ -387,7 +387,11 @@ def update_item_nutrition(
             if v is None or str(v).strip() == "":
                 current.pop(k, None)
             else:
-                current[k] = v
+                raw_str = str(v).strip()
+                try:
+                    current[k] = int(raw_str) if raw_str.isdigit() else float(raw_str)
+                except ValueError:
+                    current[k] = raw_str
         item.custom_nutrients = current
         flag_modified(item, "custom_nutrients")
 
@@ -432,7 +436,7 @@ def search_nutrition_apis(item_id: int, q: str, db: Session = Depends(get_db)):
 
     # 2. Search USDA Foundation Foods
     try:
-        usda_results = fdc_service.search_foods(q)
+        usda_results = fdc_service.search_items(q)
         if usda_results and "foods" in usda_results:
             for f in usda_results["foods"][:5]:
                 results.append(
