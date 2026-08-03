@@ -39,24 +39,29 @@
 
     <!-- Tabs -->
     <div class="border-b border-borderDefault">
-        <nav class="-mb-px flex space-x-8">
-            <button @click="tab = 'all'" class="py-2 px-1 border-b-2 font-medium text-sm"
+        <nav role="tablist" aria-label="Items sections" class="-mb-px flex space-x-8">
+            <button role="tab" id="tab-all" aria-controls="panel-all" :aria-selected="tab === 'all'" :tabindex="tab === 'all' ? 0 : -1"
+                @click="tab = 'all'" class="py-2 px-1 border-b-2 font-medium text-sm"
                 :class="tab === 'all' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-textMuted hover:text-textBase hover:border-gray-300 dark:hover:border-gray-600'">
                 All Items
             </button>
-            <button @click="tab = 'duplicates'" class="py-2 px-1 border-b-2 font-medium text-sm"
+            <button role="tab" id="tab-duplicates" aria-controls="panel-duplicates" :aria-selected="tab === 'duplicates'" :tabindex="tab === 'duplicates' ? 0 : -1"
+                @click="tab = 'duplicates'" class="py-2 px-1 border-b-2 font-medium text-sm"
                 :class="tab === 'duplicates' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-textMuted hover:text-textBase hover:border-gray-300 dark:hover:border-gray-600'">
                 Find Duplicates
             </button>
-            <button @click="tab = 'search'" class="py-2 px-1 border-b-2 font-medium text-sm"
+            <button role="tab" id="tab-search" aria-controls="panel-search" :aria-selected="tab === 'search'" :tabindex="tab === 'search' ? 0 : -1"
+                @click="tab = 'search'" class="py-2 px-1 border-b-2 font-medium text-sm"
                 :class="tab === 'search' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-textMuted hover:text-textBase hover:border-gray-300 dark:hover:border-gray-600'">
                 Search
             </button>
-            <button @click="tab = 'dismissed'" class="py-2 px-1 border-b-2 font-medium text-sm"
+            <button role="tab" id="tab-dismissed" aria-controls="panel-dismissed" :aria-selected="tab === 'dismissed'" :tabindex="tab === 'dismissed' ? 0 : -1"
+                @click="tab = 'dismissed'" class="py-2 px-1 border-b-2 font-medium text-sm"
                 :class="tab === 'dismissed' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-textMuted hover:text-textBase hover:border-gray-300 dark:hover:border-gray-600'">
                 Dismissed
             </button>
-            <button @click="tab = 'categories'" class="py-2 px-1 border-b-2 font-medium text-sm"
+            <button role="tab" id="tab-categories" aria-controls="panel-categories" :aria-selected="tab === 'categories'" :tabindex="tab === 'categories' ? 0 : -1"
+                @click="tab = 'categories'" class="py-2 px-1 border-b-2 font-medium text-sm"
                 :class="tab === 'categories' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-textMuted hover:text-textBase hover:border-gray-300 dark:hover:border-gray-600'">
                 Categories
             </button>
@@ -64,7 +69,7 @@
     </div>
 
     <!-- All Items Tab -->
-    <div x-show="tab === 'all'" x-cloak class="bg-bgCard rounded-lg shadow dark:shadow-gray-900/50">
+    <div id="panel-all" role="tabpanel" aria-labelledby="tab-all" x-show="tab === 'all'" x-cloak class="bg-bgCard rounded-lg shadow dark:shadow-gray-900/50">
         <div class="p-6 border-b border-borderDefault flex items-center justify-between gap-3">
             <h2 class="text-lg font-semibold text-textBase">All Items</h2>
             {% if filter_category_id and filter_category_name %}
@@ -93,7 +98,7 @@
     </div>
 
     <!-- Duplicates Tab -->
-    <div x-show="tab === 'duplicates'" x-cloak
+    <div id="panel-duplicates" role="tabpanel" aria-labelledby="tab-duplicates" x-show="tab === 'duplicates'" x-cloak
         class="bg-bgCard rounded-lg shadow dark:shadow-gray-900/50">
         <div class="p-6 border-b border-borderDefault">
             <div class="flex justify-between items-center">
@@ -122,7 +127,7 @@
     </div>
 
     <!-- Search Tab -->
-    <div x-show="tab === 'search'" x-cloak class="bg-bgCard rounded-lg shadow dark:shadow-gray-900/50">
+    <div id="panel-search" role="tabpanel" aria-labelledby="tab-search" x-show="tab === 'search'" x-cloak class="bg-bgCard rounded-lg shadow dark:shadow-gray-900/50">
         <div class="p-6 border-b border-borderDefault">
             <h2 class="text-lg font-semibold text-textBase mb-2">Search Items</h2>
 
@@ -154,7 +159,7 @@
     </div>
 
     <!-- Dismissed Suggestions Tab -->
-    <div x-show="tab === 'dismissed'" x-cloak
+    <div id="panel-dismissed" role="tabpanel" aria-labelledby="tab-dismissed" x-show="tab === 'dismissed'" x-cloak
         class="bg-bgCard rounded-lg shadow dark:shadow-gray-900/50">
         <div class="p-6 border-b border-borderDefault">
             <h2 class="text-lg font-semibold text-textBase">Dismissed Suggestions</h2>
@@ -173,7 +178,7 @@
     </div>
 
     <!-- Categories Tab -->
-    <div x-show="tab === 'categories'" x-cloak
+    <div id="panel-categories" role="tabpanel" aria-labelledby="tab-categories" x-show="tab === 'categories'" x-cloak
         class="bg-bgCard rounded-lg shadow dark:shadow-gray-900/50"
         x-data="{ showAddModal: false, newCategoryName: '' }" @keydown.escape.window="showAddModal = false">
         <div class="p-6 border-b border-borderDefault flex justify-between items-center">

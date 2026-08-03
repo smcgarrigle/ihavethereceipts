@@ -199,7 +199,7 @@
             <h2 class="text-lg font-semibold text-textBase">Items (<span x-text="items.length"></span>)
             </h2>
             <div class="flex items-center gap-2">
-                <button @click="toggleAllExpanded()" type="button"
+                <button @click="toggleAllExpanded()" type="button" :aria-expanded="allExpanded"
                     class="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-700 flex items-center gap-1 transition">
                     <span x-text="allExpanded ? 'Collapse All' : 'Expand All'"></span>
                 </button>
@@ -363,6 +363,10 @@
 
                     <!-- Accordion Toggle -->
                     <div @click="item.detailsExpanded = !item.detailsExpanded"
+                         @keydown.enter="item.detailsExpanded = !item.detailsExpanded"
+                         @keydown.space.prevent="item.detailsExpanded = !item.detailsExpanded"
+                         role="button" tabindex="0" :aria-expanded="item.detailsExpanded"
+                         :aria-controls="'{{ array_name }}-details-' + index"
                          class="w-full h-2.5 mt-2 rounded bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 cursor-pointer flex items-center justify-center transition-colors"
                          title="Toggle advanced details (Discounts, Fees, Original Price)">
                         <svg class="w-4 h-4 text-gray-400 dark:text-gray-500 transform transition-transform"
@@ -373,7 +377,7 @@
                     </div>
 
                     <!-- Expandable Details Section -->
-                    <div x-show="item.detailsExpanded" x-collapse class="mt-4 pt-4 border-t border-borderDefault">
+                    <div :id="'{{ array_name }}-details-' + index" x-show="item.detailsExpanded" x-collapse class="mt-4 pt-4 border-t border-borderDefault">
                         <!-- Discounts Header -->
                     <div class="flex justify-between items-center mb-2">
                         <label class="text-sm font-medium text-textMuted">Discounts</label>
@@ -481,7 +485,9 @@
 
         <!-- CRV Grouping Section -->
         <div x-show="crv_items.length > 0" class="border-t border-borderDefault bg-bgHover">
-            <div @click="crvExpanded = !crvExpanded" class="p-6 cursor-pointer flex justify-between items-center hover:bg-bgHover transition-colors">
+            <div @click="crvExpanded = !crvExpanded" @keydown.enter="crvExpanded = !crvExpanded" @keydown.space.prevent="crvExpanded = !crvExpanded"
+                 role="button" tabindex="0" :aria-expanded="crvExpanded" aria-controls="crv-items-panel"
+                 class="p-6 cursor-pointer flex justify-between items-center hover:bg-bgHover transition-colors">
                 <div>
                     <h3 class="text-lg font-semibold text-textBase flex items-center gap-2">
                         <span>♻️</span> CRV Fees (<span x-text="crv_items.length"></span> items)
@@ -495,7 +501,7 @@
                 </div>
             </div>
 
-            <div x-show="crvExpanded" x-collapse class="divide-y divide-gray-200 dark:divide-gray-700 border-t border-borderDefault bg-bgCard">
+            <div id="crv-items-panel" x-show="crvExpanded" x-collapse class="divide-y divide-gray-200 dark:divide-gray-700 border-t border-borderDefault bg-bgCard">
                 <template x-for="(item, index) in crv_items" :key="'crv-'+index">
                     {{ item_editor_row('crv_items') }}
                 </template>
@@ -521,7 +527,9 @@
 
     <!-- Technical Details (Original Document Path) -->
     <div class="mt-8 bg-bgCard rounded-xl shadow border border-borderDefault p-6" x-data="{ showRaw: false }">
-        <div class="flex justify-between items-center cursor-pointer" @click="showRaw = !showRaw">
+        <div class="flex justify-between items-center cursor-pointer"
+             @click="showRaw = !showRaw" @keydown.enter="showRaw = !showRaw" @keydown.space.prevent="showRaw = !showRaw"
+             role="button" tabindex="0" :aria-expanded="showRaw" aria-controls="receipt-raw-details-panel">
             <h3 class="text-base font-semibold text-textBase flex items-center">
                 <svg class="w-5 h-5 text-textSubtle mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                 Original Document Details
@@ -529,7 +537,7 @@
             <svg class="w-5 h-5 text-textSubtle transform transition-transform duration-200" :class="{'rotate-180': showRaw}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
         </div>
 
-        <div x-show="showRaw" x-collapse class="mt-4 border-t border-borderDefault pt-4">
+        <div id="receipt-raw-details-panel" x-show="showRaw" x-collapse class="mt-4 border-t border-borderDefault pt-4">
             <p class="text-sm text-textMuted mb-2">The original document associated with this receipt processing job:</p>
             <div class="bg-gray-900 rounded-lg p-3 overflow-x-auto custom-scrollbar">
                 <code class="text-xs font-mono text-green-400 break-all">{{ receipt.image_path if receipt and receipt.image_path else 'No document linked' }}</code>

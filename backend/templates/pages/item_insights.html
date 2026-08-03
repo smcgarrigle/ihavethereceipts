@@ -295,6 +295,7 @@
             <div class="flex-shrink-0 flex items-center space-x-3" x-data="{ clearing: false, searching: false }">
                  <!-- Override match (paste FDC URL/ID) — available with or without an existing match -->
                  <button @click="showOverride = !showOverride; if (showOverride) $nextTick(() => $refs.fdcRefInput.focus())"
+                    :aria-expanded="showOverride" aria-controls="fdc-override-panel"
                     class="p-3 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-800/30 rounded-2xl transition-all border border-transparent hover:border-amber-200 dark:hover:border-amber-500/50"
                     :class="showOverride ? 'ring-2 ring-amber-400' : ''"
                     title="Manually set the USDA match — paste an FDC URL or ID">
@@ -351,7 +352,7 @@
         </div>
 
         <!-- Manual Match Override Panel -->
-        <div x-show="showOverride" style="display: none;" x-transition.opacity
+        <div id="fdc-override-panel" x-show="showOverride" style="display: none;" x-transition.opacity
              class="relative mt-6 bg-bgMain border border-borderDefault rounded-2xl p-5">
             <label for="fdc-override-input" class="block text-xs font-bold text-textSubtle uppercase tracking-wider mb-2">Override USDA Match</label>
             <p class="text-sm text-textMuted mb-3">
@@ -628,7 +629,9 @@
 
     <!-- Technical Details (Raw API Data) -->
     <div class="mt-12 bg-bgCard rounded-3xl shadow-xl border border-borderDefault p-8" x-data="{ showRaw: false }">
-        <div class="flex justify-between items-center cursor-pointer" @click="showRaw = !showRaw">
+        <div class="flex justify-between items-center cursor-pointer"
+             @click="showRaw = !showRaw" @keydown.enter="showRaw = !showRaw" @keydown.space.prevent="showRaw = !showRaw"
+             role="button" tabindex="0" :aria-expanded="showRaw" aria-controls="item-raw-details-panel">
             <h3 class="text-lg font-black text-textBase flex items-center">
                 <svg class="w-5 h-5 text-textSubtle mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
                 Technical Details (USDA Raw Data)
@@ -636,7 +639,7 @@
             <svg class="w-5 h-5 text-textSubtle transform transition-transform duration-200" :class="{'rotate-180': showRaw}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
         </div>
 
-        <div x-show="showRaw" x-collapse class="mt-6 border-t border-borderDefault pt-6">
+        <div id="item-raw-details-panel" x-show="showRaw" x-collapse class="mt-6 border-t border-borderDefault pt-6">
             <p class="text-sm text-textMuted mb-4">This is the raw JSON response returned by the USDA FoodData Central API for FDC ID: {{ item.fdc_id }}.</p>
             <div class="bg-gray-900 rounded-xl p-4 overflow-x-auto max-h-[500px] overflow-y-auto custom-scrollbar">
                 <pre class="text-xs font-mono text-green-400 m-0">{{ usda | tojson(indent=2) if usda else "{}" }}</pre>

@@ -245,7 +245,9 @@ def list_items(category_id: int | None = None, db: Session = Depends(get_db)):
         <div class='bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md transition overflow-hidden'
              x-data='{{expanded: false, categoryId: {item.category_id or "null"}}}'>
 
-            <!-- Header (Always Visible) -->
+            <!-- Header (Always Visible). The expand/collapse control itself lives on the
+                 chevron below, not this whole row, since it also wraps a real <a> link
+                 (nested interactive controls aren't allowed) -->
             <div @click="expanded = !expanded" class="p-4 flex justify-between items-center cursor-pointer bg-gray-50/50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors">
                 <div class="flex-1 min-w-0">
                     <h3 class='font-semibold truncate pr-2'>
@@ -259,7 +261,10 @@ def list_items(category_id: int | None = None, db: Session = Depends(get_db)):
                         <span class="font-medium text-gray-700 dark:text-gray-300">${avg_price:.2f} avg</span>
                     </div>
                 </div>
-                <div class="flex-shrink-0 text-right pl-2">
+                <div @click.stop="expanded = !expanded" @keydown.enter="expanded = !expanded" @keydown.space.prevent="expanded = !expanded"
+                     role="button" tabindex="0" :aria-expanded="expanded" aria-controls="item-details-{item.id}"
+                     aria-label="Toggle details for {escaped_item_name}"
+                     class="flex-shrink-0 text-right pl-2">
                     <span class="block font-bold text-gray-900 dark:text-white">${total_spent:.0f}</span>
                     <svg class="w-5 h-5 text-gray-400 transform transition-transform duration-200 mx-auto mt-1"
                          :class="expanded ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -269,7 +274,7 @@ def list_items(category_id: int | None = None, db: Session = Depends(get_db)):
             </div>
 
             <!-- Drawer (Collapsible) -->
-            <div x-show="expanded" x-collapse class="border-t border-gray-100 dark:border-gray-700">
+            <div id="item-details-{item.id}" x-show="expanded" x-collapse class="border-t border-gray-100 dark:border-gray-700">
                 <div class="p-4 space-y-4">
 
                     <!-- Item Details -->
