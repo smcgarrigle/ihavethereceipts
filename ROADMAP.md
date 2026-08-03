@@ -22,7 +22,8 @@ All three Strategic Vision phases have been delivered as of May 2026. The applic
 ---
 
 ## 🟢 Recently Completed (Q3 2026)
-- [x] **WCAG AA Contrast Compliance (July 2026)**: All four themes (Light/Dark/Forest/Sunset) plus the marketing site now satisfy WCAG 2.1 SC 1.4.3 *Contrast (Minimum)* — every text token ≥ 4.5:1 on its surfaces — and SC 1.4.11 *Non-text Contrast* for form input borders (≥ 3:1, Option A: card borders remain decorative and rely on shadows). Changes: `--text-subtle` raised in light (2.4→4.6:1) and dark (3.0→4.8:1); new `--text-code` token for inline code/debug badges in dark (4.1→6.2:1); `--border-input` raised in all themes (3.1–3.3:1); button hover states no longer dip below AA (`hover:bg-blue-500` → `700`). Guarded by `scripts/check_contrast.py`, which parses the tokens from CSS and fails on any violation. *Deferred: chart-fill label contrast and SC 1.4.1 Use of Color (color-only signaling).*
+- [x] **Accessibility Sweep — Labeling, ARIA, Focus Management (August 2026)**: Closes out the July accessibility backlog. `tests/test_a11y_axe.py` wires axe-core + Playwright into an opt-in smoke suite (`uv run pytest -m e2e`) over 9 pages/flows — color-contrast excluded since it's guarded separately (see below), but every other severe (critical/serious) rule is enforced. Every chart (`<canvas>`) across the app now carries `role="img"` + a descriptive `aria-label` (dashboard, categories, items, item insights, trends, the demo-bi dashboard), guarded by `test_chart_a11y_labels.py`. Every form field and icon-only button has an accessible name, guarded by `test_form_a11y_labels.py`. The Items page's 5-tab nav gets the full `settings.html` tablist pattern (`role=tablist/tab/tabpanel`, `aria-selected`, roving tabindex); accordions and disclosure buttons across items/receipt_review/item_insights/dashboard get `aria-expanded`/`aria-controls`; toggle-mode buttons (trends' nutrient/percent switches) get `aria-pressed`. Every modal now traps Tab and returns focus to its trigger on close — the ones using the vendored Alpine Focus plugin (`x-trap`) were already correct, but `item_insights.html`'s search modal and several vanilla-JS modals (dashboard's store-history/category-drilldown, items.html's relevant-receipts/price-history/add-category, categories.html's category-items/price-history) had no focus management at all. The app's 3 `<img>` elements all have alt text (`test_img_alt_text.py`). SC 1.4.1 (Use of Color) audit found the category/store spend-stack widget was the one real color-only signal (narrow segments hid their store-name label, color was the only differentiator) — fixed with `aria-label` + keyboard support; everything else checked (price deltas, source badges, chart legends) already had a text-based secondary cue. Along the way, fixed two unrelated pre-existing bugs the audit surfaced: a store-history pill used `onclick="$dispatch(...)"` (a no-op — `$dispatch` only works inside Alpine's `@click`), and `/items?category=` was previously untestable at scale (see "Known gaps" below). *Still deferred: chart-fill/badge pixel contrast (SC 1.4.3) — see below.*
+- [x] **WCAG AA Contrast Compliance (July 2026)**: All four themes (Light/Dark/Forest/Sunset) plus the marketing site now satisfy WCAG 2.1 SC 1.4.3 *Contrast (Minimum)* — every text token ≥ 4.5:1 on its surfaces — and SC 1.4.11 *Non-text Contrast* for form input borders (≥ 3:1, Option A: card borders remain decorative and rely on shadows). Changes: `--text-subtle` raised in light (2.4→4.6:1) and dark (3.0→4.8:1); new `--text-code` token for inline code/debug badges in dark (4.1→6.2:1); `--border-input` raised in all themes (3.1–3.3:1); button hover states no longer dip below AA (`hover:bg-blue-500` → `700`). Guarded by `scripts/check_contrast.py`, which parses the tokens from CSS and fails on any violation. *Deferred: chart-fill label contrast — now quantified by the axe suite above (27–374 color-contrast nodes per page on dashboard/trends/settings/restock/receipts) but not yet fixed.*
 - [x] **OCR Feedback Loop (Self-Improving Extraction)**: Human corrections from the review sandbox are persisted (`ocr_corrections` table) and injected into future OCR prompts as few-shot examples. The OCR cache is keyed on image + prompt, so learned corrections invalidate stale results on reprocess.
 - [x] **Gemini Structured Outputs**: The API path now passes a response schema (`_ReceiptSchema`), contractually guaranteeing valid JSON; `json-repair` remains as the local-model fallback. Fails soft to prompt-only JSON if a model rejects the schema.
 - [x] **OCR Eval Harness**: `scripts/ocr_eval.py` scores extraction accuracy against human-approved receipts — `--stored` for a zero-cost baseline, `--live` to measure prompt/model changes. Baseline: 91% item recall, 100% precision, 47% price accuracy (the current improvement target).
@@ -45,26 +46,7 @@ All three Strategic Vision phases have been delivered as of May 2026. The applic
 
 ## 🟡 Near-Term Backlog & Strategic Roadmap
 
-### 1. Accessibility (WCAG 2.1 AA) — 🔴 Top Priority (Refreshed July 2026)
-
-The July contrast work fixed the most measurable gap (color contrast), but a follow-up audit of the rendered templates shows real gaps remain in labeling, ARIA coverage, and automated regression testing. Verified against the codebase (not just estimated) as of July 30, 2026.
-
-**Done:**
-- [x] **Contrast Compliance** ✅ (July 2026): All four themes satisfy SC 1.4.3 (text ≥ 4.5:1) and SC 1.4.11 (form input borders ≥ 3:1). Guarded by `scripts/check_contrast.py`. See "Recently Completed" above for details.
-- [x] **Skip-Navigation Link**: Present and correctly wired (`templates/layouts/base.html:82-86`) — `sr-only`, reveals on keyboard focus, targets `#main-content` (`base.html:341`).
-- [x] **Chart Labeling on Trends & Item Insights**: Every `<canvas>` on `/trends` (14/14) and `/items/{id}/insights` (1/1) carries `role="img"` + a descriptive `aria-label`. This is the pattern to replicate elsewhere (see below).
-- [x] **Some ARIA widget patterns exist**: `role="dialog"`/`"tab"`/`"tablist"`/`"tabpanel"`/`"switch"` are already in use in `settings.html`, `restock.html`, and modal templates — the base pattern is proven, just not applied consistently.
-
-**Remaining — ranked by leverage:**
-1. [ ] **Automated a11y testing** (do this first): wire `axe-core` (or `pa11y`) into a pytest/Playwright smoke pass over the main pages (dashboard, trends, settings, receipt review, items). Nothing currently catches regressions beyond static contrast tokens — `check_contrast.py` reads CSS variables, not the rendered DOM, so it can't see mislabeled forms or missing roles. This single step will likely surface most of the remaining mechanical issues below and give page-by-page precision beyond manual grep counts.
-2. [ ] **Chart labeling gaps**: apply the Trends pattern (`role="img"` + `aria-label`) to the canvases still missing it — Dashboard (2/5 labeled), Categories (0/1), Items (0/1), and the static demo site (0/3).
-3. [ ] **Form label audit**: 51 `<input>` elements vs. 36 `<label>` + 7 `sr-only`-label instances repo-wide — a real but partial gap, not a blanket miss. Prioritize the highest-traffic forms first: receipt review, settings, Produce Entry.
-4. [ ] **ARIA widget completeness**: `aria-expanded` (4 instances) and `aria-controls` (5 instances) are thin relative to the number of collapsible sections, tabs, and dropdowns in the app. Extend the already-proven dialog/tab/switch pattern to the rest.
-5. [ ] **Modal/dialog focus management**: Escape-to-close exists in ~12 places (Alpine `@keydown.escape`), but there's no evidence of focus being trapped inside open dialogs or returned to the triggering element on close. Audit the `role="dialog"` instances in `dashboard.html`, `items.html`, `receipt_review.html`, `receipts.html`.
-6. [ ] **Icon/image alt text**: only one `alt=` attribute exists in the entire template tree. Most icons are emoji/text glyphs (likely fine as decorative), so this needs a quick per-instance judgment call rather than a blanket fix — flag any genuinely informative `<img>` first.
-7. [ ] **SC 1.4.1 (Use of Color)**: explicitly deferred during the July contrast work. Color-only signaling (red/green price deltas, category chart colors) needs a secondary cue — icon, pattern, or text label.
-
-### 2. Nutrition Catch-Up (Proposed — July 2026)
+### 1. Nutrition Catch-Up (Proposed — July 2026)
 
 Automated background nutrition enrichment that detects coverage gaps, searches USDA FDC for uncovered items, and surfaces results for user review — turning the manual `scripts/backfill_nutrients.py` workflow into a self-service feature.
 
@@ -79,40 +61,41 @@ Automated background nutrition enrichment that detects coverage gaps, searches U
 
 Full plan: [`scratch/PLAN_NUTRITION_CATCHUP.md`](file:///home/mcgar/projects/grocery-tracker/scratch/PLAN_NUTRITION_CATCHUP.md)
 
-### 3. Taxonomy Cleanup & Category Merging ✅ (July 2026)
+### 2. Taxonomy Cleanup & Category Merging ✅ (July 2026)
 - [x] **Taxonomy Mapping Engine**: Strict 13-category canonical set defined.
 - [x] **The Interceptor**: `category_mapper` funnels chaotic external categories (USDA/OpenFoodFacts) into the master taxonomy and prevents re-fragmentation.
 - [x] **Database Migration**: Fragmented categories collapsed into the clean taxonomy (see "Category Taxonomy Collapse" above).
 
-### 4. Price History & Volatility
+### 3. Price History & Volatility
 - [ ] **Retailer Overlays**: Overlay multiple stores on a single item's price history chart to compare pricing.
 - [ ] **Volatility Alerts**: Automated UI notifications flagging items with >15% price shifts in the last 30 days.
 - [ ] **Advanced Spreadsheet Grid**: High-density, thermal-coded grid for price history analysis.
 
-### 5. AI & Data Enrichment
+### 4. AI & Data Enrichment
 - [x] **Dynamic AI Few-Shot Learning** ✅ (July 2026): Every review-sandbox save is diffed against the AI's original extraction; corrections are stored in `ocr_corrections` and injected into the OCR prompt (store-scoped on reprocess, global on first pass). See "OCR Feedback Loop" below.
 - [x] **Full USDA FDC Sweep** ✅ (July 2026): Checkpointed backfill (`scripts/backfill_nutrients.py`) matched 498 items via FDC + 24 via OpenFoodFacts — nutrient coverage rose from 8% to 49% of items (45.9% of spend).
 - [x] **Store-Scoped Matching Context** ✅ (July 2026): `item_matcher.py` now ranks items previously purchased at the current receipt's store ahead of near-tied text matches (raw-score gap ≤ 10), preventing cross-contamination of store brands (e.g., Whole Foods "365" vs Safeway "O Organics"). Ranking-only by design — store history never lowers the match threshold and never alters reported similarity scores, so it cannot promote a weak match into an auto-merge. Store purchase history is fetched once per receipt (`get_store_item_ids`). See `PLAN_STORE_CONTEXT.md`.
 - [ ] **Barcode Scanning Support**: Mobile camera integration to pull global product metadata from OpenFoodFacts.
 
-### 6. Dynamic Trends & Dashboards
+### 5. Dynamic Trends & Dashboards
 - [ ] **Interactive Chart Controllers**: Dropdown menus to dynamically filter charts by date ranges, stores, or categories. Must use `hx-push-url="true"` to ensure URL query parameter state remains bookmarkable and shareable.
 - [ ] **Low-Data "Bootstrap" Charts**: Visualizations designed to deliver insights with only 5–10 receipts.
 - [ ] **Shopping Habits Gallery**: Recurring trend charts with improved signal/noise filtering.
 
-### 7. Automation & Scalability
+### 6. Automation & Scalability
 - [x] **Local Folder-Watch Ingestion** ✅ (July 2026): Drop PDFs/images into `data/inbox` and they auto-ingest through the normal OCR + review pipeline (`FOLDER_WATCH=0` to disable).
 - [ ] **Household Support**: Individual accounts with shared or separate grocery databases.
 - [ ] **Cross-Device Sync (Offline-First)**: Robust synchronization across mobile and desktop clients. Architect as a Progressive Web App (PWA) using IndexedDB to allow scanning and viewing in low-service grocery stores, syncing back to the server later.
 
-### 8. UI/UX Refinements (Post-Launch)
+### 7. UI/UX Refinements (Post-Launch)
 - [ ] **Reorderable Item Columns (Broker-Style)**: Table view for the Items page with drag-to-reorder column headers (Category, qty, total spent, weight/vol, unit, $/unit), persisted in localStorage — plus show/hide toggles and click-to-sort. Prerequisite: extract the `list_items` f-string HTML into a Jinja fragment. Full scope: `scratch/TODO_items_column_reorder.md` (est. 1.5–2 days).
 - [ ] **Mobile Slide-out Drawers**: Replace heavy full-page navigations for Item Insights on mobile with HTMX-powered slide-up drawers to preserve the user's context on the main Dashboard.
 - [ ] **PDF Viewer 'Esc' Key Fix**: The native PDF `<embed>` swallows the 'Esc' key when focused, preventing the receipt review modal from closing.
   - *Option A (Lightweight)*: Auto-focus the modal's "Close" button upon opening so 'Esc' works immediately until the user clicks into the PDF.
   - *Option B (Heavy)*: Migrate from native `<embed>` to `PDF.js` to render PDFs as flat canvases that do not steal keyboard focus.
+- [ ] **Items Page Pagination** (found during the August 2026 a11y sweep): `/items` renders every item as a full card with no pagination — on the live dataset (1,493 items) that's ~80K DOM nodes, which is why the axe a11y test suite scans a single small category instead of the full list. Independent of accessibility, this is a real cost for every visitor (initial render, Alpine reactivity, and the "Find Duplicates" tab's O(n²) fuzzy match all run against the unfiltered set on every page load). Same prerequisite as the column-reorder item above: extract `list_items` into a paginated Jinja fragment.
 
-### 9. Custom Category Lenses (Proposed — July 2026)
+### 8. Custom Category Lenses (Proposed — July 2026)
 
 Let users create personally meaningful categories — e.g. **"Protein-Maxxing"** — and route items into them across canonical lines (chicken out of Meat, eggs out of Dairy, Greek yogurt out of Dairy), turning the category system from a fixed taxonomy into a motivational lens that can dominate charts and trends.
 
@@ -186,7 +169,7 @@ And a one-time nudge on custom-category creation:
 </details>
 
 ---
-*Last Updated: July 30, 2026*
+*Last Updated: August 2, 2026*
 
 <!-- Search UX options considered (Option A implemented May 2026):
   Option B — Dedicated /search full-page (Enter key navigates to results page; table view with all purchase history)
