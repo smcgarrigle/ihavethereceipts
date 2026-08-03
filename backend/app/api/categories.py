@@ -129,6 +129,7 @@ def list_categories(db: Session = Depends(get_db)):
                 <div class='flex justify-between items-center p-6 border-b dark:border-gray-700'>
                     <h3 class='text-xl font-semibold text-gray-900 dark:text-white'>Category Items</h3>
                     <button onclick='document.getElementById("category-items-modal").classList.add("hidden")'
+                            aria-label="Close"
                             class='text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl'>
                         ×
                     </button>
