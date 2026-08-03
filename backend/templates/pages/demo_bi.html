@@ -91,7 +91,7 @@
         <span class="flex items-center gap-1.5"><span class="inline-block w-6 h-0.5 bg-emerald-500 rounded border-dashed"></span>Protein (g)</span>
       </div>
     </div>
-    <div class="h-[260px] relative"><canvas id="dual-axis-chart"></canvas></div>
+    <div class="h-[260px] relative"><canvas id="dual-axis-chart" role="img" aria-label="Weekly spend versus protein intake dual-axis line chart, 12-week trend"></canvas></div>
   </div>
 
   <!-- Row 3: Category Efficiency Table + Basket Composition -->
@@ -119,7 +119,7 @@
     <div class="bg-bgCard border border-borderDefault rounded-2xl p-6">
       <h2 class="text-xs font-mono font-bold uppercase tracking-widest text-textSubtle mb-1">BASKET COMPOSITION</h2>
       <p class="text-sm text-textMuted mb-4">Spend share by category this month.</p>
-      <div class="h-[200px] relative"><canvas id="basket-chart"></canvas></div>
+      <div class="h-[200px] relative"><canvas id="basket-chart" role="img" aria-label="Basket composition donut chart, spend share by category this month"></canvas></div>
     </div>
   </div>
 
@@ -327,7 +327,7 @@ function renderSmallMultiples() {
         <span class="text-xs font-bold text-textBase">${s.name}</span>
         <span class="text-[9px] font-mono text-textSubtle uppercase">g/week</span>
       </div>
-      <div class="h-14 w-full"><canvas id="sm-${s.name.replace(/\s+/g,'-')}"></canvas></div>
+      <div class="h-14 w-full"><canvas id="sm-${s.name.replace(/\s+/g,'-')}" role="img" aria-label="${s.name} weekly protein and fat sparkline"></canvas></div>
       <div class="flex gap-3 text-[9px] text-textSubtle">
         <span><span class="text-emerald-500">●</span> Protein</span>
         <span><span class="text-amber-500">●</span> Fat</span>
