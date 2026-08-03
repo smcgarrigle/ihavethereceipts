@@ -436,7 +436,7 @@
                                 <div
                                     class="w-16 h-16 flex-shrink-0 bg-bgSkeleton rounded overflow-hidden flex items-center justify-center">
                                     <template x-if="result.image_url">
-                                        <img :src="result.image_url" class="w-full h-full object-contain">
+                                        <img :src="result.image_url" :alt="result.product_name" class="w-full h-full object-contain">
                                     </template>
                                     <template x-if="!result.image_url">
                                         <span class="text-xs text-textSubtle">No Img</span>

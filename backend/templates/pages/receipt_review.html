@@ -582,7 +582,8 @@
                     {% if filename and filename.lower().endswith('.pdf') %}
                     <embed src="/api/receipts/{{ receipt_id }}/file" type="application/pdf" class="w-full h-[70vh] rounded">
                     {% else %}
-                    <img src="/api/receipts/{{ receipt_id }}/file" onerror="this.src='/static/placeholder-receipt.png'"
+                    <img src="/api/receipts/{{ receipt_id }}/file" alt="Scanned receipt document"
+                        onerror="this.src='/static/placeholder-receipt.png'"
                         class="max-h-[70vh] object-contain rounded">
                     {% endif %}
                 </div>
