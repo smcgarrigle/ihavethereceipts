@@ -917,7 +917,10 @@ def get_category_store_stack_widget(db: Session = Depends(get_db)):
             html += f"""
             <div class="{color} h-full transition-all hover:scale-[1.02] hover:z-10 hover:shadow-lg cursor-pointer group relative flex items-center justify-center min-w-[2px] overflow-hidden"
                  style="width: {pct}%"
+                 role="button" tabindex="0"
+                 aria-label="{store["name"]}: ${store["spent"]:,.2f}"
                  onclick='showCategoryStoreDrilldown({cat["id"]}, {store["id"]}, {cat_json}, {store_json})'
+                 onkeydown='if(event.key==="Enter"||event.key===" "){{event.preventDefault();showCategoryStoreDrilldown({cat["id"]}, {store["id"]}, {cat_json}, {store_json})}}'
                  title="{store["name"]}: ${store["spent"]:,.2f}">
 
                 <!-- Overlay Store Name -->
