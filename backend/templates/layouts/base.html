@@ -391,6 +391,57 @@
     })();
     </script>
 
+    <!-- Category Items modal focus management.
+         Lives here rather than on a page because the modal markup ships inside the
+         /api/categories/list fragment, which is rendered on BOTH /categories and the
+         Items page's Categories tab — page-scoped handlers break on one of them. -->
+    <script>
+    (function () {
+        let opener = null;
+
+        window.openCategoryItemsModal = function (triggerEl) {
+            const modal = document.getElementById('category-items-modal');
+            if (!modal) return;
+            modal.classList.remove('hidden');
+            opener = triggerEl || document.activeElement;
+            requestAnimationFrame(function () {
+                const first = modal.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+                if (first) first.focus();
+            });
+        };
+
+        window.closeCategoryItemsModal = function () {
+            const modal = document.getElementById('category-items-modal');
+            if (!modal) return;
+            modal.classList.add('hidden');
+            if (opener) { opener.focus(); opener = null; }
+        };
+
+        document.addEventListener('keydown', function (event) {
+            const modal = document.getElementById('category-items-modal');
+            if (!modal || modal.classList.contains('hidden')) return;
+            if (event.key === 'Escape') {
+                window.closeCategoryItemsModal();
+                return;
+            }
+            if (event.key !== 'Tab') return;
+            const focusable = Array.from(modal.querySelectorAll(
+                'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+            )).filter(function (el) { return !el.disabled && el.offsetParent !== null; });
+            if (focusable.length === 0) return;
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
+            }
+        });
+    })();
+    </script>
+
     {% block extra_scripts %}{% endblock %}
 </body>
 
