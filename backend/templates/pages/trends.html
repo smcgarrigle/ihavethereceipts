@@ -246,13 +246,13 @@
 
             <!-- Collapsible Detail: Product Contributor Breakdown -->
             <div class="bg-bgCard rounded-3xl shadow-xl border border-borderDefault overflow-hidden" x-data="{ open: false }">
-                <button @click="open = !open" class="w-full px-6 py-4 flex justify-between items-center bg-bgSkeleton/20 hover:bg-bgSkeleton/40 transition-all">
+                <button @click="open = !open" :aria-expanded="open" aria-controls="trends-product-contributors-panel" class="w-full px-6 py-4 flex justify-between items-center bg-bgSkeleton/20 hover:bg-bgSkeleton/40 transition-all">
                     <span class="font-bold text-textBase flex items-center gap-2 text-sm">
                         <span>🔍</span> Detail: Top Product Contributors
                     </span>
                     <span class="text-textSubtle text-xs" x-text="open ? 'Hide Detail ▲' : 'Show Detail ▼'"></span>
                 </button>
-                <div x-show="open" x-collapse class="p-6 border-t border-borderDefault" style="display: none;">
+                <div id="trends-product-contributors-panel" x-show="open" x-collapse class="p-6 border-t border-borderDefault" style="display: none;">
                     <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8" x-data="{ nutrient: 'sugar', percent: false }">
                         <div>
                             <h4 class="text-base font-bold text-textBase">Product Contribution Breakdown</h4>
@@ -260,12 +260,12 @@
                         </div>
                         <div class="flex flex-wrap items-center gap-3">
                             <div class="flex bg-bgSkeleton/50 rounded-xl p-1">
-                                <button @click="nutrient = 'sodium'; setNutrient('sodium')" :class="nutrient === 'sodium' ? 'bg-bgInput shadow-sm text-red-600' : 'text-textSubtle hover:text-textMuted'" class="px-3 py-1.5 text-xs font-bold rounded-lg transition-all">Sodium</button>
-                                <button @click="nutrient = 'fat'; setNutrient('fat')" :class="nutrient === 'fat' ? 'bg-bgInput shadow-sm text-amber-600' : 'text-textSubtle hover:text-textMuted'" class="px-3 py-1.5 text-xs font-bold rounded-lg transition-all">Fat</button>
-                                <button @click="nutrient = 'sugar'; setNutrient('sugar')" :class="nutrient === 'sugar' ? 'bg-bgInput shadow-sm text-blue-600' : 'text-textSubtle hover:text-textMuted'" class="px-3 py-1.5 text-xs font-bold rounded-lg transition-all">Sugar</button>
-                                <button @click="nutrient = 'protein'; setNutrient('protein')" :class="nutrient === 'protein' ? 'bg-bgInput shadow-sm text-emerald-600' : 'text-textSubtle hover:text-textMuted'" class="px-3 py-1.5 text-xs font-bold rounded-lg transition-all">Protein</button>
+                                <button @click="nutrient = 'sodium'; setNutrient('sodium')" :aria-pressed="nutrient === 'sodium'" :class="nutrient === 'sodium' ? 'bg-bgInput shadow-sm text-red-600' : 'text-textSubtle hover:text-textMuted'" class="px-3 py-1.5 text-xs font-bold rounded-lg transition-all">Sodium</button>
+                                <button @click="nutrient = 'fat'; setNutrient('fat')" :aria-pressed="nutrient === 'fat'" :class="nutrient === 'fat' ? 'bg-bgInput shadow-sm text-amber-600' : 'text-textSubtle hover:text-textMuted'" class="px-3 py-1.5 text-xs font-bold rounded-lg transition-all">Fat</button>
+                                <button @click="nutrient = 'sugar'; setNutrient('sugar')" :aria-pressed="nutrient === 'sugar'" :class="nutrient === 'sugar' ? 'bg-bgInput shadow-sm text-blue-600' : 'text-textSubtle hover:text-textMuted'" class="px-3 py-1.5 text-xs font-bold rounded-lg transition-all">Sugar</button>
+                                <button @click="nutrient = 'protein'; setNutrient('protein')" :aria-pressed="nutrient === 'protein'" :class="nutrient === 'protein' ? 'bg-bgInput shadow-sm text-emerald-600' : 'text-textSubtle hover:text-textMuted'" class="px-3 py-1.5 text-xs font-bold rounded-lg transition-all">Protein</button>
                             </div>
-                            <button @click="percent = !percent; togglePercentMode(percent)" :class="percent ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-700/50 dark:text-gray-400'" class="px-3 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-2">
+                            <button @click="percent = !percent; togglePercentMode(percent)" :aria-pressed="percent" :class="percent ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-700/50 dark:text-gray-400'" class="px-3 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-2">
                                 <span x-text="percent ? '100% Stacked' : 'Absolute Mass'"></span>
                                 <span>🔄</span>
                             </button>

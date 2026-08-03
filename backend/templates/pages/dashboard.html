@@ -445,7 +445,7 @@
             <!-- Global Show All Button -->
             {% if stores|length > 4 %}
             <div class="flex justify-center mt-8">
-                <button @click="showAll = !showAll"
+                <button @click="showAll = !showAll" :aria-expanded="showAll"
                     class="flex items-center space-x-2 px-6 py-2.5 bg-bgCard border border-borderDefault text-textMuted rounded-full hover:bg-bgHover hover:shadow-md transition-all">
                     <span x-text="showAll ? 'Show Less' : 'Show All Receipts'"></span>
                     <svg class="w-5 h-5 transform transition-transform" :class="showAll ? 'rotate-180' : ''" fill="none"

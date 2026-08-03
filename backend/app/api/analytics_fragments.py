@@ -344,7 +344,7 @@ def get_store_spend_html(db: Session = Depends(get_db)):
         {
         f'''
         <div class="p-2 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-200 dark:border-gray-700 text-center">
-            <button @click="showAll = !showAll"
+            <button @click="showAll = !showAll" :aria-expanded="showAll"
                     class="text-xs font-black text-blue-600 dark:text-blue-400 hover:underline uppercase tracking-widest">
                 <span x-text="showAll ? 'Show Less' : 'Show All ({len(results)})'"></span>
             </button>
