@@ -39,6 +39,7 @@ dev = [
     "types-pillow>=10.2.0.20240213",
     "beautifulsoup4>=4.12.0",
     "playwright>=1.40.0",
+    "axe-core-python>=0.1.0",
 ]
 
 [tool.ruff]

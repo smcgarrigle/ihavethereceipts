@@ -174,12 +174,12 @@
             <!-- Total (Read-only) & Save Metadata Button -->
             <div class="flex items-end gap-3">
                 <div class="flex-1">
-                    <label class="block text-sm font-medium text-textMuted mb-1">Total</label>
+                    <label for="review-ocr-total" class="block text-sm font-medium text-textMuted mb-1">Total</label>
                     <div class="relative rounded-md shadow-sm">
                         <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                             <span class="text-gray-500 text-lg font-bold">$</span>
                         </div>
-                        <input type="text" inputmode="decimal" x-model="ocrTotal"
+                        <input id="review-ocr-total" type="text" inputmode="decimal" x-model="ocrTotal"
                             @blur="ocrTotal = parseFloat(ocrTotal).toFixed(2)"
                             class="block w-full h-10 rounded-md border-borderInput bg-bgInput text-textBase pl-7 focus:border-blue-500 focus:ring-blue-500 text-lg font-bold">
                     </div>
@@ -265,6 +265,7 @@
                                 </template>
                             </div>
                             <button @click="{{ array_name }}.splice(index, 1); updateCrvTotal()"
+                                :aria-label="'Remove ' + (item.name || 'item')"
                                 class="ml-4 text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -277,8 +278,8 @@
                         <div class="grid grid-cols-2 md:grid-cols-6 gap-4">
                             <!-- Category Dropdown -->
                             <div>
-                                <label class="block text-xs font-medium text-textMuted mb-1">Category</label>
-                                <select x-model="item.category"
+                                <label :for="'{{ array_name }}-category-' + index" class="block text-xs font-medium text-textMuted mb-1">Category</label>
+                                <select :id="'{{ array_name }}-category-' + index" x-model="item.category"
                                     class="w-full rounded-md border-borderInput bg-bgInput text-textBase shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
                                     <option value="">- Uncategorized -</option>
                                     <template x-if="item.category && !categories.includes(item.category) && item.category !== 'Other'">
@@ -293,17 +294,17 @@
 
                             <!-- Quantity -->
                             <div>
-                                <label
+                                <label :for="'{{ array_name }}-qty-' + index"
                                     class="block text-xs font-medium text-textMuted mb-1">Qty</label>
-                                <input type="text" inputmode="decimal" x-model="item.quantity"
+                                <input :id="'{{ array_name }}-qty-' + index" type="text" inputmode="decimal" x-model="item.quantity"
                                     @input="onQtyChange(item)"
                                     class="w-full rounded-md border-borderInput bg-bgInput text-textBase shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
                             </div>
 
                             <!-- Base Price (Total Line Price) -->
                             <div>
-                                <label class="block text-xs font-medium text-textMuted mb-1">Total Line Price ($)</label>
-                                <input type="text" inputmode="decimal" x-model="item.final_price"
+                                <label :for="'{{ array_name }}-final-price-' + index" class="block text-xs font-medium text-textMuted mb-1">Total Line Price ($)</label>
+                                <input :id="'{{ array_name }}-final-price-' + index" type="text" inputmode="decimal" x-model="item.final_price"
                                     @input="onTotalChange(item)"
                                     @blur="fmt2(item, 'final_price')"
                                     class="w-full rounded-md border-borderInput bg-bgInput text-textBase shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
@@ -311,18 +312,18 @@
 
                             <!-- Weight -->
                             <div>
-                                <label
+                                <label :for="'{{ array_name }}-weight-' + index"
                                     class="block text-xs font-medium text-textMuted mb-1">Weight/Vol</label>
-                                <input type="text" inputmode="decimal" x-model="item.weight"
+                                <input :id="'{{ array_name }}-weight-' + index" type="text" inputmode="decimal" x-model="item.weight"
                                     @input="onWeightChange(item); updateBasePrice(item)"
                                     class="w-full rounded-md border-borderInput bg-bgInput text-textBase shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
                             </div>
 
                             <!-- Unit Type -->
                             <div>
-                                <label
+                                <label :for="'{{ array_name }}-unit-type-' + index"
                                     class="block text-xs font-medium text-textMuted mb-1">Unit</label>
-                                <select x-model="item.unit_type" @change="onUnitDropdownChange(item)"
+                                <select :id="'{{ array_name }}-unit-type-' + index" x-model="item.unit_type" @change="onUnitDropdownChange(item)"
                                     class="w-full rounded-md border-borderInput bg-bgInput text-textBase shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
                                     <option value="">-</option>
                                     <option value="lb">lb</option>
@@ -342,7 +343,7 @@
                             <!-- Unit Price -->
                             <div>
                                 <div class="flex justify-between items-center mb-1">
-                                    <label class="block text-xs font-medium text-textMuted">
+                                    <label :for="'{{ array_name }}-unit-price-' + index" class="block text-xs font-medium text-textMuted">
                                         Price Per <span x-text="item.is_bulk ? (item.unit_type || 'unit') : 'Unit'"></span> ($)
                                     </label>
                                     <button @click="togglePricingMode(item)" type="button"
@@ -352,7 +353,7 @@
                                         <span x-text="item.is_bulk ? '⚖️' : '🏷️'"></span>
                                     </button>
                                 </div>
-                                <input type="text" inputmode="decimal" x-model="item.unit_price"
+                                <input :id="'{{ array_name }}-unit-price-' + index" type="text" inputmode="decimal" x-model="item.unit_price"
                                     @input="onUnitPriceChange(item)"
                                     @blur="fmt2(item, 'unit_price')"
                                     class="w-full rounded-md border-borderInput bg-bgInput text-textBase shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">

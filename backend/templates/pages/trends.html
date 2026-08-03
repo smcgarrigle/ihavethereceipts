@@ -24,7 +24,8 @@
             <span class="font-bold text-textBase">Global Filters</span>
         </div>
         <form hx-get="/api/trends/fragment/all-charts" hx-target="#htmx-scripts" hx-trigger="change" class="flex flex-wrap gap-4 items-center">
-            <select name="time_range" class="bg-bgSkeleton text-textBase rounded-lg px-3 py-2 text-sm border-none focus:ring-2 focus:ring-blue-500 font-medium">
+            <select name="time_range" aria-label="Time range"
+                class="bg-bgSkeleton text-textBase rounded-lg px-3 py-2 text-sm border-none focus:ring-2 focus:ring-blue-500 font-medium">
                 <option value="3m">Last 3 Months</option>
                 <option value="6m" selected>Last 6 Months</option>
                 <option value="year">Last 1 Year</option>
