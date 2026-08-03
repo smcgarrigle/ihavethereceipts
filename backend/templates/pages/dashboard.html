@@ -197,7 +197,7 @@
                         <span class="mt-2 text-sm text-textSubtle font-medium">Analyzing trends...</span>
                     </div>
                 </div>
-                <canvas id="categoryTrendsChart"></canvas>
+                <canvas id="categoryTrendsChart" role="img" aria-label="Category spending trends line chart"></canvas>
             </div>
 
             <!-- Quick Insights / Legend Area -->
@@ -340,7 +340,7 @@
                         <span class="text-[10px] font-bold text-textSubtle">Unit Price ($)</span>
                     </div>
                     <div class="flex-grow relative">
-                        <canvas :id="'randomChart-' + i"></canvas>
+                        <canvas :id="'randomChart-' + i" role="img"></canvas>
                     </div>
                 </div>
             </template>
@@ -483,7 +483,7 @@
                         </button>
                     </div>
                     <div class="h-[400px] w-full">
-                        <canvas id="storeHistoryChart"></canvas>
+                        <canvas id="storeHistoryChart" role="img"></canvas>
                     </div>
                 </div>
                 <div class="bg-bgHover px-6 py-4 flex justify-end border-t border-borderDefault">
@@ -575,6 +575,7 @@
         function showStoreHistory(storeId, storeName) {
             // Update Title
             document.getElementById('modal-title').textContent = 'Spending History: ' + storeName;
+            document.getElementById('storeHistoryChart').setAttribute('aria-label', storeName + ' spending history chart');
 
             // Show Modal
             document.getElementById('store-history-modal').classList.remove('hidden');
@@ -757,7 +758,9 @@
                         const titleEl = document.getElementById(`random-title-${chartIdx}`);
                         if (titleEl) titleEl.textContent = chart.category_name;
 
-                        const ctx = document.getElementById(`randomChart-${chartIdx}`).getContext('2d');
+                        const canvasEl = document.getElementById(`randomChart-${chartIdx}`);
+                        canvasEl.setAttribute('aria-label', chart.category_name + ' item price trends line chart');
+                        const ctx = canvasEl.getContext('2d');
 
                         const datasets = chart.datasets.map((ds, dsIdx) => ({
                             ...ds,
