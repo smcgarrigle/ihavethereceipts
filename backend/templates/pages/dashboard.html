@@ -666,11 +666,34 @@
             if (_drilldownOpener) { _drilldownOpener.focus(); _drilldownOpener = null; }
         }
 
-        // Close modals on escape key
+        // Close modals on escape key, and trap Tab focus inside whichever is open
+        function _focusableElements(container) {
+            return Array.from(container.querySelectorAll(
+                'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+            )).filter(el => !el.disabled && el.offsetParent !== null);
+        }
+
         document.addEventListener('keydown', function (event) {
             if (event.key === "Escape") {
                 closeStoreHistory();
                 closeCategoryStoreDrilldown();
+                return;
+            }
+            if (event.key !== "Tab") return;
+            const openModal = ['store-history-modal', 'category-store-modal']
+                .map(id => document.getElementById(id))
+                .find(modal => modal && !modal.classList.contains('hidden'));
+            if (!openModal) return;
+            const focusable = _focusableElements(openModal);
+            if (focusable.length === 0) return;
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
             }
         });
 

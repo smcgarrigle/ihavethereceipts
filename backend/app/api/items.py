@@ -207,7 +207,10 @@ def list_items(category_id: int | None = None, db: Session = Depends(get_db)):
 
                 store_pills += f"""
                 <span class='inline-flex items-center px-2 py-1 text-xs font-medium rounded-full border cursor-pointer hover:shadow-sm transition {pill_color}'
-                      onclick="$dispatch('open-relevant-receipts', {{ids: '{clean_ids}'}})">
+                      role="button" tabindex="0"
+                      @click="$dispatch('open-relevant-receipts', {{ids: '{clean_ids}'}})"
+                      @keydown.enter="$dispatch('open-relevant-receipts', {{ids: '{clean_ids}'}})"
+                      @keydown.space.prevent="$dispatch('open-relevant-receipts', {{ids: '{clean_ids}'}})">
                     {store_name} ${lowest_price:.2f} {f"<span class='ml-1 text-[10px] uppercase opacity-75'>({badge_text})</span>" if badge_text else ""}
                 </span>
                 """

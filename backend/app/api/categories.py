@@ -112,7 +112,7 @@ def list_categories(db: Session = Depends(get_db)):
                 hx-get='/api/items/list?category_id={category.id}'
                 hx-target='#modal-content'
                 hx-swap='innerHTML'
-                onclick='document.getElementById("category-items-modal").classList.remove("hidden")'>
+                onclick='openCategoryItemsModal(this)'>
                 View Items
             </button>
         </div>
@@ -123,12 +123,13 @@ def list_categories(db: Session = Depends(get_db)):
     # Add modal for viewing items
     html += """
         <div id='category-items-modal' class='hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
-            onclick='if(event.target === this) this.classList.add("hidden")'>
+            role='dialog' aria-modal='true' aria-labelledby='category-items-modal-title'
+            onclick='if(event.target === this) closeCategoryItemsModal()'>
             <div class='bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col'>
                 <!-- Header -->
                 <div class='flex justify-between items-center p-6 border-b dark:border-gray-700'>
-                    <h3 class='text-xl font-semibold text-gray-900 dark:text-white'>Category Items</h3>
-                    <button onclick='document.getElementById("category-items-modal").classList.add("hidden")'
+                    <h3 id='category-items-modal-title' class='text-xl font-semibold text-gray-900 dark:text-white'>Category Items</h3>
+                    <button onclick='closeCategoryItemsModal()'
                             aria-label="Close"
                             class='text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl'>
                         ×
