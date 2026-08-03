@@ -259,7 +259,7 @@
                                         <span>Did you mean: <strong class="cursor-pointer hover:underline"
                                                 @click="item.name = item.suggestion.name; item.suggestion = null"
                                                 x-text="item.suggestion.name"></strong>?</span>
-                                        <button @click="item.suggestion = null"
+                                        <button @click="item.suggestion = null" aria-label="Dismiss suggestion"
                                             class="text-textSubtle hover:text-textBase text-sm">✕</button>
                                     </div>
                                 </template>
@@ -392,6 +392,7 @@
                                     placeholder="Description (e.g., Coupon)"
                                     class="flex-1 min-w-0 px-3 py-1 text-sm border border-borderInput rounded-lg bg-bgInput text-textBase" />
                                 <button @click="item.discounts.splice(dIndex, 1); updateBasePrice(item)"
+                                    aria-label="Remove discount"
                                     class="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 flex-shrink-0">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -419,7 +420,7 @@
                                     <input type="text" inputmode="decimal" x-model="fee.amount"
                                         @input="updateBasePrice(item)" placeholder="Amount"
                                         class="w-1/2 sm:w-24 px-3 py-1 text-sm border border-borderInput rounded-lg bg-bgInput text-textBase" />
-                                    <select x-model="fee.type"
+                                    <select x-model="fee.type" aria-label="Fee type"
                                         class="w-1/2 sm:w-28 px-3 py-1 text-sm border border-borderInput rounded-lg bg-bgInput text-textBase">
                                         <option value="crv">CRV</option>
                                         <option value="deposit">Deposit</option>
@@ -431,6 +432,7 @@
                                     <input type="text" x-model="fee.description" placeholder="Description"
                                         class="flex-1 min-w-0 px-3 py-1 text-sm border border-borderInput rounded-lg bg-bgInput text-textBase" />
                                     <button @click="item.fees.splice(fIndex, 1); updateBasePrice(item)"
+                                        aria-label="Remove fee"
                                         class="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 flex-shrink-0">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -446,8 +448,8 @@
                 <!-- Final Price / Original Price Summary -->
                 <div class="mt-4 flex items-end space-x-4">
                     <div>
-                        <label class="block text-xs font-medium text-textMuted mb-1">Original Price ($)</label>
-                        <input type="text" readonly :value="parseFloat(item.base_price || 0).toFixed(2)"
+                        <label :for="'{{ array_name }}-original-price-' + index" class="block text-xs font-medium text-textMuted mb-1">Original Price ($)</label>
+                        <input :id="'{{ array_name }}-original-price-' + index" type="text" readonly :value="parseFloat(item.base_price || 0).toFixed(2)"
                             class="w-32 rounded-md border-borderInput bg-bgSkeleton text-textSubtle shadow-sm text-sm font-semibold cursor-not-allowed">
                     </div>
                     <div class="pb-2 text-xs text-textMuted">

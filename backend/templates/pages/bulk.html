@@ -42,14 +42,14 @@
                  @drop.prevent="handleDrop($event)"
                  :class="{ 'border-blue-500 bg-blue-500/5': dragOver }">
 
-                <input type="file" multiple class="absolute inset-0 opacity-0 cursor-pointer" @change="handleFileSelect($event)">
+                <input type="file" multiple aria-labelledby="bulk-upload-heading" class="absolute inset-0 opacity-0 cursor-pointer" @change="handleFileSelect($event)">
 
                 <div class="w-16 h-16 rounded-2xl bg-bgHover flex items-center justify-center mb-4 group-hover:scale-110 transition shadow-xl">
                     <svg class="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path>
                     </svg>
                 </div>
-                <h3 class="text-lg font-bold text-white mb-2">Drop Receipts Here</h3>
+                <h3 id="bulk-upload-heading" class="text-lg font-bold text-white mb-2">Drop Receipts Here</h3>
                 <p class="text-sm text-textSubtle font-medium px-4">JPG, PNG, or PDF files. Max 10MB each.</p>
 
                 <div class="mt-8">
