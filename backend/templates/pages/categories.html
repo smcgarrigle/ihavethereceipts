@@ -89,46 +89,6 @@
 
 {% block extra_scripts %}
 <script>
-    // Category Items modal: focus management
-    let _categoryItemsOpener = null;
-    function openCategoryItemsModal(triggerEl) {
-        const modal = document.getElementById('category-items-modal');
-        modal.classList.remove('hidden');
-        _categoryItemsOpener = triggerEl || document.activeElement;
-        requestAnimationFrame(() => {
-            const first = modal.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
-            if (first) first.focus();
-        });
-    }
-
-    function closeCategoryItemsModal() {
-        document.getElementById('category-items-modal').classList.add('hidden');
-        if (_categoryItemsOpener) { _categoryItemsOpener.focus(); _categoryItemsOpener = null; }
-    }
-
-    document.addEventListener('keydown', function (event) {
-        const modal = document.getElementById('category-items-modal');
-        if (!modal || modal.classList.contains('hidden')) return;
-        if (event.key === 'Escape') {
-            closeCategoryItemsModal();
-            return;
-        }
-        if (event.key !== 'Tab') return;
-        const focusable = Array.from(modal.querySelectorAll(
-            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        )).filter(el => !el.disabled && el.offsetParent !== null);
-        if (focusable.length === 0) return;
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-        if (event.shiftKey && document.activeElement === first) {
-            event.preventDefault();
-            last.focus();
-        } else if (!event.shiftKey && document.activeElement === last) {
-            event.preventDefault();
-            first.focus();
-        }
-    });
-
     // Function to show price history chart
     async function showPriceHistory(elementOrId, itemName) {
         let itemId = elementOrId;

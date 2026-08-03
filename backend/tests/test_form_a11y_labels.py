@@ -92,9 +92,12 @@ def test_form_fields_have_accessible_names(path):
 @pytest.mark.parametrize("path", _template_files(), ids=lambda p: str(p.relative_to(TEMPLATES_DIR)))
 def test_buttons_have_accessible_names(path):
     soup = BeautifulSoup(path.read_text(), "html.parser")
-    buttons = soup.find_all("button")
+    # role="button" elements count too: the a11y sweep turned several clickable
+    # <div>/<span>s into real controls that way, and they need a name just as much
+    # as a <button> does — checking only the tag name would skip them entirely.
+    buttons = soup.find_all("button") + soup.find_all(attrs={"role": "button"})
     if not buttons:
-        pytest.skip("no <button> elements in this template")
+        pytest.skip("no button-role elements in this template")
 
     unlabeled = [b for b in buttons if not _button_has_accessible_name(b)]
     assert not unlabeled, (

@@ -4,6 +4,7 @@ Split from analytics.py; JSON chart-data endpoints remain there. Both routers
 are mounted under /api/analytics.
 """
 
+import html as html_mod  # aliased: `html` is the HTML-accumulator local in these builders
 import json
 from datetime import datetime
 
@@ -56,6 +57,7 @@ def get_top_categories_html(limit: int = 8, db: Session = Depends(get_db)):
     """
 
     for cat_id, name, total in results:
+        name = html_mod.escape(name)
         html += f"""
             <tr>
                 <td class="px-4 py-2 whitespace-nowrap text-sm font-medium truncate max-w-[150px]" title="{name}">
@@ -263,6 +265,7 @@ def get_top_items_html(limit: int = 8, db: Session = Depends(get_db)):
     """
 
     for item_id, name, total in results:
+        name = html_mod.escape(name)
         html += f"""
             <tr>
                 <td class="px-4 py-2 whitespace-nowrap text-sm font-medium truncate max-w-[150px]" title="{name}">
@@ -318,7 +321,11 @@ def get_store_spend_html(db: Session = Depends(get_db)):
     """
 
     for idx, (store_id, name, total) in enumerate(results):
-        safe_name = name.replace("'", "\\'")
+        # Two escapings from the same raw name, for two different contexts: a JS string
+        # literal nested inside an HTML attribute (json.dumps for JS, then escape for the
+        # attribute the browser decodes first), and plain HTML text/attributes.
+        name_js = html_mod.escape(json.dumps(name))
+        name = html_mod.escape(name)
         hidden_class = 'x-show="showAll || ' + str(idx) + ' < 8"'
         html += f"""
             <tr {hidden_class}
@@ -329,7 +336,7 @@ def get_store_spend_html(db: Session = Depends(get_db)):
                 <td class="px-2 sm:px-4 py-1 sm:py-2 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white truncate max-w-[200px] sm:max-w-[150px] w-full sm:w-auto" title="{name}">{name}</td>
                 <td class="px-2 sm:px-4 py-1 sm:py-2 whitespace-nowrap text-sm text-left sm:text-right text-gray-500 dark:text-gray-400 w-1/2 sm:w-auto">${total:.2f}</td>
                 <td class="px-2 sm:px-4 py-1 sm:py-2 whitespace-nowrap text-sm text-right w-1/2 sm:w-auto">
-                    <button onclick="showStoreHistory({store_id}, '{safe_name}')"
+                    <button onclick="showStoreHistory({store_id}, {name_js})"
                             aria-label="View price history at {name}"
                             class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 ml-auto flex">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg>
@@ -883,7 +890,7 @@ def get_category_store_stack_widget(db: Session = Depends(get_db)):
 
         html += '<div class="flex flex-col space-y-2">'
         html += '<div class="flex justify-between items-end px-1">'
-        html += f'<span class="text-sm font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider">{cat["name"]}</span>'
+        html += f'<span class="text-sm font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider">{html_mod.escape(cat["name"])}</span>'
         html += f'<span class="text-xs font-mono font-bold text-gray-500 dark:text-gray-400">${cat_total:,.2f}</span>'
         html += "</div>"
 
@@ -910,23 +917,25 @@ def get_category_store_stack_widget(db: Session = Depends(get_db)):
                 continue  # Skip negligible segments
 
             color = colors[idx % len(colors)]
-            # Fix: Use json.dumps() for secure JS escaping
-            store_json = json.dumps(store["name"])
-            cat_json = json.dumps(cat["name"])
+            # json.dumps escapes for the JS string literal; html_mod.escape then covers the
+            # HTML attribute the browser decodes before ever evaluating that JS.
+            store_json = html_mod.escape(json.dumps(store["name"]))
+            cat_json = html_mod.escape(json.dumps(cat["name"]))
+            store_name_html = html_mod.escape(store["name"])
 
             html += f"""
             <div class="{color} h-full transition-all hover:scale-[1.02] hover:z-10 hover:shadow-lg cursor-pointer group relative flex items-center justify-center min-w-[2px] overflow-hidden"
                  style="width: {pct}%"
                  role="button" tabindex="0"
-                 aria-label="{store["name"]}: ${store["spent"]:,.2f}"
+                 aria-label="{store_name_html}: ${store["spent"]:,.2f}"
                  onclick='showCategoryStoreDrilldown({cat["id"]}, {store["id"]}, {cat_json}, {store_json})'
                  onkeydown='if(event.key==="Enter"||event.key===" "){{event.preventDefault();showCategoryStoreDrilldown({cat["id"]}, {store["id"]}, {cat_json}, {store_json})}}'
-                 title="{store["name"]}: ${store["spent"]:,.2f}">
+                 title="{store_name_html}: ${store["spent"]:,.2f}">
 
                 <!-- Overlay Store Name -->
                 <span class="absolute inset-0 flex items-center justify-center pointer-events-none px-1">
-                    <span class="text-[9px] font-black text-white/90 truncate drop-shadow-sm transition-opacity duration-300 {"opacity-0" if pct < 10 else "opacity-100"}" title="{store["name"]}">
-                        {store["name"]}
+                    <span class="text-[9px] font-black text-white/90 truncate drop-shadow-sm transition-opacity duration-300 {"opacity-0" if pct < 10 else "opacity-100"}" title="{store_name_html}">
+                        {store_name_html}
                     </span>
                 </span>
 
