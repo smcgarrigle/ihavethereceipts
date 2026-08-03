@@ -196,11 +196,12 @@
         </div>
 
         <!-- Add Category Modal -->
-        <div x-show="showAddModal" x-cloak
+        <div x-show="showAddModal" x-trap="showAddModal" x-cloak
+            role="dialog" aria-modal="true" aria-labelledby="add-category-modal-title"
             class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
             @click.self="showAddModal = false">
             <div class="bg-bgCard rounded-lg p-6 max-w-md w-full mx-4">
-                <h3 class="text-lg font-semibold text-textBase mb-4">Add New Category</h3>
+                <h3 id="add-category-modal-title" class="text-lg font-semibold text-textBase mb-4">Add New Category</h3>
                 <form @submit.prevent="
                     fetch('/api/categories/create', {
                         method: 'POST',
@@ -474,7 +475,7 @@
 
         <!-- Backdrop -->
         <div class="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
-            onclick="document.getElementById('relevantReceiptsModal').classList.add('hidden')"></div>
+            onclick="closeRelevantReceiptsModal()"></div>
 
         <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
             <div
@@ -483,7 +484,7 @@
                     class="bg-bgCard px-6 py-4 flex justify-between items-center border-b border-borderDefault">
                     <h3 class="text-lg font-bold text-textBase" id="relevant-modal-title">Relevant
                         Receipts</h3>
-                    <button onclick="document.getElementById('relevantReceiptsModal').classList.add('hidden')"
+                    <button onclick="closeRelevantReceiptsModal()" aria-label="Close"
                         class="text-textSubtle hover:text-textMuted text-2xl px-2">✕</button>
                 </div>
                 <div id="relevant-receipts-list"
@@ -503,7 +504,7 @@
                 <div
                     class="bg-bgSkeleton/80 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6 border-t border-borderDefault">
                     <button type="button"
-                        onclick="document.getElementById('relevantReceiptsModal').classList.add('hidden')"
+                        onclick="closeRelevantReceiptsModal()"
                         class="inline-flex w-full justify-center rounded-lg bg-bgInput px-4 py-2 text-sm font-semibold text-textBase shadow-sm ring-1 ring-inset ring-borderInput hover:bg-bgHover sm:w-auto transition-all">
                         Close
                     </button>
@@ -541,6 +542,7 @@
     }
 
     // Global function for relevant receipts modal
+    let _relevantReceiptsOpener = null;
     window.openRelevantReceipts = function (ids) {
         if (!ids) return;
         const modal = document.getElementById('relevantReceiptsModal');
@@ -548,6 +550,11 @@
 
         // Show modal
         modal.classList.remove('hidden');
+        _relevantReceiptsOpener = document.activeElement;
+        requestAnimationFrame(() => {
+            const first = modal.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+            if (first) first.focus();
+        });
 
         // Fetch receipts via HTMX
         htmx.ajax('GET', `/api/receipts/list?ids=${ids}`, {
@@ -555,6 +562,34 @@
             swap: 'innerHTML'
         });
     }
+
+    window.closeRelevantReceiptsModal = function () {
+        document.getElementById('relevantReceiptsModal').classList.add('hidden');
+        if (_relevantReceiptsOpener) { _relevantReceiptsOpener.focus(); _relevantReceiptsOpener = null; }
+    }
+
+    document.addEventListener('keydown', function (event) {
+        const modal = document.getElementById('relevantReceiptsModal');
+        if (!modal || modal.classList.contains('hidden')) return;
+        if (event.key === 'Escape') {
+            closeRelevantReceiptsModal();
+            return;
+        }
+        if (event.key !== 'Tab') return;
+        const focusable = Array.from(modal.querySelectorAll(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        )).filter(el => !el.disabled && el.offsetParent !== null);
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+        }
+    });
 
     // Function to show price history chart
     async function showPriceHistory(elementOrId, itemName) {
@@ -577,11 +612,14 @@
         const modal = document.createElement('div');
         modal.id = 'priceHistoryModal';
         modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        modal.setAttribute('aria-labelledby', 'price-history-modal-title');
         modal.innerHTML = `
         <div class="bg-bgCard rounded-lg p-6 max-w-2xl w-full mx-4 shadow-2xl overflow-hidden">
             <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-semibold text-textBase">${itemName} - Price History</h3>
-                <button onclick="this.closest('.fixed').remove()" class="text-textMuted hover:text-textBase text-2xl px-2">✕</button>
+                <h3 id="price-history-modal-title" class="text-lg font-semibold text-textBase">${itemName} - Price History</h3>
+                <button onclick="closePriceHistoryModal(this)" aria-label="Close" class="text-textMuted hover:text-textBase text-2xl px-2">✕</button>
             </div>
             <div class="mb-4">
                  <p class="text-xs text-textMuted">Click on a stack/purchase to view the receipt.</p>
@@ -593,6 +631,33 @@
     `;
 
         document.body.appendChild(modal);
+
+        const priceHistoryOpener = document.activeElement;
+        window.closePriceHistoryModal = function (fromEl) {
+            const m = fromEl ? fromEl.closest('.fixed') : modal;
+            if (m) m.remove();
+            if (priceHistoryOpener) priceHistoryOpener.focus();
+        };
+        requestAnimationFrame(() => {
+            const first = modal.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+            if (first) first.focus();
+        });
+        modal.addEventListener('keydown', (e) => {
+            if (e.key !== 'Tab') return;
+            const focusable = Array.from(modal.querySelectorAll(
+                'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+            )).filter(el => !el.disabled && el.offsetParent !== null);
+            if (focusable.length === 0) return;
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (e.shiftKey && document.activeElement === first) {
+                e.preventDefault();
+                last.focus();
+            } else if (!e.shiftKey && document.activeElement === last) {
+                e.preventDefault();
+                first.focus();
+            }
+        });
 
         // Process data for Line Chart
         // 1. Get all unique dates, sorted chronologically
@@ -693,8 +758,8 @@
         });
 
         // Close logic
-        modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
-        const escapeHandler = (e) => { if (e.key === 'Escape') { modal.remove(); document.removeEventListener('keydown', escapeHandler); } };
+        modal.addEventListener('click', (e) => { if (e.target === modal) closePriceHistoryModal(); });
+        const escapeHandler = (e) => { if (e.key === 'Escape') { closePriceHistoryModal(); document.removeEventListener('keydown', escapeHandler); } };
         document.addEventListener('keydown', escapeHandler);
     }
 </script>
