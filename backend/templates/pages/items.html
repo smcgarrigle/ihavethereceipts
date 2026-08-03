@@ -5,6 +5,15 @@
 {% block content %}
 <div class="space-y-6" x-data="{
         tab: '{{ initial_tab }}',
+        tabIds: ['all', 'duplicates', 'search', 'dismissed', 'categories'],
+        moveTab(dir) {
+            const i = this.tabIds.indexOf(this.tab);
+            const n = dir === 'home' ? 0
+                    : dir === 'end' ? this.tabIds.length - 1
+                    : (i + dir + this.tabIds.length) % this.tabIds.length;
+            this.tab = this.tabIds[n];
+            this.$nextTick(() => document.getElementById('tab-' + this.tab)?.focus());
+        },
         showDismissModal: false,
         pendingDismiss: null,
         confirmDismiss() {
@@ -39,7 +48,11 @@
 
     <!-- Tabs -->
     <div class="border-b border-borderDefault">
-        <nav role="tablist" aria-label="Items sections" class="-mb-px flex space-x-8">
+        <nav role="tablist" aria-label="Items sections" class="-mb-px flex space-x-8"
+            @keydown.arrow-right.prevent="moveTab(1)"
+            @keydown.arrow-left.prevent="moveTab(-1)"
+            @keydown.home.prevent="moveTab('home')"
+            @keydown.end.prevent="moveTab('end')">
             <button role="tab" id="tab-all" aria-controls="panel-all" :aria-selected="tab === 'all'" :tabindex="tab === 'all' ? 0 : -1"
                 @click="tab = 'all'" class="py-2 px-1 border-b-2 font-medium text-sm"
                 :class="tab === 'all' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-textMuted hover:text-textBase hover:border-gray-300 dark:hover:border-gray-600'">

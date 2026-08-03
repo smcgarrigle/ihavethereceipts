@@ -203,8 +203,23 @@
     </div>
 
     <!-- Tab Navigation (Alpine.js) -->
-    <div x-data="{ tab: 'analytics' }">
-        <div role="tablist" aria-label="Settings sections" class="flex gap-1 p-1 rounded-xl bg-bgMain border border-borderDefault">
+    <div x-data="{
+            tab: 'analytics',
+            tabIds: ['analytics', 'predictions', 'ocr_skip', 'ocr_junk'],
+            moveTab(dir) {
+                const i = this.tabIds.indexOf(this.tab);
+                const n = dir === 'home' ? 0
+                        : dir === 'end' ? this.tabIds.length - 1
+                        : (i + dir + this.tabIds.length) % this.tabIds.length;
+                this.tab = this.tabIds[n];
+                this.$nextTick(() => document.getElementById('tab-' + this.tab)?.focus());
+            }
+         }">
+        <div role="tablist" aria-label="Settings sections" class="flex gap-1 p-1 rounded-xl bg-bgMain border border-borderDefault"
+            @keydown.arrow-right.prevent="moveTab(1)"
+            @keydown.arrow-left.prevent="moveTab(-1)"
+            @keydown.home.prevent="moveTab('home')"
+            @keydown.end.prevent="moveTab('end')">
             {% for t, label, icon in [('analytics', 'Analytics', '📊'), ('predictions', 'Predictions', '🔮'), ('ocr_skip', 'OCR Skip Lines', '🚫'), ('ocr_junk', 'OCR Junk Strips', '✂️')] %}
             <button role="tab"
                     id="tab-{{ t }}"
