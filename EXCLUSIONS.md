@@ -17,17 +17,16 @@ This document defines the various layers of filtering, ignoring, and excluding d
 *   **View Excluded From**: **All views** (Receipts, Items, Dashboard). These strings are removed before the data is saved to the database.
 
 ### Skip Keywords (Metadata)
-The following lines are ignored entirely during parsing:
-- `Shipping`, `Estimated tax`, `Grand Total`, `Order Summary`
-- `Order placed`, `Order Date`, `Order #`
+The following lines are ignored entirely during parsing. These are the **fallback defaults** — the live list is loaded from `data/ocr_filters.json` (editable without restarting the app):
+- `Purchased at`, `Order Summary`, `Order Details`
+- `Item(s) Subtotal`, `Shipping`, `Total before tax`
+- `Estimated tax`, `Grand Total`, `Order placed`, `Order #`
 - `PAGE`, `PICKUP AT`, `Payment method`
 
 ### Junk Filters (Marketing Strings)
-The following strings are stripped from item names (primarily for Amazon/iHerb):
-- `, with Immune Support`
+The following strings are stripped from item names. These are the **fallback defaults** — the live list is in `data/ocr_filters.json`:
 - `, Non-GMO`, `, Gluten-Free`
-- `, 7g Protein`, `, 27 Vitamins & Minerals for Kids`
-- `, Award Winning`, `, Made with Real Fruit`
+- `, with Immune Support`, `, Award Winning`
 
 ## 3. Analytics & Dashboard Exclusions
 
@@ -45,4 +44,4 @@ The following strings are stripped from item names (primarily for Amazon/iHerb):
 > To hide a specific item from your spending totals, add its name (or a substring of it) to Settings → Analytics Exclusions — e.g. adding `crv` will hide all CRV items.
 
 ---
-*Last Updated: July 21, 2026*
+*Last Updated: August 3, 2026*

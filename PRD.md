@@ -1,18 +1,17 @@
 # Product Requirements Document (PRD) - Grocery Price Tracker
-For AI agent behavior and coding style, see [GEMINI.md](file:///home/mcgar/projects/grocery-tracker/GEMINI.md).
+For AI agent behavior and coding style, see [GEMINI.md](/grocery-tracker/GEMINI.md).
 
 ## 1. Problem Statement
 Grocery prices are volatile and confusing. Consumers struggle to:
 - Track how much they are spending on specific categories (e.g., Produce vs. Snacks).
 - Remember "good" prices for items they buy regularly.
 - Compare prices across different stores (e.g., Costco vs. Trader Joe's).
-- Maintain a digital history of their paper receipts without manual entry.
+- Maintain a digital history of their paper receipts with minimal manual entry.
 
 ## 2. Product Goals
 1.  **Zero-Friction Entry**: Make receipt capture as effortless as possible via AI OCR.
 2.  **Data Precision**: Ensure extracted data is accurate, normalized, and granular (unit prices, discounts).
-3.  **Actionable Intelligence**: Provide insights that help users save money (e.g., "Buy this at Costco, not Safeway").
-4.  **Mobile First**: The primary use case is on a phone, in a kitchen, or at the store.
+3.  **Actionable Intelligence**: Provide insights that help users save money
 
 ## 3. User Stories
 
@@ -60,16 +59,13 @@ Grocery prices are volatile and confusing. Consumers struggle to:
 - **Store Comparison**: "Best Price" indicators for items available at multiple stores.
 
 ## 5. Non-Functional Requirements
-- **Performance**: Receipt upload to review screen in < 5 seconds.
+- **Performance**: Receipt upload to review screen in < 10 seconds.
 - **Responsiveness**: Fully functional on mobile web (iOS/Android) via standard browser.
 - **Privacy**: All receipt images and data stored locally or in self-hosted infrastructure.
 - **Reliability**: Graceful handling of API failures (e.g., Gemini quota exceeded).
 - **Usability**: Dark mode support for low-light usage.
 
 ## 6. Future Scope (Post-MVP)
-- Multi-user Family Accounts
 - Barcode Scanning for instant product lookup
-- Advanced Spreadsheet Grid for price history (thermal-coded timeline)
 - USDA FDC full enrichment sweep for all 1,300+ items
-- Retailer price overlay charts (compare store volatility on a single item)
 - Volatility Alerts for items with >15% price shift in 30 days

@@ -1,175 +1,140 @@
 # Grocery Price Tracker - Strategic Roadmap
 
-This document outlines the development trajectory of the Grocery Price Tracker, from core infrastructure to advanced AI-driven analytics and visualization.
-
 ---
 
-## 🟢 Current Status: Phase 1 Strategic Vision Complete
-All three Strategic Vision phases have been delivered as of May 2026. The application is now in active use with a full prediction engine, multi-theme UI, and store-optimized shopping lists.
+## 🟡 Near-Term Backlog
 
-### [Phase 14] Advanced Entry & Visuals ✅ (April 2026)
-- **Bulk Pricing UI (⚖️/🏷️)**: Hybrid toggle for Per-Item vs Per-Weight pricing in the review screen.
-- **SSE Radar Pulse**: Live scanning feedback on the thermal view.
-- **Export & Entry Engine**: CSV/Excel Export Engine and Quick Produce Entry.
+### 1. Nutrition Catch-Up
+Automated background enrichment that detects FDC coverage gaps and surfaces candidates for user review — turning the manual `scripts/backfill_nutrients.py` workflow into a self-service feature.
 
-### [Phase 16] Strategic Vision — Phase 1 ✅ (May 2026)
-- **Multi-Theme Engine**: CSS variable-based theming with Alpine.js. Supports Light, Dark, Forest, and Sunset themes across all pages (329 class replacements across 13 templates).
-- **Shopping List Optimizer**: Store-grouped urgent restock view at `/restock` — surfaces the best store per item based on historical price data.
-- **Reorder Prediction Engine**: Purchase cadence analysis with predicted exhaustion dates, urgency tiers, and a TTL-cached `/api/predictions/` endpoint suite.
-- **Data Normalization**: Multipack price correction (Non-Alcoholic Beer 6/12-packs), item name cleanup scripts, and Amazon Fresh boilerplate removal.
-- **PDF Receipt Viewer Fix**: `X-Frame-Options` updated to `SAMEORIGIN` to enable in-app PDF embedding.
-
----
-
-## 🟢 Recently Completed (Q3 2026)
-- [x] **Accessibility Sweep — Labeling, ARIA, Focus Management (August 2026)**: Closes out the July accessibility backlog. `tests/test_a11y_axe.py` wires axe-core + Playwright into an opt-in smoke suite (`uv run pytest -m e2e`) over 9 pages/flows — color-contrast excluded since it's guarded separately (see below), but every other severe (critical/serious) rule is enforced. Every chart (`<canvas>`) across the app now carries `role="img"` + a descriptive `aria-label` (dashboard, categories, items, item insights, trends, the demo-bi dashboard), guarded by `test_chart_a11y_labels.py`. Every form field and icon-only button has an accessible name, guarded by `test_form_a11y_labels.py`. The Items page's 5-tab nav gets the full `settings.html` tablist pattern (`role=tablist/tab/tabpanel`, `aria-selected`, roving tabindex); accordions and disclosure buttons across items/receipt_review/item_insights/dashboard get `aria-expanded`/`aria-controls`; toggle-mode buttons (trends' nutrient/percent switches) get `aria-pressed`. Every modal now traps Tab and returns focus to its trigger on close — the ones using the vendored Alpine Focus plugin (`x-trap`) were already correct, but `item_insights.html`'s search modal and several vanilla-JS modals (dashboard's store-history/category-drilldown, items.html's relevant-receipts/price-history/add-category, categories.html's category-items/price-history) had no focus management at all. The app's 3 `<img>` elements all have alt text (`test_img_alt_text.py`). SC 1.4.1 (Use of Color) audit found the category/store spend-stack widget was the one real color-only signal (narrow segments hid their store-name label, color was the only differentiator) — fixed with `aria-label` + keyboard support; everything else checked (price deltas, source badges, chart legends) already had a text-based secondary cue. Along the way, fixed two unrelated pre-existing bugs the audit surfaced: a store-history pill used `onclick="$dispatch(...)"` (a no-op — `$dispatch` only works inside Alpine's `@click`), and `/items?category=` was previously untestable at scale (see "Known gaps" below). *Still deferred: chart-fill/badge pixel contrast (SC 1.4.3) — see below.*
-- [x] **WCAG AA Contrast Compliance (July 2026)**: All four themes (Light/Dark/Forest/Sunset) plus the marketing site now satisfy WCAG 2.1 SC 1.4.3 *Contrast (Minimum)* — every text token ≥ 4.5:1 on its surfaces — and SC 1.4.11 *Non-text Contrast* for form input borders (≥ 3:1, Option A: card borders remain decorative and rely on shadows). Changes: `--text-subtle` raised in light (2.4→4.6:1) and dark (3.0→4.8:1); new `--text-code` token for inline code/debug badges in dark (4.1→6.2:1); `--border-input` raised in all themes (3.1–3.3:1); button hover states no longer dip below AA (`hover:bg-blue-500` → `700`). Guarded by `scripts/check_contrast.py`, which parses the tokens from CSS and fails on any violation. *Deferred: chart-fill label contrast — now quantified by the axe suite above (27–374 color-contrast nodes per page on dashboard/trends/settings/restock/receipts) but not yet fixed.*
-- [x] **OCR Feedback Loop (Self-Improving Extraction)**: Human corrections from the review sandbox are persisted (`ocr_corrections` table) and injected into future OCR prompts as few-shot examples. The OCR cache is keyed on image + prompt, so learned corrections invalidate stale results on reprocess.
-- [x] **Gemini Structured Outputs**: The API path now passes a response schema (`_ReceiptSchema`), contractually guaranteeing valid JSON; `json-repair` remains as the local-model fallback. Fails soft to prompt-only JSON if a model rejects the schema.
-- [x] **OCR Eval Harness**: `scripts/ocr_eval.py` scores extraction accuracy against human-approved receipts — `--stored` for a zero-cost baseline, `--live` to measure prompt/model changes. Baseline: 91% item recall, 100% precision, 47% price accuracy (the current improvement target).
-- [x] **Nutrition Pipeline Phase 1**: Full-payload FDC enrichment, package-size fallback for discrete items, working manual overrides, and honest coverage badges on all nutrition charts.
-- [x] **Structural Refactor**: main.py reduced to pure app wiring (~175 lines); page routes, analytics fragments, and nutrition trends extracted into per-domain routers. Alembic is now the single schema authority (migrations run at startup).
-- [x] **Precompiled Tailwind + Self-Contained CSP**: browser Play runtime replaced by a static build (`scripts/build_css.sh`); Inter vendored; zero external requests.
-- [x] **Category Taxonomy Collapse**: 92 fragment categories (338 items) merged into a strict 13-category canonical set; the interceptor in `category_mapper` prevents re-fragmentation.
-- [x] **Local Folder Watch**: drop PDFs/images into `data/inbox` and they auto-ingest through the normal OCR + review pipeline (`FOLDER_WATCH=0` to disable).
-
-## 🟢 Recently Completed (Q2 2026)
-- [x] **Open Produce Mode**: A dedicated, ultra-fast manual entry system for loose/bulk items.
-- [x] **Export Data Engine**: One-click export of entire purchase history to CSV/Excel.
-- [x] **AI-Powered Size Extraction**: Fully automated unit pricing from OCR item names.
-- [x] **Shopping List Optimizer**: Store-grouped urgent restock view.
-- [x] **Multi-Theme Engine**: CSS variable refactor supporting Light, Dark, Forest, and Sunset themes.
-- [x] **Purchase Cadence Engine**: Computes average purchase intervals and exhaustion dates.
-- [x] **Agent-Friendly API Endpoints**: `/api/predictions/` endpoints ready for AI agents.
-
----
-
-## 🟡 Near-Term Backlog & Strategic Roadmap
-
-### 1. Nutrition Catch-Up (Proposed — July 2026)
-
-Automated background nutrition enrichment that detects coverage gaps, searches USDA FDC for uncovered items, and surfaces results for user review — turning the manual `scripts/backfill_nutrients.py` workflow into a self-service feature.
-
-**Current state:** 66.1% of items (69.3% of spend) have nutrient data. ~680 enrichable items remain uncovered (excluding non-food categories like Fees & Taxes).
-
-- [ ] **`NutritionEnricher` background service**: Singleton daemon thread (same pattern as `BulkProcessor`). Searches FDC for uncovered items prioritized by spend, stores candidates in a `nutrition_suggestions` table for review.
+- [ ] **`NutritionEnricher` daemon**: Singleton background thread (same pattern as `BulkProcessor`). Searches FDC for uncovered items prioritized by spend; stores candidates in `nutrition_suggestions` for review.
 - [ ] **Trigger logic**: Auto-fires after receipt saves when enrichable coverage drops below a configurable threshold (default 70%). Manual "Run Catch-Up" button in Settings.
 - [ ] **Review page** (`/settings/nutrition-review`): Items sorted by spend impact with approve/reject/search actions. Batch approve for speed.
 - [ ] **Persistent notification banner**: Shows pending suggestion count across all pages until reviewed or dismissed.
-- [ ] **Settings integration**: Coverage indicator card, threshold slider, enable/disable toggle.
-- [ ] **Non-food exclusion**: Exclude Fees & Taxes / Household from enrichable coverage denominator.
+- [ ] **Settings card**: Coverage indicator, threshold slider, enable/disable toggle. Exclude Fees & Taxes / Household from the enrichable denominator.
 
-Full plan: [`scratch/PLAN_NUTRITION_CATCHUP.md`](file:///home/mcgar/projects/grocery-tracker/scratch/PLAN_NUTRITION_CATCHUP.md)
+Full plan: [`scratch/PLAN_NUTRITION_CATCHUP.md`](/grocery-tracker/scratch/PLAN_NUTRITION_CATCHUP.md)
 
-### 2. Taxonomy Cleanup & Category Merging ✅ (July 2026)
-- [x] **Taxonomy Mapping Engine**: Strict 13-category canonical set defined.
-- [x] **The Interceptor**: `category_mapper` funnels chaotic external categories (USDA/OpenFoodFacts) into the master taxonomy and prevents re-fragmentation.
-- [x] **Database Migration**: Fragmented categories collapsed into the clean taxonomy (see "Category Taxonomy Collapse" above).
+### 2. Price History & Volatility
+- [ ] **Retailer Overlays**: Overlay multiple stores on a single item's price history chart.
+- [ ] **Volatility Alerts**: UI notifications for items with >15% price shifts in the last 30 days.
+- [ ] **Advanced Spreadsheet Grid**: High-density thermal-coded grid for price history analysis.
 
-### 3. Price History & Volatility
-- [ ] **Retailer Overlays**: Overlay multiple stores on a single item's price history chart to compare pricing.
-- [ ] **Volatility Alerts**: Automated UI notifications flagging items with >15% price shifts in the last 30 days.
-- [ ] **Advanced Spreadsheet Grid**: High-density, thermal-coded grid for price history analysis.
+### 3. AI & Data Enrichment
+- [ ] **Barcode Scanning**: Mobile camera integration pulling product metadata from OpenFoodFacts.
 
-### 4. AI & Data Enrichment
-- [x] **Dynamic AI Few-Shot Learning** ✅ (July 2026): Every review-sandbox save is diffed against the AI's original extraction; corrections are stored in `ocr_corrections` and injected into the OCR prompt (store-scoped on reprocess, global on first pass). See "OCR Feedback Loop" below.
-- [x] **Full USDA FDC Sweep** ✅ (July 2026): Checkpointed backfill (`scripts/backfill_nutrients.py`) matched 498 items via FDC + 24 via OpenFoodFacts — nutrient coverage rose from 8% to 49% of items (45.9% of spend).
-- [x] **Store-Scoped Matching Context** ✅ (July 2026): `item_matcher.py` now ranks items previously purchased at the current receipt's store ahead of near-tied text matches (raw-score gap ≤ 10), preventing cross-contamination of store brands (e.g., Whole Foods "365" vs Safeway "O Organics"). Ranking-only by design — store history never lowers the match threshold and never alters reported similarity scores, so it cannot promote a weak match into an auto-merge. Store purchase history is fetched once per receipt (`get_store_item_ids`). See `PLAN_STORE_CONTEXT.md`.
-- [ ] **Barcode Scanning Support**: Mobile camera integration to pull global product metadata from OpenFoodFacts.
-
-### 5. Dynamic Trends & Dashboards
-- [ ] **Interactive Chart Controllers**: Dropdown menus to dynamically filter charts by date ranges, stores, or categories. Must use `hx-push-url="true"` to ensure URL query parameter state remains bookmarkable and shareable.
-- [ ] **Low-Data "Bootstrap" Charts**: Visualizations designed to deliver insights with only 5–10 receipts.
+### 4. Dynamic Trends & Dashboards
+- [ ] **Interactive Chart Controllers**: Dropdown filters by date range, store, or category. Use `hx-push-url="true"` to keep state bookmarkable.
+- [ ] **Low-Data "Bootstrap" Charts**: Visualizations useful with only 5–10 receipts.
 - [ ] **Shopping Habits Gallery**: Recurring trend charts with improved signal/noise filtering.
 
-### 6. Automation & Scalability
-- [x] **Local Folder-Watch Ingestion** ✅ (July 2026): Drop PDFs/images into `data/inbox` and they auto-ingest through the normal OCR + review pipeline (`FOLDER_WATCH=0` to disable).
+### 5. Automation & Scalability
 - [ ] **Household Support**: Individual accounts with shared or separate grocery databases.
-- [ ] **Cross-Device Sync (Offline-First)**: Robust synchronization across mobile and desktop clients. Architect as a Progressive Web App (PWA) using IndexedDB to allow scanning and viewing in low-service grocery stores, syncing back to the server later.
+- [ ] **Cross-Device Sync (Offline-First)**: PWA with IndexedDB for offline scanning; syncs back to server on reconnect.
 
-### 7. UI/UX Refinements (Post-Launch)
-- [ ] **Reorderable Item Columns (Broker-Style)**: Table view for the Items page with drag-to-reorder column headers (Category, qty, total spent, weight/vol, unit, $/unit), persisted in localStorage — plus show/hide toggles and click-to-sort. Prerequisite: extract the `list_items` f-string HTML into a Jinja fragment. Full scope: `scratch/TODO_items_column_reorder.md` (est. 1.5–2 days).
-- [ ] **Mobile Slide-out Drawers**: Replace heavy full-page navigations for Item Insights on mobile with HTMX-powered slide-up drawers to preserve the user's context on the main Dashboard.
-- [ ] **PDF Viewer 'Esc' Key Fix**: The native PDF `<embed>` swallows the 'Esc' key when focused, preventing the receipt review modal from closing.
-  - *Option A (Lightweight)*: Auto-focus the modal's "Close" button upon opening so 'Esc' works immediately until the user clicks into the PDF.
-  - *Option B (Heavy)*: Migrate from native `<embed>` to `PDF.js` to render PDFs as flat canvases that do not steal keyboard focus.
-- [ ] **Items Page Pagination** (found during the August 2026 a11y sweep): `/items` renders every item as a full card with no pagination — on the live dataset (1,493 items) that's ~80K DOM nodes, which is why the axe a11y test suite scans a single small category instead of the full list. Independent of accessibility, this is a real cost for every visitor (initial render, Alpine reactivity, and the "Find Duplicates" tab's O(n²) fuzzy match all run against the unfiltered set on every page load). Same prerequisite as the column-reorder item above: extract `list_items` into a paginated Jinja fragment.
+### 6. UI/UX Refinements
+- [ ] **Items Page Pagination**: `/items` renders all 1,493 items with no pagination (~80K DOM nodes). Prerequisite: extract `list_items` into a paginated Jinja fragment. Also unblocks column-reorder and the a11y axe suite.
+- [ ] **Reorderable Item Columns**: Drag-to-reorder column headers (Category, qty, total spent, weight/vol, unit, $/unit) persisted in localStorage. Requires paginated fragment above. Full scope: `scratch/TODO_items_column_reorder.md`.
+- [ ] **Mobile Slide-out Drawers**: HTMX-powered slide-up drawers for Item Insights on mobile, replacing full-page navigations.
+- [ ] **PDF Viewer 'Esc' Key Fix**: Native `<embed>` swallows the 'Esc' key when focused, preventing modal close. Option A (lightweight): auto-focus the "Close" button on open. Option B (heavy): migrate to PDF.js.
 
-### 8. Custom Category Lenses (Proposed — July 2026)
+### 7. Custom Category Lenses
+Let users create personally meaningful categories (e.g. "Protein-Maxxing") that cut across canonical lines. The data model and charts already support it — the work is UX only.
 
-Let users create personally meaningful categories — e.g. **"Protein-Maxxing"** — and route items into them across canonical lines (chicken out of Meat, eggs out of Dairy, Greek yogurt out of Dairy), turning the category system from a fixed taxonomy into a motivational lens that can dominate charts and trends.
-
-**Already true today** (verified July 2026): all analytics group by `Category.name` generically, so a user-created category flows into every chart with zero code changes; user-created categories pass the `category_mapper` interceptor untouched (only *unknown* machine-sourced names are canonicalized to the 13-set); item-level FDC nutrition aggregates cleanly under any category; and matched repurchases inherit their item's category, so a routed item *stays* routed.
-
-**Pros**
-- **Motivation & engagement**: a self-named goal category ("Protein-Maxxing") is a reason to open the app; watching it dominate the spending chart is the reward.
-- **Expresses what the canonical taxonomy can't**: goal-oriented buckets that cut across Meat/Dairy/Frozen (chicken + eggs + yogurt + protein bars).
-- **Near-zero build cost**: the data model and charts already support it; the work is UX (bulk move, create-from-selection), not schema.
-- **Nutrition synergy**: protein-per-dollar and similar views come free once the lens exists, since nutrition lives on items.
-- **AI synergy (later)**: the Phase 3 correction-capture loop could learn the user's personal taxonomy so new chicken SKUs land in "Protein-Maxxing" automatically.
-
-**Cons / risks**
-- **Exclusive membership rewrites history**: an item has one `category_id`, and re-categorizing re-buckets **all of its past purchases**, not just future ones — moving eggs to "Protein-Maxxing" retroactively bends the Dairy trend line. (Deliberate design call: stay with exclusive categories rather than a many-to-many tag system, which would double charting complexity for a lens toggle few users need. Revisit only if users demand items counted in two places at once.)
-- **Hard-coded canonical surfaces go blind**: `/best-value/{category_type}` keys off a fixed dict of canonical names (`pages.py`), so moved items silently drop out of best-value views. Any future canonical-keyed feature inherits this hazard — audit before shipping.
-- **Re-fragmentation pressure**: the July 2026 taxonomy collapse (92 → 13) exists because category sprawl destroyed the charts once. User-created lenses reopen that door intentionally; the interceptor still guards machine-sourced names, but nothing stops a user creating twelve near-duplicate lenses.
-- **Maintenance drift**: AI categorization only knows the canonical 13, so *new* item variants land in canonical categories and must be swept into the lens manually (until the feedback-loop synergy above lands).
-- **Order-of-operations trap**: a custom name must be created (Add Category) *before* it is typed at review time, or `map_category_name` flattens it to "Other". Needs a UI affordance so users never hit this silently.
-
-**Soft-warning UX** — re-categorization is lossless and fully reversible (a `category_id` repoint), so warn, don't block. Proposed copy for the bulk-move confirmation:
-> *"Moving 12 items to 'Protein-Maxxing' also moves their entire purchase history — your Meat and Dairy charts will change retroactively. Nothing is deleted: moving items back restores the old charts exactly."*
-
-And a one-time nudge on custom-category creation:
-> *"Custom categories are exclusive — an item lives in one category at a time. Items you move here leave their current category in all charts and trends."*
-
-**Prerequisites / build order**: (1) retire or redirect the orphaned `/categories` page (nav redesign left it unlinked; it duplicates the Items-page Categories tab), (2) per-category item list with checkboxes + bulk "move to…" + "create category from selection" (~half day), (3) warning copy above, (4) *later*: feedback-loop taxonomy learning, and grow the Categories surface into a motivational per-lens dashboard.
+- [ ] **Per-category item list with checkboxes** + bulk "move to…" + "create category from selection".
+- [ ] **Re-categorization warning**: Warn (don't block) that moving items rewrites all historical chart data for those items.
+- [ ] **Prerequisite**: Retire or redirect the orphaned `/categories` page left unlinked by the nav redesign.
+- [ ] **Later**: Feedback-loop taxonomy learning so new item variants land in user lenses automatically.
 
 ---
 
 ## 🏛️ Completed Milestones Archive
 
 <details>
-<summary><b>Phase 15: Data Quality Cleanup (May 2026)</b></summary>
+<summary><b>Accessibility & WCAG (Jul 2026)</b></summary>
 
-- **Batch Import Audit**: Deep audit of 158 PDF-imported receipts (Amazon/iHerb).
-- **1,318 items patched**: Size extraction (weight/unit/is_bulk) and unit_price recalculated from final_price.
-- **127 dates recovered**: From PDF filename parsing and pdfplumber text extraction.
-- **86 junk items removed**: Address strings and boilerplate scraped by PDF parser.
-- **Store normalization**: `Iherb`/`IHerb` → `iHerb`, `Amazon` → `Amazon.com`.
-- **33 receipts deleted**: 31 missing-PDF sources + 2 empty iHerb receipts. DB: 331 → 298.
-- **5 reusable maintenance scripts** added to `backend/scripts/`.
-- Full audit log: `DATA_CLEANUP_2026_05_02.md`.
+- **Accessibility Sweep**: axe-core + Playwright smoke suite over 9 pages (`uv run pytest -m e2e`). All `<canvas>` charts carry `role="img"` + `aria-label`. All form fields and icon-only buttons have accessible names. Items-page tabs get full `role=tablist/tab/tabpanel` + roving tabindex. Accordions and disclosure buttons get `aria-expanded`/`aria-controls`. Toggle-mode buttons get `aria-pressed`. Every modal traps Tab and returns focus to its trigger. All `<img>` elements have alt text. Color-only signal in the category spend-stack widget fixed with `aria-label` + keyboard support. Fixed two pre-existing bugs surfaced by the audit.
+- **WCAG AA Contrast**: All four themes satisfy SC 1.4.3 (≥4.5:1 text) and SC 1.4.11 (≥3:1 input borders). New `--text-subtle`, `--text-code`, `--border-input` tokens. Guarded by `scripts/check_contrast.py`. *(Chart-fill label contrast deferred.)*
+
 </details>
 
 <details>
-<summary><b>Phases 11-13: Performance & Local AI (Feb-Apr 2026)</b></summary>
+<summary><b>OCR & AI Quality (Jul 2026)</b></summary>
+
+- **OCR Feedback Loop**: Human review corrections persisted to `ocr_corrections` table and injected as few-shot examples into future OCR prompts. Cache keyed on image + prompt.
+- **Gemini Structured Outputs**: API path passes `_ReceiptSchema`, guaranteeing valid JSON. `json-repair` retained as local-model fallback.
+- **OCR Eval Harness**: `scripts/ocr_eval.py` scores extraction accuracy. Baseline: 91% item recall, 100% precision, 47% price accuracy.
+- **Store-Scoped Matching**: `item_matcher.py` ranks items previously purchased at the current store ahead of near-tied text matches (raw-score gap ≤10). Never lowers the match threshold.
+- **Full USDA FDC Sweep**: Checkpointed backfill matched 498 items via FDC + 24 via OpenFoodFacts. Nutrient coverage rose from 8% to 49% of items.
+
+</details>
+
+<details>
+<summary><b>Taxonomy & Data Integrity (Jun–Jul 2026)</b></summary>
+
+- **Category Taxonomy Collapse**: 92 fragment categories (338 items) merged into a strict 13-category canonical set. `category_mapper` interceptor prevents re-fragmentation.
+- **Nutrition Pipeline Phase 1**: Full-payload FDC enrichment, package-size fallback, manual overrides, coverage badges on nutrition charts.
+- **Structural Refactor**: `main.py` reduced to ~175 lines; page routes, analytics, and nutrition trends extracted into per-domain routers. Alembic is now the single schema authority.
+
+</details>
+
+<details>
+<summary><b>Infrastructure & UI (Jun 2026)</b></summary>
+
+- **Precompiled Tailwind + CSP**: Browser Play CDN replaced by a static build (`scripts/build_css.sh`); Inter vendored; zero external requests.
+- **Local Folder-Watch Ingestion**: Drop PDFs/images into `data/inbox` for auto-ingest through the OCR + review pipeline. (`FOLDER_WATCH=0` to disable.)
+- **Multi-Theme Engine**: CSS variable-based theming with Alpine.js. Light, Dark, Forest, Sunset themes across all 13 templates.
+- **Shopping List Optimizer**: Store-grouped urgent restock view at `/restock`.
+- **Reorder Prediction Engine**: Purchase cadence analysis with predicted exhaustion dates and urgency tiers. TTL-cached `/api/predictions/` endpoint suite.
+- **Open Produce Mode**: Ultra-fast manual entry for loose/bulk items.
+- **Export Data Engine**: One-click CSV/Excel export of full purchase history.
+- **AI-Powered Size Extraction**: Automated unit pricing from OCR item names.
+- **Bulk Pricing UI**: Hybrid ⚖️/🏷️ toggle for Per-Item vs Per-Weight pricing in the review screen.
+- **PDF Receipt Viewer Fix**: `X-Frame-Options` set to `SAMEORIGIN` for in-app PDF embedding.
+- **SSE Radar Pulse**: Live scanning feedback on the thermal view.
+
+</details>
+
+<details>
+<summary><b>Phase 15: Data Quality Cleanup (Jun 2026)</b></summary>
+
+- Deep audit of 158 PDF-imported receipts (Amazon/iHerb). 1,318 items patched for size/unit/price. 127 dates recovered. 86 junk items removed. Store names normalized. 33 receipts deleted. 5 reusable maintenance scripts added to `backend/scripts/`.
+
+</details>
+
+<details>
+<summary><b>Phases 11–13: Performance & Local AI (Late May–Jun 2026)</b></summary>
 
 - **Phase 13**: Bulk Receipt Loader & Background Processor.
 - **Phase 12**: Weight Extraction Automation & Categorization History.
 - **Phase 11**: Local OCR Support (Ollama, Granite 3.3 Vision).
+
 </details>
 
 <details>
-<summary><b>Phases 6-10: Analytics & UX (Dec 2025-Jan 2026)</b></summary>
+<summary><b>Phases 6–10: Analytics & UX (May 2026)</b></summary>
 
 - **Phase 10**: Duplicate Dismissal & Store History Modals.
 - **Phase 9**: Mobile Responsiveness & Hamburger Menus.
 - **Phase 8**: Bi-directional Price Calculation Logic.
-- **Phase 7**: Dark Mode implementation & Loading States.
+- **Phase 7**: Dark Mode & Loading States.
 - **Phase 6**: Initial Price Comparison Pills & Category Charts.
+
 </details>
 
 <details>
-<summary><b>Phases 1-5: Foundation (Sept-Nov 2025)</b></summary>
+<summary><b>Phases 1–5: Foundation (Apr–May 2026)</b></summary>
 
-- **Phase 5**: Duplicate Detection & Merging logic.
+- **Phase 5**: Duplicate Detection & Merging.
 - **Phase 4**: Fuzzy Matching & AI Categorization.
 - **Phase 3**: Receipt Review UI (Manual Adjustment).
 - **Phase 2**: OCR Pipeline (Gemini 1.5).
-- **Phase 1**: Core Infrastructure (FastAPI, SQLite/PG, SQLAlchemy).
+- **Phase 1**: Core Infrastructure (FastAPI, SQLite, SQLAlchemy).
+
 </details>
 
 ---
-*Last Updated: August 2, 2026*
+*Last Updated: August 3, 2026*
 
 <!-- Search UX options considered (Option A implemented May 2026):
   Option B — Dedicated /search full-page (Enter key navigates to results page; table view with all purchase history)

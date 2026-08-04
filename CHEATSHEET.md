@@ -1,5 +1,5 @@
 # Grocery Tracker - Cheatsheet
-For AI agent behavior and coding style, see [GEMINI.md](file:///home/mcgar/projects/grocery-tracker/GEMINI.md).
+For AI agent behavior and coding style, see [GEMINI.md](/grocery-tracker/GEMINI.md).
 
 ## 🚀 Application Management
 
@@ -26,7 +26,7 @@ uvicorn app.main:app --reload --port 8000
 
 ---
 
-## � Log Tracing
+## 📋 Log Tracing
 
 ### Local Mode (Python/Uvicorn)
 If you started the app using `./start_server.sh`, logs are written to a file:
@@ -38,7 +38,7 @@ tail -f backend/uvicorn_log.txt
 If you ran `uvicorn` directly in the terminal, logs appear in that terminal window.
 ---
 
-## �🛠 Troubleshooting
+## 🛠️ Troubleshooting
 
 ### Clear a Used Port (Address already in use)
 If port `8000` is blocked:
@@ -107,19 +107,19 @@ uv run python scripts/build_static_demo.py --base-path /repo-name
 
 ### Serve It Locally
 ```bash
-python3 -m http.server -d site/demo 8080   # from repo root → http://localhost:8080
+python3 -m http.server -d site/demo 8080   # from repo root → http://127.0.0.1:8080
 ```
 
 ### Share It via Tailscale
-This machine already proxies `/ → 127.0.0.1:8080` at `https://ubuntu-desktop-15faep6-1.tail7b7656.ts.net` — starting the local server above makes the demo live there instantly.
+If you have a Tailscale serve proxy pointing to port 8080, starting the local server makes the demo live at your machine's Tailscale hostname instantly.
 ```bash
-tailscale serve status                     # check current mode first
+tailscale serve status                     # check current proxy config
 ```
-⚠️ As of July 2026 that proxy is **Funnel = public internet**, not tailnet-only. To restrict to your tailnet:
+⚠️ The default `tailscale serve` is tailnet-only. To expose to the public internet:
 ```bash
-tailscale funnel off && tailscale serve --bg 8080
+tailscale funnel --bg 8080
 ```
-To go public again: `tailscale funnel --bg 8080`
+To pull it back to tailnet-only: `tailscale funnel off && tailscale serve --bg 8080`
 
 ---
 
@@ -143,7 +143,8 @@ uv run python scripts/ocr_eval.py --live --limit 5 # re-run OCR with current pro
 ### Inspect What the OCR Has Learned
 The feedback loop stores your review corrections and feeds them into future prompts:
 ```bash
-sqlite3 grocery.db "SELECT field, ai_value, approved_value FROM ocr_corrections ORDER BY id DESC LIMIT 20;"
+sqlite3 backend/grocery.db "SELECT field, ai_value, approved_value FROM ocr_corrections ORDER BY id DESC LIMIT 20;"
+# or from backend/: sqlite3 grocery.db "..."
 ```
 
 ### Monitor GPU Usage
@@ -185,38 +186,38 @@ All scripts live in `backend/scripts/` and use `grocery.db` directly. Run from `
 Patches `ocr_data` JSON to extract weight/unit from names like `"5LB"`, `"8 Oz"`, `"6PK"` and recalculate `unit_price = final_price / weight`. Zero API calls.
 ```bash
 # Single receipt
-.venv/bin/python scripts/patch_receipt_ocr.py --receipt-id 452
+uv run python scripts/patch_receipt_ocr.py --receipt-id 452
 # All receipts
-.venv/bin/python scripts/patch_receipt_ocr.py --all
+uv run python scripts/patch_receipt_ocr.py --all
 # Preview without writing
-.venv/bin/python scripts/patch_receipt_ocr.py --all --dry-run
+uv run python scripts/patch_receipt_ocr.py --all --dry-run
 ```
 
 ### Back-fill Missing Dates from PDF Files
 Recovers `purchase_date` from PDF filenames and content (reads `"Order placed..."` from PDF text).
 ```bash
-.venv/bin/python scripts/fix_batch_dates.py [--dry-run]
+uv run python scripts/fix_batch_dates.py [--dry-run]
 ```
 
 ### Remove Junk Item Names (PDF Parser Boilerplate)
 Flags items whose names contain address strings, "Buy again", payment details, etc.
 ```bash
 # Report only
-.venv/bin/python scripts/fix_dirty_names.py
+uv run python scripts/fix_dirty_names.py
 # Delete the flagged items
-.venv/bin/python scripts/fix_dirty_names.py --delete
+uv run python scripts/fix_dirty_names.py --delete
 ```
 
 ### Normalize Store Names
 Merges variants like `Iherb`/`IHerb` → `iHerb`, `Amazon` → `Amazon.com`.
 ```bash
-.venv/bin/python scripts/fix_store_names.py [--dry-run]
+uv run python scripts/fix_store_names.py [--dry-run]
 ```
 
 ### Backfill Unit Prices (Saved ReceiptItems)
 Fixes `unit_price` in the `receipt_items` table for already-saved items.
 ```bash
-.venv/bin/python scripts/backfill_unit_prices.py [--dry-run]
+uv run python scripts/backfill_unit_prices.py [--dry-run]
 ```
 
 > See `DATA_CLEANUP_2026_05_02.md` for the full audit log from the May 2026 batch import cleanup.

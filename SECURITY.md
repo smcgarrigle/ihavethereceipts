@@ -1,5 +1,4 @@
-# Security Practices
-For AI agent behavior and coding style, see [GEMINI.md](file:///home/mcgar/projects/grocery-tracker/GEMINI.md).
+# Security PracticesFor AI agent behavior and coding style, see GEMINI.md
 
 1. Never store sensitive data in localStorage. Use httpOnly cookies
 2. Disable directory listing on your server. Never expose file structure

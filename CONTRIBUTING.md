@@ -70,7 +70,7 @@ backend/
 | Backend | FastAPI, SQLAlchemy, Alembic |
 | Database | SQLite (file-based, zero-config) |
 | Frontend | Jinja2, Tailwind CSS, HTMX, Alpine.js |
-| AI / OCR | Google Gemini 3.5 Flash, IBM Granite 3.3 Vision (local), Qwen2-VL (local) |
+| AI / OCR | Google Gemini Flash / Gemini 3.5, IBM Granite 3.3 Vision (local), Qwen2-VL (local) |
 | Testing | pytest |
 | Linting | Ruff, Mypy |
 
@@ -148,6 +148,7 @@ uv run alembic upgrade head
 - **HTMX over JavaScript**: Prefer server-side rendered fragments and HTMX for dynamic content.
 - **Alpine.js for UI-only state**: Modals, tabs, dropdowns — anything that doesn't need the server.
 - **Semantic Tailwind classes**: Use CSS variable-based tokens (`bg-bgCard`, `text-textMuted`) from `themes.css`. Do **not** add hardcoded `dark:bg-gray-800` patterns.
+- **Rebuild Tailwind after adding classes**: The CSS is precompiled. After adding any new Tailwind class to a template or `pages.py`, run `cd backend && ./scripts/build_css.sh` and commit the rebuilt `static/css/tailwind.css` alongside your template changes — new classes silently render unstyled otherwise.
 - **Dark mode first**: All UI should look premium in dark mode.
 - **`def` not `async def` for DB endpoints**: FastAPI runs sync endpoints in a thread pool, which avoids blocking the event loop with SQLite I/O.
 
@@ -157,10 +158,14 @@ uv run alembic upgrade head
 
 ```bash
 cd backend
-uv run pytest                     # all tests
+uv run pytest                          # all unit + integration tests
 uv run pytest tests/test_ocr_merging.py  # single file
-uv run pytest -v                  # verbose output
+uv run pytest -v                       # verbose output
+uv run pytest -m e2e                   # accessibility smoke suite (requires Playwright)
 ```
+
+> [!NOTE]
+> The `e2e` suite (`tests/test_a11y_axe.py` and related) runs axe-core + Playwright over 9 pages. Install Playwright browsers once with `uv run playwright install chromium` before running `-m e2e`.
 
 ---
 

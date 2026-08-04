@@ -7,15 +7,15 @@ trigger: always_on
 This document serves as the primary blueprint for all AI agents working on this project. It contains technology choices, coding style preferences, and architectural patterns established through development.
 
 ## Project Documentation
-- [CHEATSHEET.md](file:///home/mcgar/projects/grocery-tracker/CHEATSHEET.md): Quick reference guide for users.
-- [EXCLUSIONS.md](file:///home/mcgar/projects/grocery-tracker/EXCLUSIONS.md): Logic for junk filters and analytics exclusions.
-- [PRD.md](file:///home/mcgar/projects/grocery-tracker/PRD.md): Core instructions and product requirements.
-- [PROJECT_CONTEXT.md](file:///home/mcgar/projects/grocery-tracker/PROJECT_CONTEXT.md): Overall project information and technical context.
-- [ROADMAP.md](file:///home/mcgar/projects/grocery-tracker/ROADMAP.md): Feature backlog, strategic vision, and completed milestones.
-- [SBOM.md](file:///home/mcgar/projects/grocery-tracker/SBOM.md): Software Bill of Materials — all dependencies and licenses.
-- [README.md](file:///home/mcgar/projects/grocery-tracker/README.md): GitHub instructions and project sharing guide.
-- [SECURITY.md](file:///home/mcgar/projects/grocery-tracker/SECURITY.md): Sensible security practices before pushing to GitHub or containerizing.
-- [skill.md](file:///home/mcgar/projects/grocery-tracker/skill.md): Portable AI operational blueprint and task guide.
+- [CHEATSHEET.md](/grocery-tracker/CHEATSHEET.md): Quick reference guide for users.
+- [DATA_DESIGN.md](/grocery-tracker/DATA_DESIGN.md): Database schema, ERD, and field definitions.
+- [EXCLUSIONS.md](/grocery-tracker/EXCLUSIONS.md): Logic for junk filters and analytics exclusions.
+- [PRD.md](/grocery-tracker/PRD.md): Core instructions and product requirements.
+- [ROADMAP.md](/grocery-tracker/ROADMAP.md): Feature backlog, strategic vision, and completed milestones.
+- [SBOM.md](/grocery-tracker/SBOM.md): Software Bill of Materials — all dependencies and licenses.
+- [README.md](/grocery-tracker/README.md): GitHub instructions and project sharing guide.
+- [SECURITY.md](/grocery-tracker/SECURITY.md): Sensible security practices before pushing to GitHub or containerizing.
+- [skill.md](/grocery-tracker/skill.md): Portable AI operational blueprint and task guide.
 
 ## 1. Core Technology Stack
 - **Backend**: Python 3.11, FastAPI
@@ -28,7 +28,7 @@ This document serves as the primary blueprint for all AI agents working on this 
     - **Reactivity**: Alpine.js (Lightweight client-side state)
 - **AI/OCR**:
     - Primary: Google Gemini 3.5 Flash API
-    - Local: IBM Granite 3.3 Vision (2B/8B), Qwen2-VL — via **LM Studio** or **Ollama**
+    - Local: Qwen2.5-VL or similar — via **LM Studio** or **Ollama**
     - **Finding Latest Models**: Use `app.services.model_manager.model_manager.fetch_available_models()` or check the `data/known_models.json` cache to see what models are available on your API key. The "Flash" models are typically the efficient/free tier choices.
     - **OCR Feedback Loop**: `app/services/correction_service.py` records human review corrections (`ocr_corrections` table) and builds the few-shot block injected into the receipt prompt by `process_receipt_task`. When changing the OCR prompt or models, measure the impact with `uv run python scripts/ocr_eval.py` (`--stored` = free baseline from past receipts, `--live` = re-run OCR). Note: the OCR result cache is keyed on image + full prompt text.
 
@@ -50,11 +50,11 @@ This document serves as the primary blueprint for all AI agents working on this 
     - Create a test in `/tests` that reproduces the bug.
     - Fix the bug.
     - Prove the fix with the passing test.
-3. **Receipt Processing**:
+4. **Receipt Processing**:
     - OCR data is stored in the `ocr_data` JSON field of the `Receipt` model.
     - Always maintain bi-directional price calculation (Total = Qty * UnitPrice).
     - Store names must be normalized using `app.services.store_utils.normalize_store_name`.
-4. **AI Continuity**: Always check for recent **Knowledge Items (KIs)** at the start of a session. Review the latest handoff to understand the current "Save State" of the project before proposing new changes.
+5. **AI Continuity**: Always check for recent **Knowledge Items (KIs)** at the start of a session. Review the latest handoff to understand the current "Save State" of the project before proposing new changes.
 
 ## 4. Hard-won Lessons (Anti-patterns to Avoid)
 - **Alpine.js Inline Limitations**: Do **NOT** use `const` or `let` inside Alpine.js inline attributes (e.g., `@click`). It breaks in many environments. Move complex logic to the `x-data` object methods.
@@ -64,7 +64,7 @@ This document serves as the primary blueprint for all AI agents working on this 
 - **Unit Price Math**: For bulk/weight tracking, always use `(Price * Qty) / TotalWeight`. Using `Price / (Weight * Qty)` leads to precision errors and $0.00 rounding issues in analytics.
 - **Blocking the Event Loop**: Do **NOT** use `async def` for endpoints performing heavy synchronous I/O (Database, AI). This freezes the entire application. Use standard `def` instead; FastAPI runs these in a thread pool.
 - **N+1 Database Queries**: Avoid querying within loops. Use SQLAlchemy `joinedload()` or batch fetch logic instead of fetching related items one-by-one in a list.
-- **AI Rate Limiting**: Mass background migrations (100+ items) should use `gemini-1.5-flash` or `gemini-3.5-flash` with 2-5 second delays between chunks of 15-20 items to avoid `429 RESOURCE_EXHAUSTED` errors on free tier.
+- **AI Rate Limiting**: Mass background migrations (100+ items) should use `gemini-2.0-flash` or `gemini-2.5-flash` with 2-5 second delays between chunks of 15-20 items to avoid `429 RESOURCE_EXHAUSTED` errors on free tier.
 - **SQLite Concurrency**: When using SQLite, the **Bulk Loader** background service can cause "database is locked" errors if a user attempts to save a manual review at the same time. Enable WAL mode (`PRAGMA journal_mode=WAL`) to reduce locking contention for high-volume ingestion.
 - **VS Code Markdown Links**: VS Code's internal markdown preview intercepts links to `http://localhost` and tries to resolve them as local workspace files, which breaks external browser routing. Always use `http://127.0.0.1` instead of `localhost` when generating markdown reports or documentation with local links.
 - **Hardcoded Tailwind Theme Classes**: Do **NOT** add new `bg-white dark:bg-gray-800` or `text-gray-600 dark:text-gray-400` patterns. Use semantic variables: `bg-bgCard`, `text-textMuted`, `border-borderDefault`, etc. The mapping is in `themes.css`.
