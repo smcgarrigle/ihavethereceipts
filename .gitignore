@@ -121,3 +121,11 @@ backend/tools/
 
 # Generated static demo site (rebuild with: make demo)
 site/demo/
+
+# agent tooling
+.agents/
+.claude/
+skills-lock.json
+
+# local media
+videos/
