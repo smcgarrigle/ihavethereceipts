@@ -1,26 +1,26 @@
 # 🛒 Grocery Price Tracker
 
-A self-hosted, AI-powered receipt tracker that builds a personal price history database from your grocery receipts. Built with **FastAPI**, **SQLite**, **HTMX**, and **Google Gemini 3.5**.
+A self-hosted, AI-powered receipt tracker that builds a personal price history database from your grocery receipts. Built with **FastAPI**, **SQLite**, **HTMX**, and **Google Gemini/Antigravity, Gemini CLI (RIP), Claude Code CLI, Z.AI, OpenAI and more**.
 
 ## 🚀 Key Features
 
 ### 📄 Intelligent Receipt Processing
-- **AI OCR**: Takes images (JPG/PNG) or PDFs and extracts data using **Google Gemini 3.5** or local models like **IBM Granite 3.3 Vision** or **Qwen2-VL** via **LM Studio** or **Ollama**.
-- **Paste-Text Ingestion**: Got a digital receipt or order-confirmation email? Just paste the text — no screenshot or PDF needed. Text parsing skips vision processing entirely, using a small fraction of the tokens of image OCR, so it's faster, cheaper, and much friendlier to free-tier API limits.
-- **Local Model Support**: Run OCR entirely on your own hardware for privacy and zero API costs.
+- **AI OCR**: Takes images (JPG/PNG) or PDFs and extracts data using **Google Gemini 3.5** or local models like or **Qwen2.5-VL** via **LM Studio** or **Ollama**.
+- **Paste-Text Ingestion**: Got a digital receipt or order-confirmation email? Just copy-paste the text into the box — no screenshot or PDF needed.
+- **Local Model Support**: Run OCR entirely on your own hardware and choice of open weights models for privacy and zero API costs.
 - **Smart Parsing**: Handles discounts, varied unit types (oz, lb, etc.), and complex "2 for $X" deals.
-- **Interactive Review (Human-in-the-Loop)**: Verify and edit OCR results before saving. The AI extracts data into a safe sandbox, and your analytics charts remain completely untouched until you explicitly click "Save". *It's your data, you approve it.*
-- **Self-Improving OCR (Feedback Loop)**: Every correction you make in the review sandbox is remembered. Renames, price fixes, and missed items are stored per store and injected into future OCR prompts as few-shot examples — the extractor literally learns your stores' receipt dialects over time.
+- **Interactive Review (Human-in-the-Loop)**: Verify, edit and approve your OCR results before saving. The AI extracts data into a safe sandbox, and your analytics charts remain completely untouched until you explicitly click "Save". *It's your data, you approve it.*
+- **Self-Improving OCR (Feedback Loop)**: Every correction you make in the review sandbox is remembered. Renames, price edits, and missed items are stored per store and injected into future OCR prompts as few-shot examples — the extractor literally learns your stores' receipt dialects over time.
 - **Structured Outputs + Eval Harness**: The Gemini path uses a response schema for guaranteed-valid JSON, and `scripts/ocr_eval.py` measures extraction accuracy against your own reviewed receipts (`--stored` for a free baseline, `--live` to benchmark prompt or model changes).
 - **Reprocessing Tool**: CLI script to re-run OCR on historical receipts to test different models.
 
 > [!NOTE]
 > **Edge Cases & Why Things Don't Always Add Up**
-> Every store's Point-of-Sale (POS) system is like its own dialect. Some stores (like Target) distribute a basket discount (e.g., "$5 off $50") proportionally across every single item. Others just dump a massive "-$5.00" string at the very bottom of the receipt, leaving the AI completely guessing what it applies to (often attaching it to the last scanned item!). The "Sandbox Review" step exists specifically to smooth out these store-specific idiosyncrasies, allowing you to separate out basket-level rewards into negative line items or manually adjust prices to perfectly balance the math before the data pollutes your spending analytics.
+> Every store's Point-of-Sale (POS) system has its own dialect. Some stores (like Target) distribute a basket discount (e.g., "$5 off $50") proportionally across every single item. Others just put "-$5.00" string at the very bottom of the receipt, leaving the AI completely guessing what it applies to (often attaching it to the last scanned item!). The "Sandbox Review" step exists specifically to smooth out these store-specific idiosyncrasies, allowing you to separate out basket-level rewards into negative line items or manually adjust prices to perfectly balance the math before the data pollutes your spending analytics. These corrections are remembered and are using to improve the OCR via future prompts.
 
 ### 📊 Powerful Analytics
 - **Dashboard**: At-a-glance view of monthly spending, top categories, and recent trips.
-- **Trends Page**: Visualize price history for any item with interactive scatter plots.
+- **Trends Page**: Visualize price history for any item with interactive visualizations.
 - **Store Comparison**: See which store offers the best price for your favorite items.
 - **Spending History**: Searchable, filterable history of every dollar spent.
 
