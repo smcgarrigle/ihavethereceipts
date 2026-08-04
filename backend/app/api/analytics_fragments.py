@@ -621,7 +621,7 @@ def get_best_value_rows(
             else '<span class="text-gray-400">N/A</span>'
         )
 
-        date_str = item["date"].strftime("%Y-%m-%d") if item["date"] else "N/A"
+        date_str = item["date"].strftime("%m-%d-%y") if item["date"] else "N/A"
 
         # Row container: flex-col on mobile, 12-col grid on desktop
         html += f"""
@@ -640,7 +640,7 @@ def get_best_value_rows(
                 </div>
 
                 <!-- Base Price -->
-                <div class="lg:col-span-2 text-sm lg:text-right text-gray-900 dark:text-gray-100 font-medium">
+                <div class="lg:col-span-1 text-sm lg:text-right text-gray-900 dark:text-gray-100 font-medium">
                     <span class="lg:hidden text-[10px] uppercase text-gray-400 mr-1">Price:</span>
                     {unit_price_display}
                 </div>
@@ -671,11 +671,11 @@ def get_best_value_rows(
             """
 
         html += f"""
-                <div class="lg:col-span-1 text-sm lg:text-right">
-                    <a href="/receipts/{item["receipt_id"]}/review" class="text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1" title="View Receipt">
+                <div class="lg:col-span-2 text-sm lg:text-right whitespace-nowrap">
+                    <a href="/receipts/{item["receipt_id"]}/review" class="text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 justify-end" title="View Receipt">
                         <span class="lg:hidden text-[10px] uppercase text-gray-400 mr-1">Date:</span>
                         {date_str}
-                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                        <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
                     </a>
                 </div>
             </div>
