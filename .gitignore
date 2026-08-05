@@ -112,9 +112,9 @@ backend/server_test.log
 backend/certs/
 backend/certs/*
 
-# Agent instruction files (optional — remove to make public)
+# Agent instruction files (kept locally, not for public repo)
 # .agent/
-# skill.md
+skill.md
 
 # ============================================================
 # LOCAL-ONLY DIRECTORIES
