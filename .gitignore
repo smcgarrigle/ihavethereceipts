@@ -59,14 +59,32 @@ backend/reprocess_pdfs.py
 backend/scripts/archive/
 
 # ============================================================
-# INTERNAL DOCUMENTATION
-# (personal audit logs, planning drafts, internal reports)
+# INTERNAL DOCUMENTATION & AI TASK ARTIFACTS
+# (personal audit logs, planning drafts, agent-created task docs)
+#
+# Pattern rules — any file matching these is auto-excluded:
+#   *_analysis.md     e.g. reclassification_analysis.md
+#   *_review.md       e.g. PROJECT_REVIEW.md
+#   *_audit.md        e.g. dependency_audit.md
+#   *_cleanup.md      e.g. db_cleanup.md
+#   *_report.md       e.g. coverage_report.md (root-level only)
+#   *_migration*.md   e.g. category_migration_plan.md
+#   TODO_*.md         e.g. TODO_MYPY.md
+#   implementation_plan*.md   agent planning artifacts (GEMINI.md §3.1)
+#
+# Named permanent project docs (README, SECURITY, SBOM, PRD, etc.)
+# are tracked normally — they do NOT match any of these patterns.
 # ============================================================
 backend/scripts/deleted_receipts_log.md
 backend/scripts/output.txt
-PROJECT_REVIEW.md
-reclassification_analysis.md
-TODO_MYPY.md
+*_analysis.md
+*_review.md
+*_audit.md
+*_cleanup.md
+*_report.md
+*_migration*.md
+TODO_*.md
+implementation_plan*.md
 
 # ============================================================
 # LOGS & PROCESS FILES
