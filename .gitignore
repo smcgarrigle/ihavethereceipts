@@ -64,6 +64,9 @@ backend/scripts/archive/
 # ============================================================
 backend/scripts/deleted_receipts_log.md
 backend/scripts/output.txt
+PROJECT_REVIEW.md
+reclassification_analysis.md
+TODO_MYPY.md
 
 # ============================================================
 # LOGS & PROCESS FILES
