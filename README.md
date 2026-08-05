@@ -1,11 +1,11 @@
-# 🛒 IHaveTheReceipts
+# 🧾 IHaveTheReceipts
 
 A self-hosted, AI-powered receipt tracker that builds a personal price history database from your grocery receipts. Built with **FastAPI**, **SQLite**, **HTMX**, and **Google Gemini**.
 
 ## 🚀 Key Features
 
 ### 📄 Intelligent Receipt Processing
-- **AI OCR**: Takes images (JPG/PNG) or PDFs and extracts data using **Google Gemini 3.5** or local models like **Qwen2.5-VL** via **LM Studio** or **Ollama**.
+- **AI OCR**: Takes images (JPG/PNG) or PDFs and extracts data using **Google Gemini 3.x** (Flash or Pro) or local models like **Qwen2.5-VL** via **LM Studio** or **Ollama**.
 - **Paste-Text Ingestion**: Got a digital receipt or order-confirmation email? Just copy-paste the text — no screenshot or PDF needed.
 - **Local Model Support**: Run OCR entirely on your own hardware for privacy and zero API costs.
 - **Smart Parsing**: Handles discounts, varied unit types (oz, lb, etc.), and complex "2 for $X" deals.
@@ -68,7 +68,7 @@ A self-hosted, AI-powered receipt tracker that builds a personal price history d
 - **Chart.js**: Interactive data visualization for price trends and spending analytics.
 
 ### 📊 Data & AI Tools
-- **Google GenAI (Gemini 3.5)**: Primary engine for high-accuracy OCR and categorization.
+- **Google GenAI (Gemini 3.x)**: Primary engine for high-accuracy OCR and categorization (Flash models recommended for free-tier use).
 - **LM Studio / Ollama**: Local, privacy-preserving vision models (IBM Granite 3.3 Vision, Qwen2-VL).
 - **RapidFuzz**: High-performance string matching for item deduplication.
 - **pdfplumber / pdf2image**: Structured data extraction from digital and scanned PDFs.
@@ -108,7 +108,7 @@ Different models specialize in specific tasks — architectural planning, precis
 
 1.  **Clone & Configure**:
     ```bash
-    git clone https://github.com/yourusername/ihavethereceipts.git
+    git clone https://github.com/smcgazz/ihavethereceipts.git
     cd ihavethereceipts
     cp .env.example .env
     # Edit .env and pick an OCR backend:
@@ -211,6 +211,42 @@ See [ROADMAP.md](ROADMAP.md) for the full strategic backlog. Highlights:
 - [ ] **Volatility Alerts**: Notify when an item's price shifts >15% in 30 days.
 - [ ] **Items Page Pagination**: Full paginated fragment to replace the current unbound item list.
 - [ ] **PWA / Offline Mode**: Scan receipts in-store without connectivity.
+
+
+## 🐧 Running on Linux (Ubuntu / Debian)
+
+Install system dependencies before running `uv sync`:
+
+```bash
+# PDF processing + file-type detection
+sudo apt install -y poppler-utils libmagic1
+
+# Optional: local AI via Ollama
+curl -fsSL https://ollama.com/install.sh | sh
+ollama pull granite3.3-vision:2b   # or qwen2-vl
+```
+
+Then follow the standard [Setup](#setup) steps. The `Makefile` in the project root wraps common commands:
+
+```bash
+make setup   # uv sync + pre-commit install
+make run     # start the dev server
+make test    # run pytest suite
+make lint    # ruff check + format
+```
+
+**Common Linux issues:**
+
+| Issue | Resolution |
+|---|---|
+| `pdfplumber` fails to open PDFs | Run `sudo apt install poppler-utils` |
+| `python-magic` import error | Run `sudo apt install libmagic1` |
+| Port 8000 already in use | Change with `--port 8001` in `make run` |
+| Ollama slow on first run | First inference downloads model weights — normal |
+| SQLite `database is locked` | WAL mode is on by default; this is rare under normal use |
+
+> [!NOTE]
+> **WSL2 users**: The app runs fine under WSL2. Access it at `http://127.0.0.1:8000` in your Windows browser. For best performance, clone the repo into the WSL2 filesystem (`~/projects/`) rather than a Windows-mounted path (`/mnt/c/...`) — cross-filesystem I/O adds latency to file watching and uploads.
 
 
 ## 🍎 Running on Mac M1 / M2 (Apple Silicon)
