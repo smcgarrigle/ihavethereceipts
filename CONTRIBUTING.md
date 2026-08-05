@@ -1,4 +1,4 @@
-# Contributing to Grocery Price Tracker
+# Contributing to IHaveTheReceipts
 
 Thank you for your interest in contributing! This is a self-hosted, single-user grocery price tracking app built with Python, FastAPI, HTMX, and Google Gemini.
 
@@ -18,8 +18,8 @@ Thank you for your interest in contributing! This is a self-hosted, single-user 
 ### Setup
 
 ```bash
-git clone https://github.com/yourusername/grocery-tracker.git
-cd grocery-tracker
+git clone https://github.com/yourusername/ihavethereceipts.git
+cd ihavethereceipts
 
 # Copy and configure environment
 cp .env.example .env

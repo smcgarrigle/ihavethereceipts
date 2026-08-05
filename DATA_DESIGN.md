@@ -1,6 +1,6 @@
-# Database Design - Grocery Price Tracker
+# Database Design - IHaveTheReceipts
 
-This document outlines the database schema, relationships, and field definitions used in the Grocery Price Tracker application. The system uses **SQLite** for single-user portability and zero-config operation.
+This document outlines the database schema, relationships, and field definitions used in the IHaveTheReceipts application. The system uses **SQLite** for single-user portability and zero-config operation.
 
 ## Entity Relationship Diagram (ERD)
 

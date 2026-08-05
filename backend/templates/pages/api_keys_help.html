@@ -1,5 +1,5 @@
 {% extends "layouts/base.html" %}
-{% block title %}Getting API Keys — Grocery Tracker{% endblock %}
+{% block title %}Getting API Keys — The Receipts{% endblock %}
 
 {% block content %}
 <div class="max-w-4xl mx-auto px-4 py-8 space-y-8">
@@ -9,14 +9,14 @@
         <div class="w-12 h-12 rounded-2xl bg-indigo-500/15 flex items-center justify-center text-2xl">🔑</div>
         <div>
             <h1 class="text-2xl font-bold text-textBase">Getting Your API Keys</h1>
-            <p class="text-sm text-textMuted mt-0.5">A step-by-step guide to the three data services Grocery Tracker uses. All of them are free.</p>
+            <p class="text-sm text-textMuted mt-0.5">A step-by-step guide to the three data services The Receipts uses. All of them are free.</p>
         </div>
     </div>
 
     <!-- What & why -->
     <div class="rounded-2xl border border-blue-500/30 bg-blue-500/5 p-5 text-sm text-textMuted space-y-2">
-        <p><strong class="text-textBase">What is an API key?</strong> It's like a password that lets Grocery Tracker talk to an outside service on your behalf. Each service issues you your own key when you sign up.</p>
-        <p>Grocery Tracker uses up to three services: <strong class="text-textBase">USDA FoodData Central</strong> for nutrition data, <strong class="text-textBase">Open Food Facts</strong> for product lookups (no key needed!), and <strong class="text-textBase">Google Gemini</strong> for reading your receipt photos.</p>
+        <p><strong class="text-textBase">What is an API key?</strong> It's like a password that lets The Receipts talk to an outside service on your behalf. Each service issues you your own key when you sign up.</p>
+        <p>The Receipts uses up to three services: <strong class="text-textBase">USDA FoodData Central</strong> for nutrition data, <strong class="text-textBase">Open Food Facts</strong> for product lookups (no key needed!), and <strong class="text-textBase">Google Gemini</strong> for reading your receipt photos.</p>
     </div>
 
     <!-- USDA FDC -->
@@ -40,7 +40,7 @@
         </ol>
 
         <div class="text-xs text-textSubtle bg-bgMain rounded-xl px-4 py-3">
-            💡 The free key allows <strong>1,000 requests per hour</strong> — far more than Grocery Tracker will ever need for a household.
+            💡 The free key allows <strong>1,000 requests per hour</strong> — far more than The Receipts will ever need for a household.
         </div>
     </div>
 
@@ -56,14 +56,14 @@
 
         <div class="rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 text-sm text-textMuted">
             ✅ <strong class="text-emerald-400">Good news — no API key needed.</strong>
-            Open Food Facts is an open database, free for everyone to read. Grocery Tracker simply identifies itself politely when it asks for data, and that's it. There is nothing for you to sign up for or configure.
+            Open Food Facts is an open database, free for everyone to read. The Receipts simply identifies itself politely when it asks for data, and that's it. There is nothing for you to sign up for or configure.
         </div>
 
         <p class="text-sm text-textMuted">
             If you'd ever like to <em>contribute</em> product data back to the community (photos, corrections), you can create a free account at
             <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener noreferrer"
                class="text-indigo-400 hover:text-indigo-300 underline">world.openfoodfacts.org</a>
-            — but Grocery Tracker doesn't require it.
+            — but The Receipts doesn't require it.
         </p>
     </div>
 

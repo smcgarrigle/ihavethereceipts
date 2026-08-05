@@ -1,7 +1,7 @@
 [project]
-name = "grocery-tracker"
+name = "ihavethereceipts"
 version = "0.1.0"
-description = "Grocery price tracker with HTMX frontend"
+description = "IHaveTheReceipts — grocery price tracker with AI-powered OCR"
 requires-python = ">=3.11"
 
 dependencies = [

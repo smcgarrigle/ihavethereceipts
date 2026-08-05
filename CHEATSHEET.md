@@ -1,5 +1,5 @@
-# Grocery Tracker - Cheatsheet
-For AI agent behavior and coding style, see [GEMINI.md](/grocery-tracker/GEMINI.md).
+# IHaveTheReceipts - Cheatsheet
+For AI agent behavior and coding style, see [GEMINI.md](/ihavethereceipts/GEMINI.md).
 
 ## 🚀 Application Management
 

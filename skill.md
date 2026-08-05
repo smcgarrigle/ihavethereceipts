@@ -1,6 +1,6 @@
-# Grocery Tracker - AI Skill Blueprint
+# IHaveTheReceipts - AI Skill Blueprint
 
-This document defines the operational "skills" and knowledge required for an AI agent to effectively manage, maintain, and evolve the Grocery Tracker project.
+This document defines the operational "skills" and knowledge required for an AI agent to effectively manage, maintain, and evolve the IHaveTheReceipts project.
 
 ## 1. Project DNA
 - **Goal**: Track grocery prices, nutritional data, and spending trends using OCR and USDA FDC integration.
@@ -40,7 +40,7 @@ Always use `uv` for environment management to ensure consistency across Linux, m
 ## 4. UI/UX Standards (Mandatory)
 - **Dark Mode First**: Use semantic CSS variable tokens (`bg-bgCard`, `text-textBase`, `border-borderDefault`). Do **NOT** use hardcoded classes like `bg-gray-900` or `dark:bg-gray-800`.
 - **Responsive**: Always test with mobile-first Tailwind prefixes (`sm:`, `md:`, `lg:`).
-- **Interactivity**: 
+- **Interactivity**:
     - Use **HTMX** for server-driven partial updates (`hx-get`, `hx-post`).
     - Use **Alpine.js** for client-side state (modals, toggles).
     - **NO** complex React/Vue components unless explicitly requested.

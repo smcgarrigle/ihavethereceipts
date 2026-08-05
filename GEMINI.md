@@ -2,20 +2,20 @@
 trigger: always_on
 ---
 
-# Grocery Tracker - Agent Instructions
+# IHaveTheReceipts - Agent Instructions
 
 This document serves as the primary blueprint for all AI agents working on this project. It contains technology choices, coding style preferences, and architectural patterns established through development.
 
 ## Project Documentation
-- [CHEATSHEET.md](/grocery-tracker/CHEATSHEET.md): Quick reference guide for users.
-- [DATA_DESIGN.md](/grocery-tracker/DATA_DESIGN.md): Database schema, ERD, and field definitions.
-- [EXCLUSIONS.md](/grocery-tracker/EXCLUSIONS.md): Logic for junk filters and analytics exclusions.
-- [PRD.md](/grocery-tracker/PRD.md): Core instructions and product requirements.
-- [ROADMAP.md](/grocery-tracker/ROADMAP.md): Feature backlog, strategic vision, and completed milestones.
-- [SBOM.md](/grocery-tracker/SBOM.md): Software Bill of Materials — all dependencies and licenses.
-- [README.md](/grocery-tracker/README.md): GitHub instructions and project sharing guide.
-- [SECURITY.md](/grocery-tracker/SECURITY.md): Sensible security practices before pushing to GitHub or containerizing.
-- [skill.md](/grocery-tracker/skill.md): Portable AI operational blueprint and task guide.
+- [CHEATSHEET.md](/ihavethereceipts/CHEATSHEET.md): Quick reference guide for users.
+- [DATA_DESIGN.md](/ihavethereceipts/DATA_DESIGN.md): Database schema, ERD, and field definitions.
+- [EXCLUSIONS.md](/ihavethereceipts/EXCLUSIONS.md): Logic for junk filters and analytics exclusions.
+- [PRD.md](/ihavethereceipts/PRD.md): Core instructions and product requirements.
+- [ROADMAP.md](/ihavethereceipts/ROADMAP.md): Feature backlog, strategic vision, and completed milestones.
+- [SBOM.md](/ihavethereceipts/SBOM.md): Software Bill of Materials — all dependencies and licenses.
+- [README.md](/ihavethereceipts/README.md): GitHub instructions and project sharing guide.
+- [SECURITY.md](/ihavethereceipts/SECURITY.md): Sensible security practices before pushing to GitHub or containerizing.
+- [skill.md](/ihavethereceipts/skill.md): Portable AI operational blueprint and task guide.
 
 ## 1. Core Technology Stack
 - **Backend**: Python 3.11, FastAPI

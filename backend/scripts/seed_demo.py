@@ -542,7 +542,7 @@ def build_schedule() -> list[tuple[str, date, list[str]]]:
 def seed() -> None:
     db = SessionLocal()
     try:
-        print("🌱 Seeding demo data for Grocery Tracker...\n")
+        print("🌱 Seeding demo data for IHaveTheReceipts...\n")
 
         # ---- Stores ----
         store_map: dict[str, Store] = {}

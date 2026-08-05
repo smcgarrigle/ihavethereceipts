@@ -199,7 +199,7 @@ def review_receipt(request: Request, receipt_id: int, db: Session = Depends(get_
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Processing Receipt - Grocery Tracker</title>
+            <title>Processing Receipt — The Receipts</title>
             <link rel="stylesheet" href="/static/css/tailwind.css">
             <style>
                 @keyframes blink {{

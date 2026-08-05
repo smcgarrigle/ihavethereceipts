@@ -1,5 +1,5 @@
-# Product Requirements Document (PRD) - Grocery Price Tracker
-For AI agent behavior and coding style, see [GEMINI.md](/grocery-tracker/GEMINI.md).
+# Product Requirements Document (PRD) - IHaveTheReceipts
+For AI agent behavior and coding style, see [GEMINI.md](/ihavethereceipts/GEMINI.md).
 
 ## 1. Problem Statement
 Grocery prices are volatile and confusing. Consumers struggle to:

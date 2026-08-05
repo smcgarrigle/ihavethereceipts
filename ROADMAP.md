@@ -1,4 +1,4 @@
-# Grocery Price Tracker - Strategic Roadmap
+# IHaveTheReceipts - Strategic Roadmap
 
 ---
 

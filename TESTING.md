@@ -1,6 +1,6 @@
-# Grocery Tracker Test Suite
+# IHaveTheReceipts Test Suite
 
-This document describes the automated testing infrastructure for the Grocery Tracker application. The generic test suite ensures backend stability, correct API behavior, and robust error handling.
+This document describes the automated testing infrastructure for the The Receipts application. The generic test suite ensures backend stability, correct API behavior, and robust error handling.
 
 ## 🛠️ Testing Stack
 

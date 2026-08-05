@@ -1,6 +1,6 @@
 # Software Bill of Materials (SBOM)
 
-**Project:** Grocery Price Tracker
+**Project:** IHaveTheReceipts
 **Version:** 0.1.0
 **Generated:** 2026-08-05
 **Format:** Markdown (manual, based on `uv pip list`)

@@ -20,7 +20,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Grocery Price Tracker{% endblock %}</title>
+    <title>{% block title %}The Receipts{% endblock %}</title>
     <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
     <!-- Typography -->
     <link rel="stylesheet" href="/static/fonts/inter.css">
@@ -111,8 +111,9 @@
                 <!-- Logo/Title -->
                 <div class="flex items-center">
                     <a href="/"
-                       class="text-xl font-bold text-textBase hover:text-blue-600 transition">🛒
-                        Grocery Tracker</a>
+                       class="text-xl font-bold tracking-tight hover:opacity-80 transition flex items-center gap-1.5"
+                       aria-label="The Receipts — home">🧾
+                        <span class="text-textMuted font-medium">The</span><span class="text-blue-500">Receipts</span></a>
                 </div>
                 <!-- Search Bar -->
                 <div class="hidden md:flex flex-1 max-w-xs mx-6 relative"

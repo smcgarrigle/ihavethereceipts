@@ -63,7 +63,7 @@ if not database_url_value and not is_testing:
 
 
 class Settings:
-    PROJECT_NAME: str = "Grocery Price Tracker"
+    PROJECT_NAME: str = "IHaveTheReceipts"
     BASE_DIR: Path = Path(__file__).resolve().parent.parent.parent
     DATA_DIR: Path = BASE_DIR.parent / "data"
     UPLOADS_DIR: Path = DATA_DIR / "uploads"

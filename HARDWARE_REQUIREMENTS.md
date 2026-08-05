@@ -1,6 +1,6 @@
-# Grocery Tracker: Hardware & OS Requirements
+# IHaveTheReceipts: Hardware & OS Requirements
 
-This document outlines the hardware specifications and Operating System requirements for running the Grocery Tracker application.
+This document outlines the hardware specifications and Operating System requirements for running the The Receipts application.
 
 Because the app supports both **Local AI Vision Models** (via LM Studio/Ollama) and **Cloud API Models** (via Google Gemini API) for receipt processing, the hardware requirements vary drastically depending on your chosen privacy setup.
 
@@ -42,7 +42,7 @@ If you are running the API-Only mode on a laptop with limited RAM (e.g., 8GB), W
 
 ## Raspberry Pi Deployment
 
-The Grocery Tracker runs well on Raspberry Pi hardware (A Raspberry Pi Zero 2 W) when used in **API-only or LAN-inference mode**. The Pi handles the lightweight FastAPI server and SQLite database; all AI inference happens either in the cloud (Gemini API) or on a separate, more powerful machine running LM Studio.
+The IHaveTheReceipts runs well on Raspberry Pi hardware (A Raspberry Pi Zero 2 W) when used in **API-only or LAN-inference mode**. The Pi handles the lightweight FastAPI server and SQLite database; all AI inference happens either in the cloud (Gemini API) or on a separate, more powerful machine running LM Studio.
 
 ### Pi Compatibility Matrix
 
@@ -138,8 +138,8 @@ sudo apt update && sudo apt install -y python3 python3-pip pipx poppler-utils li
 pipx install uv
 
 # Clone and configure
-git clone https://github.com/smcgazz/grocery-tracker.git
-cd grocery-tracker
+git clone https://github.com/smcgazz/ihavethereceipts.git
+cd ihavethereceipts
 cp .env.example .env
 nano .env   # add GEMINI_API_KEY — get yours free at https://aistudio.google.com
 

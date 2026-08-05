@@ -5,7 +5,7 @@
 This document covers **practical security steps** before pushing this project to GitHub,
 sharing it publicly, or exposing it over the internet (e.g., via Tailscale Funnel or a VPS).
 
-Grocery Tracker is a **single-user, local-first application** — it has no authentication,
+IHaveTheReceipts is a **single-user, local-first application** — it has no authentication,
 no multi-tenancy, and no stored passwords. Its threat model is therefore narrow but real:
 leaking your Gemini API key, exposing the app to the public internet without a firewall,
 or accidentally committing personal receipt data.

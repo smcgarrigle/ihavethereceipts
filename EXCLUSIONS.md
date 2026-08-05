@@ -1,6 +1,6 @@
-# Grocery Tracker Exclusion Logic
+# IHaveTheReceipts Exclusion Logic
 
-This document defines the various layers of filtering, ignoring, and excluding data within the Grocery Tracker application. These mechanisms prevent data noise from affecting analytics and streamline the item management workflow.
+This document defines the various layers of filtering, ignoring, and excluding data within the The Receipts application. These mechanisms prevent data noise from affecting analytics and streamline the item management workflow.
 
 ## 1. Duplicate Match Exclusions (Ignored Suggestions)
 

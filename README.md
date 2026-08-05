@@ -1,4 +1,4 @@
-# 🛒 Grocery Price Tracker
+# 🛒 IHaveTheReceipts
 
 A self-hosted, AI-powered receipt tracker that builds a personal price history database from your grocery receipts. Built with **FastAPI**, **SQLite**, **HTMX**, and **Google Gemini**.
 
@@ -108,8 +108,8 @@ Different models specialize in specific tasks — architectural planning, precis
 
 1.  **Clone & Configure**:
     ```bash
-    git clone https://github.com/yourusername/grocery-tracker.git
-    cd grocery-tracker
+    git clone https://github.com/yourusername/ihavethereceipts.git
+    cd ihavethereceipts
     cp .env.example .env
     # Edit .env and pick an OCR backend:
     #   OCR_BACKEND=gemini    + GEMINI_API_KEY=your_key        (cloud)

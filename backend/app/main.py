@@ -112,7 +112,7 @@ async def lifespan(_app: FastAPI):
     bulk_processor.stop()
 
 
-app = FastAPI(title="Grocery Price Tracker", lifespan=lifespan)
+app = FastAPI(title="IHaveTheReceipts", lifespan=lifespan)
 
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
