@@ -8,14 +8,14 @@ Because the app supports both **Local AI Vision Models** (via LM Studio/Ollama) 
 
 | Setup Type | AI Processing | OS Options | WSL2 Required? | RAM | CPU | GPU (VRAM) | Storage |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Budget / Cloud** | Google Gemini API | Win, Mac, Linux, ChromeOS | No (Native Python works) | 4GB - 8GB | Any Dual-Core (10yrs old+) | None (Integrated OK) | 128GB SSD |
+| **Budget / Cloud** | Google Gemini API | Win, Mac, Linux | No (Native Python works) | 4GB - 8GB | Any Dual-Core (10yrs old+) | None (Integrated OK) | 128GB SSD |
 | **Standard Local** | Local LM Studio (2B Vision) | Win, Linux, Mac | Optional (Win/WSL2) | 16GB | Modern 4-Core (Ryzen 5 / i5) | 6GB+ Dedicated VRAM | 256GB NVMe |
 | **Pro Local** | Local LM Studio (8B Vision) | Win, Linux, Mac | Optional (Win/WSL2) | 32GB | Modern 6-Core+ (Ryzen 7 / i7) | 12GB+ Dedicated VRAM | 512GB NVMe |
 | **Apple Silicon** | Local LM Studio (8B Vision) | macOS (M-Series) | No (Native macOS Unix) | 18GB+ (Unified) | Apple M2/M3/M4 Pro/Max | Shared with System RAM | 512GB NVMe |
 
 ## Option 1: Low-end Specs (API-Only Mode)
 By routing receipt OCR to the Google Gemini API, the local hardware handles only the lightweight Python FastAPI server, the SQLite database, and the web frontend.
-- **Ideal for**: Old laptops, Raspberry Pi 4/5, basic headless servers.
+- **Ideal for**: Old laptops, Raspberry Pi (Zero 2W, 4, 5 — tested), basic headless servers.
 - **OS Notes**: Any OS works. If using Windows on very old hardware, avoiding WSL2 and running Python natively is recommended to save RAM. Alternatively, replacing Windows 11 with a lightweight Linux distribution (like Linux Mint XFCE or Ubuntu Server) will free up significant resources.
 
 ## Option 2: The Local Privacy Specs (LM Studio / Ollama)
@@ -36,24 +36,24 @@ If you are running the API-Only mode on a laptop with limited RAM (e.g., 8GB), W
   memory=2GB
   ```
 - **The Storage Fix**: The WSL2 virtual disk (`ext4.vhdx`) expands dynamically but does not shrink automatically when you delete files inside Ubuntu. You must periodically compact it using the Windows `diskpart` utility to reclaim lost gigabytes.
-- **Alternatives to WSL2**: If WSL2 is too heavy, you can use **WSL 1** (which is a lightweight translation layer instead of a VM), or simply run the Python backend natively in Windows PowerShell.
+- **Alternatives to WSL2**: If WSL2 is too heavy, you can use **WSL 1** (a lightweight translation layer instead of a VM — note that WSL 1 has slower Linux filesystem I/O, which may affect database write performance), or simply run the Python backend natively in Windows PowerShell.
 
 ---
 
 ## Raspberry Pi Deployment
 
-The Grocery Tracker runs well on Raspberry Pi hardware when used in **API-only or LAN-inference mode**. The Pi handles the lightweight FastAPI server and SQLite database; all AI inference happens either in the cloud (Gemini API) or on a separate, more powerful machine running LM Studio.
+The Grocery Tracker runs well on Raspberry Pi hardware (A Raspberry Pi Zero 2 W) when used in **API-only or LAN-inference mode**. The Pi handles the lightweight FastAPI server and SQLite database; all AI inference happens either in the cloud (Gemini API) or on a separate, more powerful machine running LM Studio.
 
 ### Pi Compatibility Matrix
 
-| Model | RAM | 64-bit OS? | API Mode | LM Studio (LAN) | Ollama (on-device) | Local LM Studio (on-device) |
+| Model | RAM | 64-bit OS? | API Mode | LM Studio (LAN) | Ollama (on-device) | LM Studio (x86 only) |
 |:---|:---|:---|:---|:---|:---|:---|
 | **Zero 2 W** | 512MB | No (32-bit default) | ⚠️ Tight | ✅ Works | ❌ No (32-bit) | ❌ No |
 | **Zero 2 W** | 512MB | Yes (64-bit OS) | ⚠️ Tight | ✅ Works | ⚠️ Tiny models only | ❌ No |
 | **Pi 3B / 3B+** | 1GB | Yes | ✅ OK | ✅ Works | ⚠️ Tiny models only | ❌ No |
 | **Pi 4 (2GB)** | 2GB | Yes | ✅ Good | ✅ Works | ⚠️ Small models only | ❌ No |
-| **Pi 4 (4GB / 8GB)** | 4–8GB | Yes | ✅ Great | ✅ Works | ✅ Granite 3.3 2B / Qwen2-VL 2B | ❌ No |
-| **Pi 5 (4GB / 8GB)** | 4–8GB | Yes | ✅ Great | ✅ Works | ✅ Granite 3.3 2B / Qwen2-VL 2B | ❌ No |
+| **Pi 4 (4GB / 8GB)** | 4–8GB | Yes | ✅ Great | ✅ Works | ✅ Qwen2.5-VL 2B / Qwen2-VL 2B | ❌ No |
+| **Pi 5 (4GB / 8GB)** | 4–8GB | Yes | ✅ Great | ✅ Works | ✅ Qwen2.5-VL 2B / Qwen2-VL 2B | ❌ No |
 
 > [!NOTE]
 > **LM Studio does not run on any Raspberry Pi.** It requires x86-64 or Apple Silicon. However, you can run LM Studio on a desktop PC or MacBook and point the Pi at it over your local network.
@@ -72,13 +72,13 @@ OCR_BACKEND=gemini
 
 ### Option B: LM Studio on Your Desktop, Pi as Thin Client
 
-Run LM Studio on your main PC or Mac, enable the local server, and point the Pi at it over your LAN:
+Run LM Studio on your main PC or Mac, enable the local server, and point the Pi at it over your LAN. A wired Ethernet connection is strongly preferred over Wi-Fi for image uploads — large receipt images can be slow or time out on a congested wireless link.
 
 ```bash
 # .env on the Pi — replace with your desktop's local IP
 OCR_BACKEND=local
 OCR_BACKEND_URL=http://192.168.1.42:1234/v1
-OCR_MODEL=ibm/granite-3.3-vision:2b   # or whichever model you have loaded
+OCR_MODEL=qwen/qwen2.5-vl-7b   # model ID varies — use the exact string shown in LM Studio's model list
 ```
 
 The Pi sends the receipt image to your desktop for inference and receives the structured JSON response. The Pi itself does zero AI computation — it's just an HTTP client.
@@ -98,12 +98,12 @@ For fully offline, on-device inference on a Pi 4 (4GB+) or Pi 5:
 curl -fsSL https://ollama.com/install.sh | sh
 
 # Pull a supported vision model
-ollama pull granite3.3-vision:2b   # ~1.5GB download
+ollama pull qwen2.5-vl:2b   # ~1.5GB download
 
 # .env on the Pi
 OCR_BACKEND=local
 OCR_BACKEND_URL=http://127.0.0.1:11434/v1
-OCR_MODEL=granite3.3-vision:2b
+OCR_MODEL=qwen2.5-vl:2b
 ```
 
 > [!WARNING]
@@ -138,10 +138,10 @@ sudo apt update && sudo apt install -y python3 python3-pip pipx poppler-utils li
 pipx install uv
 
 # Clone and configure
-git clone https://github.com/yourusername/grocery-tracker.git
+git clone https://github.com/smcgazz/grocery-tracker.git
 cd grocery-tracker
 cp .env.example .env
-nano .env   # add GEMINI_API_KEY
+nano .env   # add GEMINI_API_KEY — get yours free at https://aistudio.google.com
 
 # Run
 cd backend

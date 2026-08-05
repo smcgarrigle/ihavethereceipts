@@ -13,8 +13,6 @@ Automated background enrichment that detects FDC coverage gaps and surfaces cand
 - [ ] **Persistent notification banner**: Shows pending suggestion count across all pages until reviewed or dismissed.
 - [ ] **Settings card**: Coverage indicator, threshold slider, enable/disable toggle. Exclude Fees & Taxes / Household from the enrichable denominator.
 
-Full plan: [`scratch/PLAN_NUTRITION_CATCHUP.md`](/grocery-tracker/scratch/PLAN_NUTRITION_CATCHUP.md)
-
 ### 2. Price History & Volatility
 - [ ] **Retailer Overlays**: Overlay multiple stores on a single item's price history chart.
 - [ ] **Volatility Alerts**: UI notifications for items with >15% price shifts in the last 30 days.
@@ -45,6 +43,10 @@ Let users create personally meaningful categories (e.g. "Protein-Maxxing") that 
 - [ ] **Re-categorization warning**: Warn (don't block) that moving items rewrites all historical chart data for those items.
 - [ ] **Prerequisite**: Retire or redirect the orphaned `/categories` page left unlinked by the nav redesign.
 - [ ] **Later**: Feedback-loop taxonomy learning so new item variants land in user lenses automatically.
+
+### 8. AI Agent Assistant shopping
+- [ ] **Agentic Shopping**: Hand off the prediction list to an agent that shops online for you and builds cart based around opitmal pricing and the urgency of restock
+- [ ] **currently prohibited by TOS**
 
 ---
 
@@ -135,8 +137,3 @@ Let users create personally meaningful categories (e.g. "Protein-Maxxing") that 
 
 ---
 *Last Updated: August 3, 2026*
-
-<!-- Search UX options considered (Option A implemented May 2026):
-  Option B — Dedicated /search full-page (Enter key navigates to results page; table view with all purchase history)
-  Option C — Command Palette Modal (Cmd+K overlay with fuzzy search, store chips, price preview; most premium feel)
-  Both are viable follow-on upgrades to the current Option A enhanced dropdown. -->

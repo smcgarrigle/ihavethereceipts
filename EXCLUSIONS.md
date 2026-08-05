@@ -10,38 +10,61 @@ This document defines the various layers of filtering, ignoring, and excluding d
 *   **Action**: When a user clicks "Dismiss" on a duplicate suggestion, a record is created in `item_match_ignores` for that pair of IDs.
 *   **Restoration**: Ignored pairs can be viewed and restored in the **Items > Dismissed** tab.
 
+---
+
 ## 2. Ingestion & OCR Filters (Junk Removal)
 
 *   **Purpose**: Strips marketing fluff and transaction metadata from item names during the initial PDF/Image parsing.
-*   **Mechanism**: Hardcoded `skip_keywords` and `junk_filters` (RegEx) in `backend/app/services/pdf_parser.py`.
-*   **View Excluded From**: **All views** (Receipts, Items, Dashboard). These strings are removed before the data is saved to the database.
+*   **Mechanism**: `skip_keywords` and `junk_filters` in `backend/app/services/pdf_parser.py`, loaded at runtime from `data/ocr_filters.json`. The lists below are the hardcoded fallbacks used when the JSON file is missing.
+*   **View Excluded From**: **All views** (Receipts, Items, Dashboard). These strings are removed before data is saved to the database.
 
-### Skip Keywords (Metadata)
-The following lines are ignored entirely during parsing. These are the **fallback defaults** — the live list is loaded from `data/ocr_filters.json` (editable without restarting the app):
-- `Purchased at`, `Order Summary`, `Order Details`
-- `Item(s) Subtotal`, `Shipping`, `Total before tax`
-- `Estimated tax`, `Grand Total`, `Order placed`, `Order #`
-- `PAGE`, `PICKUP AT`, `Payment method`
+### Skip Keywords (Metadata — entire line discarded)
+`Purchased at` · `Order Summary` · `Order Details` · `Item(s) Subtotal` · `Shipping` · `Total before tax` · `Estimated tax` · `Grand Total` · `Order placed` · `Order #` · `PAGE` · `PICKUP AT` · `Payment method`
 
-### Junk Filters (Marketing Strings)
-The following strings are stripped from item names. These are the **fallback defaults** — the live list is in `data/ocr_filters.json`:
-- `, Non-GMO`, `, Gluten-Free`
-- `, with Immune Support`, `, Award Winning`
+### Junk Filters (Marketing strings stripped from item names)
+`, Non-GMO` · `, Gluten-Free` · `, with Immune Support` · `, Award Winning`
+
+> [!TIP]
+> Both lists are user-editable via `data/ocr_filters.json` without restarting the app. The fallback lists above are only used if the file is missing or unreadable.
+
+---
 
 ## 3. Analytics & Dashboard Exclusions
 
-*   **Purpose**: Suppresses non-grocery costs (taxes, shipping, service fees) from spending charts and totals.
-*   **Mechanism**: `_is_excluded()` in `backend/app/api/analytics.py`, driven by `ExclusionRule` table entries with `scope='analytics'`.
-*   **Matching**: Case-insensitive substring against both **category names** and **item names**. For example, a pattern `crv` will hide items named "CRV 6PK UNDER 240Z AB" even if they are categorized as "Fees & Taxes" or "Other".
-*   **View Excluded From**:
-    - **Dashboard**: "Total Spent" summary card.
-    - **Dashboard**: "Spend by Category" charts.
-    - **Dashboard**: Category Drilldown modals.
-    - **X-Ray**: All 5 visualizations (Volatility, Store DNA, Phantom Items, Rhythm, Complexity).
-*   **Default patterns** (when no rules are configured): `excluded`, `other`, `taxes & fees`.
+Two distinct mechanisms apply here. It is important to understand which views are controlled by user-configured rules versus which are hardcoded.
 
-> [!TIP]
-> To hide a specific item from your spending totals, add its name (or a substring of it) to Settings → Analytics Exclusions — e.g. adding `crv` will hide all CRV items.
+### 3a. Dynamic Exclusion Rules (`ExclusionRule` table, `scope='analytics'`)
+
+*   **Purpose**: User-configured patterns that suppress categories/items from specific analytics views.
+*   **Mechanism**: `_is_excluded()` in `backend/app/api/analytics.py`, reading `ExclusionRule` rows with `scope='analytics'`. Managed from **Settings → Analytics Exclusions**.
+*   **Matching**: Case-insensitive substring against both **category names** and **item names**. A pattern `crv` will hide items named "CRV 6PK UNDER 24OZ" even if their category is "Fees & Taxes" or "Other".
+*   **Default patterns** (used when the table is empty): `excluded`, `other`, `taxes & fees`.
+*   **Views affected by dynamic rules**:
+    - **Dashboard**: BI Dashboard (30-day spend, macro breakdown).
+    - **Dashboard**: Category-Store Stack widget.
+    - **X-Ray**: All 5 visualizations — Price Volatility, Store DNA, Phantom Items, Shopping Rhythm, Receipt Complexity.
+
+### 3b. Hardcoded Category Filter (`.notin_()` SQL)
+
+*   **Purpose**: A fixed backstop that always removes known noise categories regardless of user rules.
+*   **Mechanism**: SQLAlchemy `.filter(Category.name.notin_([...]))` embedded directly in query logic — **not** driven by `ExclusionRule`. Cannot be changed from Settings.
+*   **Hardcoded exclusion list**: `Excluded`, `Other`, `Fees & Taxes`, `CRV (tax)`, `Non-Alcoholic Beer`.
+*   **Views using this filter**:
+    - **Dashboard**: "Total Spent" summary card (`summary_stats`).
+    - **Dashboard**: "Spend by Category" chart (`spending_by_category`).
+
+> [!NOTE]
+> The two mechanisms are independent. Adding a custom pattern in Settings → Analytics Exclusions will affect the BI Dashboard and X-Ray views, but **not** the "Total Spent" card or "Spend by Category" chart — those use the hardcoded list only.
 
 ---
-*Last Updated: August 3, 2026*
+
+## 4. Prediction Engine Exclusions
+
+*   **Purpose**: Suppresses categories from the restock/cadence engine so that non-consumable or noise categories don't generate restocking alerts.
+*   **Mechanism**: `_get_excluded_categories()` in `backend/app/services/predictions.py`, reading `ExclusionRule` rows with `scope='predictions'`. Managed from **Settings → Prediction Exclusions**.
+*   **Default patterns** (used when the table is empty): `Excluded`, `Other`, `Non-Alcoholic Beer`, `Fees & Taxes`, `CRV (tax)`.
+*   **Views affected**: Restock alerts, cadence engine, shopping list suggestions.
+
+---
+
+*Last Updated: August 4, 2026*

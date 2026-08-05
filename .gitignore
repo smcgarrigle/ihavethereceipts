@@ -77,6 +77,7 @@ backend/scripts/archive/
 # ============================================================
 backend/scripts/deleted_receipts_log.md
 backend/scripts/output.txt
+# lowercase variants (agent-created files)
 *_analysis.md
 *_review.md
 *_audit.md
@@ -85,6 +86,15 @@ backend/scripts/output.txt
 *_migration*.md
 TODO_*.md
 implementation_plan*.md
+# uppercase variants (same patterns, Linux case-sensitive fs)
+*_ANALYSIS.md
+*_REVIEW.md
+*_AUDIT.md
+*_CLEANUP.md
+*_REPORT.md
+*_MIGRATION*.md
+TODO_*.MD
+DELETE-*.md
 
 # ============================================================
 # LOGS & PROCESS FILES

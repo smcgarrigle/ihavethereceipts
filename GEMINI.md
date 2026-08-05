@@ -27,7 +27,7 @@ This document serves as the primary blueprint for all AI agents working on this 
     - **AJAX**: HTMX (Server-driven fragments)
     - **Reactivity**: Alpine.js (Lightweight client-side state)
 - **AI/OCR**:
-    - Primary: Google Gemini 3.5 Flash API
+    - Primary: Google Gemini 3.x API family, prefer flash models
     - Local: Qwen2.5-VL or similar — via **LM Studio** or **Ollama**
     - **Finding Latest Models**: Use `app.services.model_manager.model_manager.fetch_available_models()` or check the `data/known_models.json` cache to see what models are available on your API key. The "Flash" models are typically the efficient/free tier choices.
     - **OCR Feedback Loop**: `app/services/correction_service.py` records human review corrections (`ocr_corrections` table) and builds the few-shot block injected into the receipt prompt by `process_receipt_task`. When changing the OCR prompt or models, measure the impact with `uv run python scripts/ocr_eval.py` (`--stored` = free baseline from past receipts, `--live` = re-run OCR). Note: the OCR result cache is keyed on image + full prompt text.
@@ -71,12 +71,13 @@ This document serves as the primary blueprint for all AI agents working on this 
 
 
 ## 5. Directory Structure
-- `backend/app/api/`: FastAPI route handlers.
-- `backend/app/models/`: SQLAlchemy database models.
-- `backend/app/services/`: Business logic (OCR, Matching, Normalization).
+- `backend/app/api/`: FastAPI route handlers (`analytics.py`, `analytics_fragments.py`, `pages.py`, `receipts.py`, `receipts_review.py`, `items.py`, `trends.py`, `xray.py`, `settings_router.py`, `predictions_router.py`, `search_router.py`, `export.py`, `bulk.py`).
+- `backend/app/models/`: SQLAlchemy database models (`receipt.py`, `item.py`, `category.py`, `exclusion.py`, `ocr_correction.py`, `merge_log.py`, `store.py`).
+- `backend/app/services/`: Business logic (`ocr.py`, `item_matcher.py`, `store_utils.py`, `pdf_parser.py`, `correction_service.py`, `predictions.py`, `fdc_service.py`, `external_product.py`, `nutrition_utils.py`, `category_mapper.py`, `category_cache.py`, `category_tagger.py`, `folder_watch.py`, `bulk_processor.py`, `receipt_service.py`, `model_manager.py`, `onboarding.py`).
 - `backend/templates/`: HTML templates (layouts and pages).
 - `backend/tests/`: Pytest test suite.
+
 ## 6. Logic Explanations (Data Enrichment)
 - **Auto-merged (✨)**: Pure Python logic (using `rapidfuzz`) that matches OCR text to a "Master Item" record. It does NOT use the Gemini API.
 - **History applied (📘)**: Local database lookup that inherits quantity/weight/units from the *most recent* purchase of the same item.
-- **Live Augmentation**: These enrichments are applied "live" in `app.main.review_receipt` every time the page is loaded.
+- **Live Augmentation**: These enrichments are applied "live" in `app.api.pages.review_receipt` every time the page is loaded.
