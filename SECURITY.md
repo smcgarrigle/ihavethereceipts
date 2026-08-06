@@ -12,6 +12,33 @@ or accidentally committing personal receipt data.
 
 ---
 
+## Reporting a Vulnerability
+
+Please report security issues **privately** — don't open a public issue, and don't
+post details in a pull request or discussion.
+
+Use GitHub's [Private Vulnerability Reporting](https://github.com/smcgazz/ihavethereceipts/security/advisories/new):
+go to the **Security** tab → **Report a vulnerability**. The report is visible only
+to the maintainer until a fix is published.
+
+What to expect:
+
+- **Acknowledgement** within about a week. This is a hobby project maintained by one
+  person in their spare time, so please don't expect same-day triage.
+- **A fix or an explicit "won't fix"** once the report is confirmed. Anything declined
+  will come with the reasoning — usually that it falls under
+  [What This App Intentionally Does NOT Have](#7-what-this-app-intentionally-does-not-have).
+- **Credit** in the release notes, unless you'd rather stay anonymous.
+
+Useful context when reporting: the version or commit SHA, your OCR backend
+(`local` or `gemini`), and whether the instance is LAN-only or internet-exposed.
+
+Because this app is single-user and local-first with no authentication, reports that
+assume a multi-user threat model (privilege escalation between accounts, session
+fixation, and similar) generally don't apply — see section 7.
+
+---
+
 ## 1. Before Pushing to GitHub
 
 | Risk | Mitigation |

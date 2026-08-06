@@ -44,9 +44,9 @@ class TestSearchFoodsMethodExists:
             "search_foods unexpectedly exists — if this was added, "
             "the call site in items.py line 435 is now valid."
         )
-        assert hasattr(
-            fdc_service, "search_items"
-        ), "search_items should be the correct method name."
+        assert hasattr(fdc_service, "search_items"), (
+            "search_items should be the correct method name."
+        )
 
     def test_nutrition_search_endpoint_does_not_crash(self, db, client):
         """The /api/items/{id}/nutrition/search endpoint should not crash."""
