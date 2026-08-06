@@ -138,7 +138,7 @@ sudo apt update && sudo apt install -y python3 python3-pip pipx poppler-utils li
 pipx install uv
 
 # Clone and configure
-git clone https://github.com/smcgazz/ihavethereceipts.git
+git clone https://github.com/smcgarrigle/ihavethereceipts.git
 cd ihavethereceipts
 cp .env.example .env
 nano .env   # add GEMINI_API_KEY — get yours free at https://aistudio.google.com
