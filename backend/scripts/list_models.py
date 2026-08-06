@@ -1,19 +1,21 @@
 import os
 import sys
+from pathlib import Path
 
 from dotenv import load_dotenv
 from google import genai
 
-# Add backend to path to ensure we can load env correctly if needed, though dotenv handles it
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Setup paths
+root_dir = Path(__file__).parent.parent.parent
+sys.path.append(str(root_dir / "backend"))
 
 # Load env vars
-load_dotenv("/home/mcgar/projects/grocery-tracker/.env")
+load_dotenv(root_dir / ".env")
 
 api_key = os.getenv("GEMINI_API_KEY")
 if not api_key:
     # Try backend/.env as backup
-    load_dotenv("/home/mcgar/projects/grocery-tracker/.env")
+    load_dotenv(root_dir / "backend" / ".env")
     api_key = os.getenv("GEMINI_API_KEY")
 
 if not api_key:
