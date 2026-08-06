@@ -108,7 +108,7 @@ Different models specialize in specific tasks — architectural planning, precis
 
 1.  **Clone & Configure**:
     ```bash
-    git clone https://github.com/smcgazz/ihavethereceipts.git
+    git clone https://github.com/smcgarrigle/ihavethereceipts.git
     cd ihavethereceipts
     cp .env.example .env
     # Edit .env and pick an OCR backend:

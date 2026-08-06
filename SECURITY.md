@@ -17,7 +17,7 @@ or accidentally committing personal receipt data.
 Please report security issues **privately** — don't open a public issue, and don't
 post details in a pull request or discussion.
 
-Use GitHub's [Private Vulnerability Reporting](https://github.com/smcgazz/ihavethereceipts/security/advisories/new):
+Use GitHub's [Private Vulnerability Reporting](https://github.com/smcgarrigle/ihavethereceipts/security/advisories/new):
 go to the **Security** tab → **Report a vulnerability**. The report is visible only
 to the maintainer until a fix is published.
 
