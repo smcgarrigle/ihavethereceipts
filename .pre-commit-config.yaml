@@ -7,10 +7,12 @@ repos:
       - id: check-yaml
       - id: check-added-large-files
 
+  # Keep this rev in sync with the ruff pin in backend/pyproject.toml — if they
+  # drift, `make lint` and this hook disagree about formatting.
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.3.0
+    rev: v0.15.12
     hooks:
-      - id: ruff
+      - id: ruff-check
         args: [ --fix ]
       - id: ruff-format
 

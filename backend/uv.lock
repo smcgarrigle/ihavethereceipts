@@ -727,7 +727,7 @@ requires-dist = [
     { name = "python-levenshtein", specifier = ">=0.23.0" },
     { name = "python-multipart", specifier = ">=0.0.6" },
     { name = "rapidfuzz", specifier = ">=3.6.1" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.3.0" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15.12" },
     { name = "sqlalchemy", specifier = ">=2.0.23" },
     { name = "types-pillow", marker = "extra == 'dev'", specifier = ">=10.2.0.20240213" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.24.0" },
