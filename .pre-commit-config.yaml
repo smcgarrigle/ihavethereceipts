@@ -10,7 +10,7 @@ repos:
   # Keep this rev in sync with the ruff pin in backend/pyproject.toml — if they
   # drift, `make lint` and this hook disagree about formatting.
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.12
+    rev: v0.16.1
     hooks:
       - id: ruff-check
         args: [ --fix ]

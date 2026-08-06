@@ -114,7 +114,9 @@ class FDCService:
 
         url = f"{FDC_BASE_URL}/foods/search"
         params = {"api_key": self.api_key}
-        payload = {
+        # Annotated rather than inferred: the mixed value types would otherwise
+        # infer as dict[str, object], which requests' JsonType rejects.
+        payload: dict[str, Any] = {
             "query": cleaned_query,
             "dataType": data_type,
             "pageSize": page_size,

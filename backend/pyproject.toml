@@ -34,7 +34,7 @@ dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
     # Keep in sync with the ruff-pre-commit rev in ../.pre-commit-config.yaml.
-    "ruff>=0.15.12",
+    "ruff>=0.16.1",
     "mypy>=1.9.0",
     "pre-commit>=3.6.0",
     "types-pillow>=10.2.0.20240213",
@@ -75,7 +75,10 @@ ignore = [
 known-first-party = ["app"]
 
 [tool.mypy]
-python_version = "3.11"
+# No explicit python_version: mypy follows the interpreter it runs under.
+# numpy ships 2.4.x for py3.11 and 2.5.x (whose stubs need 3.12+ syntax) for
+# py3.12+, so a hardcoded version mismatches whichever numpy is installed.
+# CI runs the 3.11 floor from requires-python, so 3.11 compat is still guarded.
 warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true
