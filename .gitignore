@@ -30,6 +30,9 @@ data/uploads/*
 data/processed/*
 !data/uploads/.gitkeep
 !data/processed/.gitkeep
+# Folder-watch inbox (and inbox/rejected) — receipts dropped here are personal.
+# Not tracked at all: FolderWatcher.start() creates it on boot, so no .gitkeep needed.
+data/inbox/
 data/GroceryReceiptsPDFs/
 data/known_models.json
 data/category_cache.json
