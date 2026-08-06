@@ -1,14 +1,16 @@
 import os
 import sys
+from pathlib import Path
 
 import inquirer
 from dotenv import load_dotenv, set_key
 from google import genai
 
-# Add backend to path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Setup paths
+root_dir = Path(__file__).parent.parent.parent
+sys.path.append(str(root_dir / "backend"))
 
-ENV_PATH = "/home/mcgar/projects/grocery-tracker/.env"
+ENV_PATH = str(root_dir / ".env")
 load_dotenv(ENV_PATH)
 
 

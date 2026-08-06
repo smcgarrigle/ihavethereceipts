@@ -199,6 +199,10 @@ def _create_receipt(db, data, file_path):
 
 
 if __name__ == "__main__":
-    folder = "/home/mcgar/projects/grocery-tracker/data/GroceryReceiptsPDFs"
+    # Folder of receipt PDFs to sync. Override with a CLI arg or PDF_SYNC_FOLDER;
+    # defaults to data/GroceryReceiptsPDFs at the project root.
+    root_dir = Path(__file__).parent.parent.parent
+    default_folder = root_dir / "data" / "GroceryReceiptsPDFs"
+    folder = sys.argv[1] if len(sys.argv) > 1 else os.getenv("PDF_SYNC_FOLDER", str(default_folder))
     # Execute actual sync
     sync_receipts(folder, dry_run=False)

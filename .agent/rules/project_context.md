@@ -5,7 +5,7 @@ trigger: always_on
 
 This project is a Grocery Price Tracker built with Python (FastAPI), HTMX, and Alpine.js.
 
-For full technical context, architectural details, and project history, you MUST refer to the root [PROJECT_CONTEXT.md](/grocery-tracker/PROJECT_CONTEXT.md).
+For full technical context, architectural details, and project history, you MUST refer to the root [GEMINI.md](../../GEMINI.md) and the docs it indexes.
 
 Key Stack:
 - Backend: FastAPI, SQLAlchemy, Alembic

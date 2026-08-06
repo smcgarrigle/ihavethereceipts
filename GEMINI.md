@@ -15,7 +15,6 @@ This document serves as the primary blueprint for all AI agents working on this 
 - [SBOM.md](/ihavethereceipts/SBOM.md): Software Bill of Materials — all dependencies and licenses.
 - [README.md](/ihavethereceipts/README.md): GitHub instructions and project sharing guide.
 - [SECURITY.md](/ihavethereceipts/SECURITY.md): Sensible security practices before pushing to GitHub or containerizing.
-- [skill.md](/ihavethereceipts/skill.md): Portable AI operational blueprint and task guide.
 
 ## 1. Core Technology Stack
 - **Backend**: Python 3.11, FastAPI
