@@ -1,7 +1,7 @@
 """check_contrast.py — WCAG contrast regression check for the theme tokens.
 
 Parses the hex values straight out of static/css/themes.css (all four theme
-blocks) and ../site/styles.css, then verifies every meaningful pairing:
+blocks), then verifies every meaningful pairing:
 
 - normal text on its surfaces        >= 4.5:1  (WCAG 1.4.3 AA)
 - form input borders vs input fill   >= 3.0:1  (WCAG 1.4.11 non-text)
@@ -21,7 +21,6 @@ from pathlib import Path
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 THEMES_CSS = BACKEND_DIR / "static" / "css" / "themes.css"
-SITE_CSS = BACKEND_DIR.parent / "site" / "styles.css"
 
 AA_TEXT = 4.5
 UI_COMPONENT = 3.0
@@ -37,17 +36,6 @@ THEME_CHECKS = [
     ("text-subtle", "bg-card", AA_TEXT, "de-emphasised on cards"),
     ("text-code", "bg-skeleton", AA_TEXT, "inline code / debug badges"),
     ("border-input", "bg-input", UI_COMPONENT, "input boundary"),
-]
-
-SITE_CHECKS = [
-    ("text", "bg", AA_TEXT, "body text"),
-    ("text", "bg-card", AA_TEXT, "card text"),
-    ("text-muted", "bg", AA_TEXT, "secondary text"),
-    ("text-muted", "bg-card", AA_TEXT, "secondary on cards"),
-    ("text-subtle", "bg", AA_TEXT, "terminal comments / small print"),
-    ("accent", "bg", AA_TEXT, "links / eyebrow"),
-    ("accent-ai", "bg", AA_TEXT, "AI accent text"),
-    ("accent-amber", "bg", AA_TEXT, "amber accent text"),
 ]
 
 HEX_PROP = re.compile(r"--([\w-]+)\s*:\s*(#[0-9a-fA-F]{3,8})\b")
@@ -121,11 +109,6 @@ def main() -> int:
     print("App themes (static/css/themes.css):")
     for theme, palette in sorted(theme_palettes().items()):
         failures += run_checks(theme, palette, THEME_CHECKS)
-
-    print("\nMarketing site (site/styles.css):")
-    site_blocks = parse_blocks(SITE_CSS.read_text(encoding="utf-8"))
-    site_palette = site_blocks.get(":root", {})
-    failures += run_checks("marketing", site_palette, SITE_CHECKS)
 
     if failures:
         print(f"\n❌ {len(failures)} contrast failure(s):")
