@@ -7,14 +7,14 @@ trigger: always_on
 This document serves as the primary blueprint for all AI agents working on this project. It contains technology choices, coding style preferences, and architectural patterns established through development.
 
 ## Project Documentation
-- [CHEATSHEET.md](/ihavethereceipts/CHEATSHEET.md): Quick reference guide for users.
-- [DATA_DESIGN.md](/ihavethereceipts/DATA_DESIGN.md): Database schema, ERD, and field definitions.
-- [EXCLUSIONS.md](/ihavethereceipts/EXCLUSIONS.md): Logic for junk filters and analytics exclusions.
-- [PRD.md](/ihavethereceipts/PRD.md): Core instructions and product requirements.
-- [ROADMAP.md](/ihavethereceipts/ROADMAP.md): Feature backlog, strategic vision, and completed milestones.
-- [SBOM.md](/ihavethereceipts/SBOM.md): Software Bill of Materials — all dependencies and licenses.
-- [README.md](/ihavethereceipts/README.md): GitHub instructions and project sharing guide.
-- [SECURITY.md](/ihavethereceipts/SECURITY.md): Sensible security practices before pushing to GitHub or containerizing.
+- [CHEATSHEET.md](CHEATSHEET.md): Quick reference guide for users.
+- [DATA_DESIGN.md](DATA_DESIGN.md): Database schema, ERD, and field definitions.
+- [EXCLUSIONS.md](EXCLUSIONS.md): Logic for junk filters and analytics exclusions.
+- [PRD.md](PRD.md): Core instructions and product requirements.
+- [ROADMAP.md](ROADMAP.md): Feature backlog, strategic vision, and completed milestones.
+- [SBOM.md](SBOM.md): Software Bill of Materials — all dependencies and licenses.
+- [README.md](README.md): GitHub instructions and project sharing guide.
+- [SECURITY.md](SECURITY.md): Sensible security practices before pushing to GitHub or containerizing.
 
 ## 1. Core Technology Stack
 - **Backend**: Python 3.11, FastAPI
@@ -46,7 +46,7 @@ This document serves as the primary blueprint for all AI agents working on this 
 1. **Implementation Plans**: Always create an `implementation_plan.md` before making significant code changes.
 2. **Quality Gates**: All commits must pass local **pre-commit hooks** (Ruff, Mypy). Run `uv run pre-commit install` once to set this up.
 3. **Bug Fixes**: When a bug is reported, follow this sequence:
-    - Create a test in `/tests` that reproduces the bug.
+    - Create a test in `backend/tests/` that reproduces the bug.
     - Fix the bug.
     - Prove the fix with the passing test.
 4. **Receipt Processing**:

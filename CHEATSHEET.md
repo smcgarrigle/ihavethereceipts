@@ -1,5 +1,5 @@
 # IHaveTheReceipts - Cheatsheet
-For AI agent behavior and coding style, see [GEMINI.md](/ihavethereceipts/GEMINI.md).
+For AI agent behavior and coding style, see [GEMINI.md](GEMINI.md).
 
 ## 🚀 Application Management
 
