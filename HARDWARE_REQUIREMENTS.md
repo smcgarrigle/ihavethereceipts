@@ -150,3 +150,13 @@ uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
 Access the app from any device on your network at `http://<pi-ip-address>:8000`.
+
+> ⚠️ `--host 0.0.0.0` is deliberate here — a headless Pi is useless without it — but it
+> means **anything on your LAN can reach the app, and the app has no authentication**.
+> If you'd rather not trust every device on the network, keep the default
+> `--host 127.0.0.1` and put Tailscale in front instead:
+> ```bash
+> tailscale serve --bg 8000
+> ```
+> That reaches the Pi from your phone over HTTPS, restricted to your own tailnet.
+> See [SECURITY.md](SECURITY.md) §3.
