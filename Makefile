@@ -3,12 +3,19 @@
 
 BACKEND_DIR = backend
 
-.PHONY: setup run test lint format demo help
+# The app has no authentication, so it binds to loopback only by default.
+# Reach it from other devices over Tailscale instead: `tailscale serve --bg 8000`
+# publishes it to your tailnet over HTTPS without exposing it to the LAN.
+# Override deliberately with `make run-lan` (or `make run HOST=0.0.0.0`).
+HOST ?= 127.0.0.1
+
+.PHONY: setup run run-lan test lint format demo help
 
 help:
 	@echo "Grocery Tracker Dev Commands"
 	@echo "  make setup   — install dependencies and git hooks"
-	@echo "  make run     — start local dev server (http://localhost:8000)"
+	@echo "  make run     — start local dev server (http://127.0.0.1:8000)"
+	@echo "  make run-lan — same, but bound to 0.0.0.0 (no auth — trusted networks only)"
 	@echo "  make test    — run full pytest suite"
 	@echo "  make lint    — ruff check + format check"
 	@echo "  make format  — auto-fix formatting with ruff"
@@ -20,7 +27,10 @@ setup:
 	@echo "✅ Setup complete. Run 'make run' to start the server."
 
 run:
-	cd $(BACKEND_DIR) && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+	cd $(BACKEND_DIR) && uv run uvicorn app.main:app --reload --host $(HOST) --port 8000
+
+run-lan:
+	$(MAKE) run HOST=0.0.0.0
 
 test:
 	cd $(BACKEND_DIR) && uv run pytest tests/ -v

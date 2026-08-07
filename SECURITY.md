@@ -69,10 +69,26 @@ grep -r "AIza" .    # spot-check for accidentally hardcoded API keys
 
 ## 3. Network Exposure
 
-By default, the app binds to `0.0.0.0:8000`, meaning it is reachable by any device on your LAN.
+By default (`make run`), the app binds to `127.0.0.1:8000` — reachable only from the machine
+it runs on. The app has no authentication, so loopback is the safe default. The options below
+widen that deliberately.
 
-### LAN-only (default — acceptable)
-No additional hardening required for home use. Ensure your router does not expose port 8000 to the internet.
+### Tailnet-only via Tailscale Serve (recommended for phones/other devices)
+Keep the loopback bind and put Tailscale in front:
+```bash
+tailscale serve --bg 8000
+```
+This publishes the app at `https://<your-machine>.<tailnet>.ts.net` over HTTPS, reachable
+**only** by devices signed into your tailnet — not the LAN, not the internet. Confirm with
+`tailscale serve status`, which should report `(tailnet only)`.
+
+> ⚠️ `tailscale funnel` is **not** the same thing — it publishes to the whole internet. Do not
+> use it with this app unless you have added authentication first (see below).
+
+### LAN-wide (`make run-lan`)
+Binds `0.0.0.0:8000`, so any device on your network can reach the app with no credentials —
+including guests and untrusted IoT devices. Acceptable only on a network you fully trust, and
+only if your router does not forward port 8000 to the internet.
 
 ### Public internet exposure (Tailscale Funnel, VPS, or port-forwarding)
 If you expose the app publicly, you **must** add authentication. The app currently has none.
