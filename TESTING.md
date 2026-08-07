@@ -79,4 +79,4 @@ with engine.connect() as conn:
 "
 ```
 
-**Prevention**: Avoid saving files while a bulk job is actively processing. Consider running the server without `--reload` (`uvicorn app.main:app --host 0.0.0.0 --port 8000`) when doing bulk ingestion runs.
+**Prevention**: Avoid saving files while a bulk job is actively processing. Consider running the server without `--reload` (`uvicorn app.main:app --host 127.0.0.1 --port 8000`) when doing bulk ingestion runs.

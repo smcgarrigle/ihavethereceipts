@@ -141,14 +141,24 @@ if [ "$NEW_BACKEND" = "local" ]; then
   done
 fi
 
-echo "Starting server..."
+# The app has no authentication, so bind to loopback by default. To reach it
+# from a phone or another machine, put Tailscale in front rather than widening
+# the bind: `tailscale serve --bg 8000` publishes it to your tailnet over HTTPS
+# and proxies to 127.0.0.1, so loopback is all it needs.
+# Widen deliberately with:  HOST=0.0.0.0 ./start_server.sh
+HOST="${HOST:-127.0.0.1}"
+
+echo "Starting server on ${HOST}:8000..."
+if [ "$HOST" = "0.0.0.0" ]; then
+    echo -e "\033[1;33m  ⚠ Bound to all interfaces — the app has no authentication.\033[0m"
+fi
 # Check for SSL certificates
 if [ -f "certs/server.crt" ] && [ -f "certs/server.key" ]; then
     echo "  [SSL] Certificates detected. Starting in HTTPS mode..."
-    ./.venv/bin/python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 \
+    ./.venv/bin/python -m uvicorn app.main:app --reload --host "$HOST" --port 8000 \
         --ssl-certfile certs/server.crt \
         --ssl-keyfile certs/server.key
 else
     echo "  [HTTP] No certificates detected. Starting in standard mode."
-    ./.venv/bin/python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+    ./.venv/bin/python -m uvicorn app.main:app --reload --host "$HOST" --port 8000
 fi
