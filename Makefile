@@ -22,7 +22,9 @@ help:
 	@echo "  make demo    — build the static demo site into site/demo"
 
 setup:
-	cd $(BACKEND_DIR) && uv sync
+	# --extra dev is required: pytest/ruff/mypy/pre-commit live in the dev
+	# extra, and plain `uv sync` uninstalls them from an existing .venv.
+	cd $(BACKEND_DIR) && uv sync --extra dev
 	cd $(BACKEND_DIR) && uv run pre-commit install
 	@echo "✅ Setup complete. Run 'make run' to start the server."
 
