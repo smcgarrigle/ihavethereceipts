@@ -3,22 +3,22 @@
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
     {% for store, items in store_groups.items() %}
     <div class="bg-bgHover rounded-xl border border-borderDefault overflow-hidden shadow-sm">
-        <div class="px-4 py-3 bg-bgSkeleton border-b border-borderDefault flex justify-between items-center gap-2">
-            <div class="flex items-center gap-2 min-w-0">
+        <div class="px-4 py-3 bg-bgSkeleton border-b border-borderDefault">
+            <div class="flex justify-between items-center gap-2">
                 <h3 class="font-bold text-textBase flex items-center gap-2 min-w-0">
                     <span>🏪</span> <span class="truncate">{{ store }}</span>
                 </h3>
-                <button
-                    x-data="{ sent: false }"
-                    @click="sent = true; setTimeout(() => sent = false, 2000)"
-                    class="text-[10px] font-medium px-2 py-0.5 rounded bg-bgInput hover:bg-bgCard border transition whitespace-nowrap flex-shrink-0"
-                    :class="sent ? 'text-green-600 dark:text-green-400 border-green-500' : 'text-orange-500 border-orange-400 hover:text-orange-600 hover:border-orange-500'">
-                    <span x-text="sent ? 'Sent!' : 'Send to Agent'"></span>
-                </button>
+                <span class="bg-bgInput text-textMuted text-xs font-semibold px-2 py-1 rounded-full border border-gray-200 dark:border-gray-600 whitespace-nowrap flex-shrink-0">
+                    {{ items|length }} item{% if items|length != 1 %}s{% endif %}
+                </span>
             </div>
-            <span class="bg-bgInput text-textMuted text-xs font-semibold px-2 py-1 rounded-full border border-gray-200 dark:border-gray-600 whitespace-nowrap flex-shrink-0">
-                {{ items|length }} item{% if items|length != 1 %}s{% endif %}
-            </span>
+            <button
+                x-data="{ sent: false }"
+                @click="sent = true; setTimeout(() => sent = false, 2000)"
+                class="mt-2 text-[10px] font-medium px-2 py-0.5 rounded bg-bgInput hover:bg-bgCard border transition whitespace-nowrap"
+                :class="sent ? 'text-green-600 dark:text-green-400 border-green-500' : 'text-orange-500 border-orange-400 hover:text-orange-600 hover:border-orange-500'">
+                <span x-text="sent ? 'Sent!' : 'Send to Agent'"></span>
+            </button>
         </div>
         <ul class="divide-y divide-gray-200 dark:divide-gray-700">
             {% for item in items %}
