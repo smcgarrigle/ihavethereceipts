@@ -151,7 +151,32 @@ cd backend
 uv run python scripts/seed_demo.py
 ```
 
-This populates the database with ~25 fictional receipts across 5 stores (Trader Joe's, Costco, Amazon Fresh, Whole Foods, Safeway) spanning 4 months — enough to make every dashboard chart and trends page come alive.
+This populates the database with ~50 fictional receipts (~300 line items, 93 products) spanning ~15 weeks — enough to make every dashboard chart and trends page come alive. No real retailers appear; the data is entirely invented.
+
+Twelve made-up stores each have their own personality and catalog:
+
+| Store | Shopping pattern |
+|---|---|
+| **SpaceWay** | The routine weekly supermarket run |
+| **VendorVics** | Bi-weekly budget trips |
+| **WhollyFUD** | Occasional premium/organic hauls |
+| **The Flesh Prince** | Protein restocks |
+| **The FeedLoft** | Monthly bulk-warehouse hauls |
+| **LuridLurie's Gas** | Impulse gas-station stops |
+| **Salsa Emporium** | Salsa pilgrimages |
+| **B2BSaasoons** | Quarterly seasoning procurement (enterprise pricing) |
+| **L'UnOeufPun Bakery** | Weekend pastry runs |
+| **Tartanula's**, **BundtCake & More** | Dessert emergencies |
+| **Peptide Inferance Exchange** | Online supplement orders |
+
+The generator is deliberately opinionated so the analytics have something to chew on:
+
+- **Price trends** — every product is assigned a shape (steady, noisy, inflation, sale, volatile), so price-history graphs and the X-Ray Price Volatility Radar show distinct curves instead of uniform noise.
+- **Store overlap** — staples (eggs, milk, pasta, sparkling water) are stocked at several stores at different prices, giving the store-comparison charts real material.
+- **Nutrition gaps** — 78 of 93 products carry per-100g nutrient data; the rest are left unmatched on purpose so the X-Ray queue, coverage badges, and "Missing USDA Data" slice demo honestly.
+- **Mixed units** — items sold by weight carry an explicit `lb` weight on the line; packaged items record their size in oz, exercising both unit-price paths.
+
+Seeding is reproducible (`random.seed(42)`) and idempotent for stores/categories/items; re-running it adds another batch of receipts. Every demo receipt is tagged `DEMO_DATA` in its notes field.
 
 
 ## 📦 Dependency Management
