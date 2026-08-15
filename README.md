@@ -134,9 +134,9 @@ Different models specialize in specific tasks — architectural planning, precis
 
 3.  **Optional: Local AI models (LM Studio or Ollama)**:
     ```bash
-    # LM Studio: download from https://lmstudio.ai and load a Qwen2-VL or Granite model
+    # LM Studio: download from https://lmstudio.ai and load a qwen2.5-vl or Granite model
     # Ollama:
-    ollama pull granite3.3-vision:2b   # or qwen2-vl
+    ollama pull granite3.3-vision:2b   # or qwen2.5-vl
     ```
 
 4.  **Access App**: Open `http://127.0.0.1:8000`
