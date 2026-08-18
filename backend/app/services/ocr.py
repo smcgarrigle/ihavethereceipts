@@ -1,10 +1,11 @@
 """
-OCR Service — Dual Backend
---------------------------
+OCR Service — Multi Backend
+---------------------------
 Controlled by the OCR_BACKEND environment variable:
 
   OCR_BACKEND=local   (default) — LLaVA via Ollama or LM Studio
   OCR_BACKEND=gemini             — Google Gemini API (original behavior)
+  OCR_BACKEND=openrouter         — OpenRouter's free-tier models (hosted)
 
 Local backend env vars:
   OCR_BACKEND_URL=http://localhost:11434/v1   (Ollama default)
@@ -13,6 +14,20 @@ Local backend env vars:
 Gemini backend env vars:
   GEMINI_API_KEY=<your key>
   GEMINI_MODEL_NAME=gemini-flash-latest        (optional override)
+
+OpenRouter backend env vars:
+  OPENROUTER_API_KEY=<your key>               (free account, no card needed)
+  OCR_MODEL=nvidia/nemotron-nano-12b-v2-vl:free
+  OPENROUTER_ALLOW_PAID=1                     (opt in to non-":free" models)
+  OPENROUTER_ALLOW_TRAINING=1                 (opt in to providers that may
+                                               train on your receipts)
+
+  ⚠ OpenRouter is a hosted third party. Receipt images — store, items, prices,
+  dates — leave this machine. By default we send provider.data_collection=deny
+  so OpenRouter refuses providers that retain or train on inputs; that is
+  enforced server-side rather than relying on an account toggle, but it may
+  make some free models unavailable. The local backend remains the private
+  option.
 """
 
 import base64
@@ -408,22 +423,176 @@ def _error_result(msg: str) -> dict:
 
 # ===========================================================================
 # LOCAL BACKEND  (LLaVA via Ollama or LM Studio)
+# Also serves OPENROUTER — both speak the OpenAI chat-completions protocol,
+# so only the client construction and model selection differ.
 # ===========================================================================
 
+OPENROUTER_URL = "https://openrouter.ai/api/v1"
+# Free *and* vision-capable is a short list — most free models are text-only
+# and cannot read a receipt image at all. Verified against the free-models
+# collection on 2026-08-17.
+OPENROUTER_DEFAULT_MODEL = "nvidia/nemotron-nano-12b-v2-vl:free"
+OPENROUTER_FREE_VISION_MODELS = (
+    "nvidia/nemotron-nano-12b-v2-vl:free",
+    "google/gemma-4-26b-a4b-it:free",
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+)
+
 _local_client = None
+_openrouter_client = None
+
+
+def _local_backend_url() -> str:
+    """
+    Base URL for whichever OpenAI-compatible backend is active.
+
+    OpenRouter deliberately ignores OCR_BACKEND_URL: that variable points at
+    the user's Ollama/LM Studio instance and is usually left set from a
+    previous local setup, so honouring it here silently posts receipts at a
+    dead localhost port and hangs until the timeout. Override with
+    OPENROUTER_BASE_URL if you really are proxying OpenRouter.
+    """
+    if get_backend() == "openrouter":
+        return os.getenv("OPENROUTER_BASE_URL") or OPENROUTER_URL
+    return os.getenv("OCR_BACKEND_URL", "http://localhost:11434/v1")
+
+
+def _get_openrouter_client():
+    global _openrouter_client
+    if _openrouter_client is None:
+        from openai import OpenAI
+
+        api_key = os.getenv("OPENROUTER_API_KEY")
+        if not api_key:
+            raise RuntimeError(
+                "OPENROUTER_API_KEY environment variable not set "
+                "(required for OCR_BACKEND=openrouter). Get a free key at "
+                "https://openrouter.ai/keys — no payment method required."
+            )
+        # Hosted API: a 30-minute timeout is pointless here. max_retries=0
+        # because the SDK's default of 2 turns one stuck request into three,
+        # and the free tier's 50/day budget should not be spent on retries.
+        _openrouter_client = OpenAI(
+            base_url=_local_backend_url(),
+            api_key=api_key,
+            timeout=120.0,
+            max_retries=0,
+        )
+        logger.info(f"✓ OpenRouter OCR client initialized → {_local_backend_url()}")
+    return _openrouter_client
 
 
 def _get_local_client():
+    if get_backend() == "openrouter":
+        return _get_openrouter_client()
+
     global _local_client
     if _local_client is None:
         from openai import OpenAI
 
-        url = os.getenv("OCR_BACKEND_URL", "http://localhost:11434/v1")
+        url = _local_backend_url()
         # Increase timeout to 30 minutes (1800s) to prevent the client from dropping the connection
         # if a local "reasoning" model takes longer than the default 10 minutes to generate CoT tokens.
         _local_client = OpenAI(base_url=url, api_key="ollama", timeout=1800.0)
         logger.info(f"✓ Local OCR client initialized → {url}")
     return _local_client
+
+
+def _openrouter_model() -> str:
+    """
+    Resolve and validate the OpenRouter model.
+
+    Never auto-detects: client.models.list() returns OpenRouter's entire
+    catalogue, so the local backend's "first model wins" heuristic would pick
+    an arbitrary — quite possibly paid, quite possibly text-only — model and
+    silently ignore OCR_MODEL.
+    """
+    # `or` not a getenv default: the deprecated backend/.env sets OCR_MODEL to
+    # an empty string, which shadows the root .env and is "set" as far as
+    # getenv is concerned. Empty means unset here.
+    model = os.getenv("OCR_MODEL") or OPENROUTER_DEFAULT_MODEL
+    if not model.endswith(":free") and os.getenv("OPENROUTER_ALLOW_PAID") != "1":
+        raise RuntimeError(
+            f"OCR_MODEL={model!r} is not a ':free' model. OpenRouter bills paid "
+            "models against your credit balance. Append ':free', or set "
+            "OPENROUTER_ALLOW_PAID=1 to use it deliberately."
+        )
+    return model
+
+
+def _openrouter_error_message(exc: Exception, model: str) -> str:
+    """
+    Turn an OpenRouter failure into something a self-hoster can act on.
+
+    402 and 429 are the two a free-tier user actually hits, and the naive
+    reading of each is wrong: a 402 on a ':free' model means a negative
+    balance, not an exhausted free tier, and a 429 is the 50/day cap far more
+    often than the 20/min one.
+    """
+    status = getattr(exc, "status_code", None)
+    logger.error(f"[OCR] OpenRouter error (status={status}) on {model}: {exc}")
+
+    if status == 402:
+        return (
+            "OpenRouter returned 402 Payment Required. For a ':free' model this "
+            "normally means a negative credit balance rather than an exhausted "
+            "free tier — check https://openrouter.ai/credits. If you set "
+            "OPENROUTER_ALLOW_PAID=1, this model bills against that balance."
+        )
+    if status == 429:
+        retry_after = None
+        try:
+            retry_after = exc.response.headers.get("Retry-After")  # type: ignore[attr-defined]
+        except Exception:
+            pass
+        wait = f" Retry after {retry_after}s." if retry_after else ""
+        return (
+            "OpenRouter rate limit hit (429). Free models allow 20 requests/min "
+            "and 50/day until $10 of credits has been purchased (then "
+            f"1000/day).{wait} Bulk imports will exhaust this — use the local "
+            "backend for large batches."
+        )
+    if status == 404 and os.getenv("OPENROUTER_ALLOW_TRAINING") != "1":
+        # Measured 2026-08-17: every free vision model 404s under
+        # data_collection=deny with "No endpoints found matching your data
+        # policy (Free model training)". Free and private are mutually
+        # exclusive on this tier, so say so instead of leaving the user
+        # guessing at a model name.
+        return (
+            f"OpenRouter refused to route {model!r}: no provider serves it under "
+            "provider.data_collection=deny. Free models are free *because* the "
+            "provider may train on your data, so the free tier and the deny "
+            "policy are mutually exclusive. Either set "
+            "OPENROUTER_ALLOW_TRAINING=1 — accepting that your receipts may be "
+            "retained and trained on — or use OCR_BACKEND=local, which keeps "
+            "everything on this machine."
+        )
+    if status == 404:
+        return (
+            f"OpenRouter has no model {model!r} available to you — it may have "
+            "been retired or renamed. Known free vision models: "
+            f"{', '.join(OPENROUTER_FREE_VISION_MODELS)}."
+        )
+    return f"OpenRouter error: {exc}"
+
+
+def _openrouter_extra_body() -> dict[str, Any]:
+    """
+    Per-request provider policy.
+
+    data_collection=deny makes OpenRouter refuse providers that retain or train
+    on inputs — enforced server-side, so it does not depend on the user having
+    found the right account toggle. Some free models are free *because* the
+    provider trains on the data, so this can narrow the available list; opt out
+    with OPENROUTER_ALLOW_TRAINING=1.
+    """
+    if os.getenv("OPENROUTER_ALLOW_TRAINING") == "1":
+        logger.warning(
+            "[OCR] OPENROUTER_ALLOW_TRAINING=1 — receipts may be retained or "
+            "trained on by the serving provider."
+        )
+        return {}
+    return {"provider": {"data_collection": "deny"}}
 
 
 def _image_to_base64(image_path: str) -> tuple[str, str]:
@@ -506,22 +675,41 @@ def _preprocess_image_for_local(image_path: str) -> tuple[str, str]:
 
 def _process_local(image_paths: list[str], prompt_extra: str = "") -> dict:
     """Call local LLaVA/Granite model via OpenAI-compatible API."""
-    client = _get_local_client()
-    url = os.getenv("OCR_BACKEND_URL", "http://localhost:11434/v1")
-
-    # Auto-detect loaded model from LM Studio / Ollama to prevent static locking
+    is_openrouter = get_backend() == "openrouter"
     try:
-        available = client.models.list()
-        if available and available.data:
-            model = available.data[0].id
-            logger.info(f"[OCR] Auto-detected active local model: {model}")
-        else:
-            model = os.getenv("OCR_MODEL", "llava:7b")
-    except Exception as e:
-        logger.warning(f"[OCR] Failed to fetch active models ({e}). Falling back to .env.")
-        model = os.getenv("OCR_MODEL", "llava:7b")
+        client = _get_local_client()
+    except RuntimeError as e:  # missing key / paid-model guard
+        logger.error(f"[OCR] {e}")
+        return _error_result(str(e))
+    url = _local_backend_url()
 
-    logger.info("--- [OCR] LOCAL BACKEND START ---")
+    if is_openrouter:
+        # Explicit only — see _openrouter_model() for why auto-detect is unsafe.
+        try:
+            model = _openrouter_model()
+        except RuntimeError as e:
+            logger.error(f"[OCR] {e}")
+            return _error_result(str(e))
+        if model not in OPENROUTER_FREE_VISION_MODELS:
+            logger.warning(
+                f"[OCR] {model} is not in the known free vision-capable list "
+                f"{OPENROUTER_FREE_VISION_MODELS}. If it cannot read images, "
+                "extraction will come back empty."
+            )
+    else:
+        # Auto-detect loaded model from LM Studio / Ollama to prevent static locking
+        try:
+            available = client.models.list()
+            if available and available.data:
+                model = available.data[0].id
+                logger.info(f"[OCR] Auto-detected active local model: {model}")
+            else:
+                model = os.getenv("OCR_MODEL", "llava:7b")
+        except Exception as e:
+            logger.warning(f"[OCR] Failed to fetch active models ({e}). Falling back to .env.")
+            model = os.getenv("OCR_MODEL", "llava:7b")
+
+    logger.info(f"--- [OCR] {'OPENROUTER' if is_openrouter else 'LOCAL'} BACKEND START ---")
     logger.info(f"[OCR] Model:  {model}")
     logger.info(f"[OCR] Target: {url}")
 
@@ -557,6 +745,7 @@ def _process_local(image_paths: list[str], prompt_extra: str = "") -> dict:
             presence_penalty=1.5,  # Qwen best practice: prevents item repetition on long receipts
             # Note: top_k=20 is also recommended but not supported via OpenAI-compat API.
             # Configure top_k directly in LM Studio's model settings panel instead.
+            **({"extra_body": _openrouter_extra_body()} if is_openrouter else {}),
         )
         inference_duration = time.time() - inference_start
         raw = response.choices[0].message.content
@@ -576,6 +765,8 @@ def _process_local(image_paths: list[str], prompt_extra: str = "") -> dict:
         logger.error(f"[OCR] JSON parse error: {e}")
         return _error_result(f"Failed to parse AI response as JSON: {e}")
     except Exception as e:
+        if is_openrouter:
+            return _error_result(_openrouter_error_message(e, model))
         logger.error(f"[OCR] Local AI error: {e}")
         return _error_result(str(e))
 
@@ -733,6 +924,10 @@ def _dispatch(image_paths: list[str], prompt_extra: str = "") -> dict:
     if backend == "gemini":
         logger.info(f"OCR backend: GEMINI ({len(image_paths)} image(s))")
         result = _process_gemini(image_paths, prompt_extra)
+    elif backend == "openrouter":
+        model = os.getenv("OCR_MODEL") or OPENROUTER_DEFAULT_MODEL
+        logger.info(f"OCR backend: OPENROUTER ({model}) ({len(image_paths)} image(s))")
+        result = _process_local(image_paths, prompt_extra)
     else:
         # Show specific model in logs for local backend
         model = os.getenv("OCR_MODEL", "llava:7b")

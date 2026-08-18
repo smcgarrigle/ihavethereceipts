@@ -31,9 +31,9 @@ class ModelManager:
         ocr_backend = os.getenv("OCR_BACKEND", "local").lower()
         self.api_key = os.getenv("GEMINI_API_KEY")
 
-        if ocr_backend == "local":
-            # Running in local LLaVA mode — Gemini client not needed
-            logger.info("ModelManager: OCR_BACKEND=local, skipping Gemini init.")
+        if ocr_backend in ("local", "openrouter"):
+            # Non-Gemini backend selected — Gemini client not needed
+            logger.info(f"ModelManager: OCR_BACKEND={ocr_backend}, skipping Gemini init.")
             self.client = None
         elif not self.api_key:
             logger.warning("GEMINI_API_KEY not set. ModelManager will not work.")
