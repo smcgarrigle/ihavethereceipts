@@ -52,13 +52,21 @@ cat << 'EOF'
                                           . :---
                                              ..
 EOF
-echo "╔══════════════════════════════════════════╗"
-echo "║    I have the receipts – OCR Backend     ║"
-echo "╠══════════════════════════════════════════╣"
-echo "║  1) Local   – LM Studio (Port 1234)      ║"
-echo "║  2) Local   – Ollama    (Port 11434)     ║"
-echo "║  3) Cloud   – Google Gemini API          ║"
-echo "╚══════════════════════════════════════════╝"
+echo "╔══════════════════════════════════════════════════════════════╗"
+echo "║           I have the receipts – OCR Backend                  ║"
+echo "╠══════════════════════════════════════════════════════════════╣"
+echo "║  1) Local   – LM Studio (Port 1234)          private         ║"
+echo "║  2) Local   – Ollama    (Port 11434)         private         ║"
+echo "║  3) Cloud   – Google Gemini API              needs key       ║"
+echo "║  4) Cloud   – OpenRouter, no training        needs key       ║"
+echo "║  5) Cloud   – OpenRouter, allow training     needs key       ║"
+echo "╠══════════════════════════════════════════════════════════════╣"
+echo "║  4 refuses providers that train on your receipts. Every      ║"
+echo "║    ':free' model is served only by such providers, so free   ║"
+echo "║    models return 404 here — 4 needs a paid model.            ║"
+echo "║  5 accepts training on your receipt data. This is the only   ║"
+echo "║    way the free tier works. 50 requests/day.                 ║"
+echo "╚══════════════════════════════════════════════════════════════╝"
 echo ""
 echo -n "  Choose backend [current: $CURRENT_BACKEND] (press Enter to keep): "
 read -r CHOICE
@@ -78,6 +86,19 @@ case "$CHOICE" in
     NEW_BACKEND="gemini"
     NEW_MODEL="gemini-2.0-flash"
     NEW_URL=""
+    ;;
+  4)
+    # OpenRouter with provider.data_collection=deny (the app's default).
+    NEW_BACKEND="openrouter"
+    NEW_MODEL="nvidia/nemotron-nano-12b-v2-vl:free"
+    NEW_URL=""   # OpenRouter ignores OCR_BACKEND_URL — see ocr._local_backend_url
+    NEW_TRAINING="0"
+    ;;
+  5)
+    NEW_BACKEND="openrouter"
+    NEW_MODEL="nvidia/nemotron-nano-12b-v2-vl:free"
+    NEW_URL=""
+    NEW_TRAINING="1"
     ;;
   "")
     NEW_BACKEND="$CURRENT_BACKEND"
@@ -116,9 +137,43 @@ else
   if [ -n "$NEW_URL" ]; then echo "OCR_BACKEND_URL=$NEW_URL" >> ../.env; fi
 fi
 
+# Only written when options 4/5 were chosen — pressing Enter leaves whatever
+# training preference is already on file untouched.
+if [ -n "$NEW_TRAINING" ]; then
+  if grep -q "^OPENROUTER_ALLOW_TRAINING=" ../.env 2>/dev/null; then
+    sed "s|^OPENROUTER_ALLOW_TRAINING=.*|OPENROUTER_ALLOW_TRAINING=$NEW_TRAINING|" ../.env > ../.env.tmp && mv ../.env.tmp ../.env
+  else
+    echo "OPENROUTER_ALLOW_TRAINING=$NEW_TRAINING" >> ../.env
+  fi
+fi
+
 echo ""
 echo "  ✓ OCR backend set to: $NEW_BACKEND ($NEW_MODEL)"
 echo ""
+
+if [ "$NEW_BACKEND" = "openrouter" ]; then
+  if ! grep -qE '^OPENROUTER_API_KEY=.+' ../.env 2>/dev/null; then
+    echo -e "\033[1;31m  ✗ OPENROUTER_API_KEY is not set in .env — OCR will fail.\033[0m"
+    echo "    Get a free key at https://openrouter.ai/keys (no payment method needed)."
+    echo ""
+  fi
+
+  CURRENT_TRAINING=$(grep -E '^OPENROUTER_ALLOW_TRAINING=' ../.env 2>/dev/null | cut -d= -f2 | tr -d ' ')
+  if [ "$CURRENT_TRAINING" = "1" ]; then
+    echo -e "\033[1;33m  ⚠ Training opt-in is ON.\033[0m"
+    echo "    Your receipts — store, items, prices, dates — are sent to OpenRouter"
+    echo "    and the serving provider may retain and train on them."
+    echo "    Free tier allows 50 requests/day (1000 after \$10 of credits)."
+  else
+    echo "  🔒 Sending provider.data_collection=deny — providers that train on"
+    echo "     your data are refused."
+    echo -e "\033[1;33m     Note: every ':free' model is served only by such providers, so\033[0m"
+    echo -e "\033[1;33m     free models return 404 in this mode. Use a paid model (with\033[0m"
+    echo -e "\033[1;33m     OPENROUTER_ALLOW_PAID=1), pick option 5, or use option 1/2 for\033[0m"
+    echo -e "\033[1;33m     fully private local OCR.\033[0m"
+  fi
+  echo ""
+fi
 
 if [ "$NEW_BACKEND" = "local" ]; then
   while true; do
