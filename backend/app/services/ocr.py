@@ -428,10 +428,11 @@ def _error_result(msg: str) -> dict:
 # ===========================================================================
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1"
-# Free *and* vision-capable is a short list — most free models are text-only
-# and cannot read a receipt image at all. Verified against the free-models
-# collection on 2026-08-17.
-OPENROUTER_DEFAULT_MODEL = "nvidia/nemotron-nano-12b-v2-vl:free"
+# Deliberately no default model. OpenRouter serves hundreds of models at wildly
+# different prices and capabilities, and this backend exists for people who
+# already have an OpenRouter account and opinions about what to spend it on —
+# picking one for them would be presumptuous and, on a paid model, expensive.
+# See the OpenRouter section of README.md for the ':free' caveat.
 OPENROUTER_FREE_VISION_MODELS = (
     "nvidia/nemotron-nano-12b-v2-vl:free",
     "google/gemma-4-26b-a4b-it:free",
@@ -507,10 +508,17 @@ def _openrouter_model() -> str:
     an arbitrary — quite possibly paid, quite possibly text-only — model and
     silently ignore OCR_MODEL.
     """
-    # `or` not a getenv default: the deprecated backend/.env sets OCR_MODEL to
-    # an empty string, which shadows the root .env and is "set" as far as
-    # getenv is concerned. Empty means unset here.
-    model = os.getenv("OCR_MODEL") or OPENROUTER_DEFAULT_MODEL
+    # Empty counts as unset: the deprecated backend/.env ships `OCR_MODEL=`,
+    # which shadows the root .env but is still "set" as far as getenv sees it.
+    model = os.getenv("OCR_MODEL") or ""
+    if not model:
+        raise RuntimeError(
+            "OCR_MODEL is not set. The OpenRouter backend has no default model "
+            "— pick one deliberately, since most are billed and most cannot "
+            "read images. Vision-capable free models are listed in the "
+            "OpenRouter section of README.md; browse the rest at "
+            "https://openrouter.ai/models?modality=text+image->text"
+        )
     if not model.endswith(":free") and os.getenv("OPENROUTER_ALLOW_PAID") != "1":
         raise RuntimeError(
             f"OCR_MODEL={model!r} is not a ':free' model. OpenRouter bills paid "
@@ -690,11 +698,15 @@ def _process_local(image_paths: list[str], prompt_extra: str = "") -> dict:
         except RuntimeError as e:
             logger.error(f"[OCR] {e}")
             return _error_result(str(e))
-        if model not in OPENROUTER_FREE_VISION_MODELS:
+        if model.endswith(":free") and model not in OPENROUTER_FREE_VISION_MODELS:
+            # Only worth flagging for free models: the free tier is mostly
+            # text-only, and a text model handed an image returns an empty
+            # extraction rather than an error. Paid model choices are the
+            # user's own business.
             logger.warning(
-                f"[OCR] {model} is not in the known free vision-capable list "
+                f"[OCR] {model} is not a known vision-capable free model "
                 f"{OPENROUTER_FREE_VISION_MODELS}. If it cannot read images, "
-                "extraction will come back empty."
+                "extraction will come back empty rather than failing."
             )
     else:
         # Auto-detect loaded model from LM Studio / Ollama to prevent static locking
@@ -925,7 +937,7 @@ def _dispatch(image_paths: list[str], prompt_extra: str = "") -> dict:
         logger.info(f"OCR backend: GEMINI ({len(image_paths)} image(s))")
         result = _process_gemini(image_paths, prompt_extra)
     elif backend == "openrouter":
-        model = os.getenv("OCR_MODEL") or OPENROUTER_DEFAULT_MODEL
+        model = os.getenv("OCR_MODEL") or "(OCR_MODEL unset)"
         logger.info(f"OCR backend: OPENROUTER ({model}) ({len(image_paths)} image(s))")
         result = _process_local(image_paths, prompt_extra)
     else:

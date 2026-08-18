@@ -142,6 +142,50 @@ Different models specialize in specific tasks — architectural planning, precis
 4.  **Access App**: Open `http://127.0.0.1:8000`
 
 
+## 🔀 OpenRouter Connector
+
+Option 4 in `./start_server.sh` sends receipts through **your own** OpenRouter account, on a model you pick. It exists for people who already have OpenRouter credits and their own provider preferences — it is not a way to get free OCR, for reasons below.
+
+There is deliberately **no default model**. OpenRouter serves hundreds at wildly different prices and capabilities, so the startup menu asks you to name one, and OCR fails with a clear message until you do.
+
+```bash
+# root .env
+OCR_BACKEND=openrouter
+OPENROUTER_API_KEY=sk-or-v1-...     # https://openrouter.ai/keys
+OCR_MODEL=qwen/qwen-2.5-vl-72b-instruct   # any model that accepts image input
+```
+
+An account is required; a payment method is not. `OCR_BACKEND_URL` is ignored here — it points at your local Ollama/LM Studio, and honouring it would post receipts at a dead localhost port. Use `OPENROUTER_BASE_URL` if you genuinely proxy OpenRouter.
+
+### Privacy
+
+Every request carries `provider.data_collection=deny`, so OpenRouter refuses to route to providers that retain or train on inputs. This is enforced server-side rather than depending on your account settings. Receipts are still leaving your machine — if that matters, options 1 and 2 keep everything local.
+
+### ⚠ The ":free" caveat
+
+**Free models and the deny policy are mutually exclusive.** Measured against the live API on 2026-08-17: every free vision model returns `404 — No endpoints found matching your data policy (Free model training)`. Free models are free *because* the serving provider may train on what you send. There is no configuration that gives you both.
+
+If you want to use them anyway, opt in explicitly:
+
+```bash
+OPENROUTER_ALLOW_TRAINING=1   # provider may retain and train on your receipts
+```
+
+With that set, quality is good — `nvidia/nemotron-nano-12b-v2-vl:free` extracted a test receipt perfectly (8/8 line items, store, date, subtotal, tax and total exact) in ~21s. But the free tier is capped at **20 requests/min and 50/day** until $10 of credits has been purchased, so bulk imports belong on a local backend. That endpoint also reported 76.7% 24-hour uptime, and one run returned an empty item list with no error at all — a silent miss is worse than a loud failure for background OCR.
+
+Free *and* vision-capable is a short list; most free models are text-only and will return empty extractions rather than errors:
+
+| Model | Context |
+|---|---|
+| `nvidia/nemotron-nano-12b-v2-vl:free` | 128K |
+| `google/gemma-4-26b-a4b-it:free` | 256K |
+| `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free` | 256K |
+
+### Billing guard
+
+A model without the `:free` suffix is refused unless `OPENROUTER_ALLOW_PAID=1`. Choosing a paid model at the startup menu sets this for you — typing the ID is the deliberate act. The guard remains for anyone hand-editing `.env`. A `402` on a `:free` model means a negative balance, not an exhausted free tier.
+
+
 ## 🧪 Quick Demo (No Receipts Needed)
 
 Want to see the app with real-looking data before scanning your first receipt? Run the demo seed script:

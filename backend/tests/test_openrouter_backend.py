@@ -27,21 +27,26 @@ def openrouter_env(monkeypatch):
 
 
 @pytest.mark.usefixtures("openrouter_env")
-def test_default_model_is_free_and_vision_capable():
-    assert ocr.OPENROUTER_DEFAULT_MODEL.endswith(":free")
-    assert ocr.OPENROUTER_DEFAULT_MODEL in ocr.OPENROUTER_FREE_VISION_MODELS
-    assert ocr._openrouter_model() == ocr.OPENROUTER_DEFAULT_MODEL
+def test_no_default_model_the_user_must_choose():
+    """
+    OpenRouter serves hundreds of models at wildly different prices; picking
+    one on the user's behalf would be presumptuous and possibly expensive.
+    """
+    assert not hasattr(ocr, "OPENROUTER_DEFAULT_MODEL")
+    with pytest.raises(RuntimeError, match="OCR_MODEL is not set"):
+        ocr._openrouter_model()
 
 
 @pytest.mark.usefixtures("openrouter_env")
-def test_empty_ocr_model_falls_back_to_default(monkeypatch):
+def test_empty_ocr_model_is_treated_as_unset(monkeypatch):
     """
     The deprecated backend/.env ships `OCR_MODEL=` (empty). It loads before the
-    root .env and, being "set", blocks it — so an empty value must be treated
-    as unset rather than sent to OpenRouter as a blank model ID.
+    root .env and, being "set", blocks it — so an empty value must raise rather
+    than being sent to OpenRouter as a blank model ID.
     """
     monkeypatch.setenv("OCR_MODEL", "")
-    assert ocr._openrouter_model() == ocr.OPENROUTER_DEFAULT_MODEL
+    with pytest.raises(RuntimeError, match="OCR_MODEL is not set"):
+        ocr._openrouter_model()
 
 
 @pytest.mark.usefixtures("openrouter_env")
