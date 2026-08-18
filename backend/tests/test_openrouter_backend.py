@@ -133,11 +133,12 @@ def test_openrouter_never_auto_detects_model(monkeypatch):
 
 
 @pytest.mark.usefixtures("openrouter_env")
-def test_404_under_deny_explains_the_free_vs_private_tradeoff():
+def test_404_under_deny_offers_the_escape_hatches():
     """
-    Measured against the live API: every free vision model 404s under
-    data_collection=deny. The message must name the actual tradeoff and both
-    escape hatches, not send the user hunting for a valid model name.
+    Whether a model survives data_collection=deny depends on its providers —
+    google/gemma-4-26b-a4b-it:free routes fine, nvidia/nemotron-nano-12b-v2-vl
+    :free does not. The message must offer the options rather than claim free
+    and private are mutually exclusive.
     """
 
     class _NotFound(Exception):
@@ -146,6 +147,8 @@ def test_404_under_deny_explains_the_free_vs_private_tradeoff():
     msg = ocr._openrouter_error_message(_NotFound("no endpoints"), "some/model:free")
     assert "OPENROUTER_ALLOW_TRAINING=1" in msg
     assert "OCR_BACKEND=local" in msg
+    assert ocr.OPENROUTER_MODEL_FILTER_URL in msg
+    assert "mutually exclusive" not in msg
 
 
 @pytest.mark.usefixtures("openrouter_env")

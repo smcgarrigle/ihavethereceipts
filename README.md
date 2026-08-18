@@ -2,6 +2,17 @@
 
 A self-hosted, AI-powered receipt tracker that builds a personal price history database from your grocery receipts. Built with **FastAPI**, **SQLite**, **HTMX**, and **Google Gemini**.
 
+## 🧪 Quick Demo (No Receipts Needed)
+
+Want to see the app with real-looking data before scanning your first receipt? Run the demo seed script:
+
+```bash
+cd backend
+uv run python scripts/seed_demo.py
+```
+
+This populates the database with ~4months of ~52 fictional receipts across multiple stores enough to make all dashboards charts and trends pages populate.
+
 ## 🚀 Key Features
 
 ### 📄 Intelligent Receipt Processing
@@ -144,58 +155,21 @@ Different models specialize in specific tasks — architectural planning, precis
 
 ## 🔀 OpenRouter Connector
 
-Option 4 in `./start_server.sh` sends receipts through **your own** OpenRouter account, on a model you pick. It exists for people who already have OpenRouter credits and their own provider preferences — it is not a way to get free OCR, for reasons below.
-
-There is deliberately **no default model**. OpenRouter serves hundreds at wildly different prices and capabilities, so the startup menu asks you to name one, and OCR fails with a clear message until you do.
+Option 4 in `./start_server.sh` runs receipts through **your own** OpenRouter account, on a model you choose. For users who already have OpenRouter credits and provider preferences.
 
 ```bash
 # root .env
 OCR_BACKEND=openrouter
-OPENROUTER_API_KEY=sk-or-v1-...     # https://openrouter.ai/keys
-OCR_MODEL=qwen/qwen-2.5-vl-72b-instruct   # any model that accepts image input
+OPENROUTER_API_KEY=sk-or-v1-...            # https://openrouter.ai/keys
+OCR_MODEL=google/gemma-4-26b-a4b-it:free   # any model accepting image input
 ```
+**Privacy Note.** When using OpenRoutes receipts leave your machine. Every request carries `provider.data_collection=deny`, so OpenRouter refuses providers that retain or train on inputs, enforced server-side. Whether a given model still has an endpoint under that policy depends on its providers — some free models do, some don't, and a model with none returns a 404 explaining the options. You can remove that request paramenter from @/app/services/ocr.py ```return {"provider": {"data_collection": "deny"}}```
 
-An account is required; a payment method is not. `OCR_BACKEND_URL` is ignored here — it points at your local Ollama/LM Studio, and honouring it would post receipts at a dead localhost port. Use `OPENROUTER_BASE_URL` if you genuinely proxy OpenRouter.
-
-### Privacy
-
-Every request carries `provider.data_collection=deny`, so OpenRouter refuses to route to providers that retain or train on inputs. This is enforced server-side rather than depending on your account settings. Receipts are still leaving your machine — if that matters, options 1 and 2 keep everything local.
-
-### ⚠ The ":free" caveat
-
-**Free models and the deny policy are mutually exclusive.** Measured against the live API on 2026-08-17: every free vision model returns `404 — No endpoints found matching your data policy (Free model training)`. Free models are free *because* the serving provider may train on what you send. There is no configuration that gives you both.
-
-If you want to use them anyway, opt in explicitly:
-
-```bash
-OPENROUTER_ALLOW_TRAINING=1   # provider may retain and train on your receipts
-```
-
-With that set, quality is good — `nvidia/nemotron-nano-12b-v2-vl:free` extracted a test receipt perfectly (8/8 line items, store, date, subtotal, tax and total exact) in ~21s. But the free tier is capped at **20 requests/min and 50/day** until $10 of credits has been purchased, so bulk imports belong on a local backend. That endpoint also reported 76.7% 24-hour uptime, and one run returned an empty item list with no error at all — a silent miss is worse than a loud failure for background OCR.
-
-Free *and* vision-capable is a short list; most free models are text-only and will return empty extractions rather than errors:
-
-| Model | Context |
-|---|---|
-| `nvidia/nemotron-nano-12b-v2-vl:free` | 128K |
-| `google/gemma-4-26b-a4b-it:free` | 256K |
-| `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free` | 256K |
-
-### Billing guard
-
-A model without the `:free` suffix is refused unless `OPENROUTER_ALLOW_PAID=1`. Choosing a paid model at the startup menu sets this for you — typing the ID is the deliberate act. The guard remains for anyone hand-editing `.env`. A `402` on a `:free` model means a negative balance, not an exhausted free tier.
+<https://openrouter.ai/models?zdr=true&max_price=0&input_modalities=image>
 
 
-## 🧪 Quick Demo (No Receipts Needed)
 
-Want to see the app with real-looking data before scanning your first receipt? Run the demo seed script:
 
-```bash
-cd backend
-uv run python scripts/seed_demo.py
-```
-
-This populates the database with ~25 fictional receipts across 5 stores (Trader Joe's, Costco, Amazon Fresh, Whole Foods, Safeway) spanning 4 months — enough to make every dashboard chart and trends page come alive.
 
 
 ## 📦 Dependency Management

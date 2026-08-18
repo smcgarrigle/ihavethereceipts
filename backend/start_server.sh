@@ -61,8 +61,7 @@ echo "║  3) Cloud   – Google Gemini API              needs key       ║"
 echo "║  4) Cloud   – OpenRouter connector           needs key       ║"
 echo "╠══════════════════════════════════════════════════════════════╣"
 echo "║  4 runs your receipts through your own OpenRouter account,   ║"
-echo "║    on a model you choose. See the OpenRouter section of      ║"
-echo "║    README.md before picking a ':free' model.                 ║"
+echo "║    on a model you choose. See README.md for details.         ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
 echo ""
 echo -n "  Choose backend [current: $CURRENT_BACKEND] (press Enter to keep): "
@@ -95,11 +94,9 @@ case "$CHOICE" in
       *) CURRENT_MODEL="" ;; # a local model name (llava:7b) is not a valid one
     esac
     echo ""
-    echo "  Model ID from https://openrouter.ai/models (needs image input)."
-    echo "  Vision-capable free models, verified 2026-08-17:"
-    echo "    nvidia/nemotron-nano-12b-v2-vl:free"
-    echo "    google/gemma-4-26b-a4b-it:free"
-    echo "    nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
+    echo "  Model ID — must accept image input. Free, image-capable and"
+    echo "  zero-retention options are listed at:"
+    echo "  https://openrouter.ai/models?zdr=true&max_price=0&input_modalities=image"
     echo -n "  Model${CURRENT_MODEL:+ [current: $CURRENT_MODEL]}: "
     read -r ENTERED_MODEL
     NEW_MODEL="${ENTERED_MODEL:-$CURRENT_MODEL}"
@@ -183,16 +180,8 @@ if [ "$NEW_BACKEND" = "openrouter" ]; then
   fi
 
   case "$NEW_MODEL" in
-    *:free)
-      if [ "$CURRENT_TRAINING" != "1" ]; then
-        echo -e "\033[1;33m  ⚠ ':free' models are served only by providers that train on\033[0m"
-        echo -e "\033[1;33m    inputs, so this model will return 404 under the deny policy.\033[0m"
-        echo -e "\033[1;33m    See the OpenRouter section of README.md.\033[0m"
-      fi
-      ;;
-    ?*)
-      echo "  💳 $NEW_MODEL is a paid model — it bills your OpenRouter credits."
-      ;;
+    *:free) ;;
+    ?*) echo "  💳 $NEW_MODEL is a paid model — it bills your OpenRouter credits." ;;
   esac
   echo ""
 fi

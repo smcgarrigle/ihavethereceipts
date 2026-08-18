@@ -5,7 +5,7 @@ Controlled by the OCR_BACKEND environment variable:
 
   OCR_BACKEND=local   (default) — LLaVA via Ollama or LM Studio
   OCR_BACKEND=gemini             — Google Gemini API (original behavior)
-  OCR_BACKEND=openrouter         — OpenRouter's free-tier models (hosted)
+  OCR_BACKEND=openrouter         — your own OpenRouter account (hosted)
 
 Local backend env vars:
   OCR_BACKEND_URL=http://localhost:11434/v1   (Ollama default)
@@ -15,19 +15,15 @@ Gemini backend env vars:
   GEMINI_API_KEY=<your key>
   GEMINI_MODEL_NAME=gemini-flash-latest        (optional override)
 
-OpenRouter backend env vars:
-  OPENROUTER_API_KEY=<your key>               (free account, no card needed)
-  OCR_MODEL=nvidia/nemotron-nano-12b-v2-vl:free
-  OPENROUTER_ALLOW_PAID=1                     (opt in to non-":free" models)
-  OPENROUTER_ALLOW_TRAINING=1                 (opt in to providers that may
-                                               train on your receipts)
+OpenRouter backend env vars (see README.md):
+  OPENROUTER_API_KEY=<your key>
+  OCR_MODEL=<any model accepting image input — no default>
+  OPENROUTER_ALLOW_PAID=1       (opt in to non-":free" models)
+  OPENROUTER_ALLOW_TRAINING=1   (drop provider.data_collection=deny)
 
-  ⚠ OpenRouter is a hosted third party. Receipt images — store, items, prices,
-  dates — leave this machine. By default we send provider.data_collection=deny
-  so OpenRouter refuses providers that retain or train on inputs; that is
-  enforced server-side rather than relying on an account toggle, but it may
-  make some free models unavailable. The local backend remains the private
-  option.
+  Receipts leave this machine. Requests carry provider.data_collection=deny,
+  so providers that retain or train on inputs are refused; whether a given
+  model has an endpoint left under that policy depends on its providers.
 """
 
 import base64
@@ -428,16 +424,14 @@ def _error_result(msg: str) -> dict:
 # ===========================================================================
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1"
-# Deliberately no default model. OpenRouter serves hundreds of models at wildly
-# different prices and capabilities, and this backend exists for people who
-# already have an OpenRouter account and opinions about what to spend it on —
-# picking one for them would be presumptuous and, on a paid model, expensive.
-# See the OpenRouter section of README.md for the ':free' caveat.
-OPENROUTER_FREE_VISION_MODELS = (
-    "nvidia/nemotron-nano-12b-v2-vl:free",
-    "google/gemma-4-26b-a4b-it:free",
-    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+# Models that are free, accept images, and are served under a zero-retention
+# policy change often, so the app does not carry a list. This query returns the
+# current set; README.md points users at it.
+OPENROUTER_MODEL_FILTER_URL = (
+    "https://openrouter.ai/models?zdr=true&max_price=0&input_modalities=image"
 )
+# Deliberately no default model: OpenRouter serves hundreds at wildly different
+# prices and capabilities, and choosing one on the user's behalf could bill them.
 
 _local_client = None
 _openrouter_client = None
@@ -513,11 +507,9 @@ def _openrouter_model() -> str:
     model = os.getenv("OCR_MODEL") or ""
     if not model:
         raise RuntimeError(
-            "OCR_MODEL is not set. The OpenRouter backend has no default model "
-            "— pick one deliberately, since most are billed and most cannot "
-            "read images. Vision-capable free models are listed in the "
-            "OpenRouter section of README.md; browse the rest at "
-            "https://openrouter.ai/models?modality=text+image->text"
+            "OCR_MODEL is not set. The OpenRouter backend has no default — pick "
+            "a model that accepts image input. Free, image-capable, "
+            f"zero-retention options: {OPENROUTER_MODEL_FILTER_URL}"
         )
     if not model.endswith(":free") and os.getenv("OPENROUTER_ALLOW_PAID") != "1":
         raise RuntimeError(
@@ -561,25 +553,18 @@ def _openrouter_error_message(exc: Exception, model: str) -> str:
             "backend for large batches."
         )
     if status == 404 and os.getenv("OPENROUTER_ALLOW_TRAINING") != "1":
-        # Measured 2026-08-17: every free vision model 404s under
-        # data_collection=deny with "No endpoints found matching your data
-        # policy (Free model training)". Free and private are mutually
-        # exclusive on this tier, so say so instead of leaving the user
-        # guessing at a model name.
         return (
-            f"OpenRouter refused to route {model!r}: no provider serves it under "
-            "provider.data_collection=deny. Free models are free *because* the "
-            "provider may train on your data, so the free tier and the deny "
-            "policy are mutually exclusive. Either set "
-            "OPENROUTER_ALLOW_TRAINING=1 — accepting that your receipts may be "
-            "retained and trained on — or use OCR_BACKEND=local, which keeps "
-            "everything on this machine."
+            f"OpenRouter could not route {model!r}. Its providers may all train "
+            "on inputs, which provider.data_collection=deny refuses — some "
+            "models (often free ones) have no endpoint left under that policy, "
+            "while others do. Pick a different model "
+            f"({OPENROUTER_MODEL_FILTER_URL}), set OPENROUTER_ALLOW_TRAINING=1 "
+            "to accept training, or use OCR_BACKEND=local."
         )
     if status == 404:
         return (
             f"OpenRouter has no model {model!r} available to you — it may have "
-            "been retired or renamed. Known free vision models: "
-            f"{', '.join(OPENROUTER_FREE_VISION_MODELS)}."
+            f"been retired or renamed. Current options: {OPENROUTER_MODEL_FILTER_URL}"
         )
     return f"OpenRouter error: {exc}"
 
@@ -698,16 +683,6 @@ def _process_local(image_paths: list[str], prompt_extra: str = "") -> dict:
         except RuntimeError as e:
             logger.error(f"[OCR] {e}")
             return _error_result(str(e))
-        if model.endswith(":free") and model not in OPENROUTER_FREE_VISION_MODELS:
-            # Only worth flagging for free models: the free tier is mostly
-            # text-only, and a text model handed an image returns an empty
-            # extraction rather than an error. Paid model choices are the
-            # user's own business.
-            logger.warning(
-                f"[OCR] {model} is not a known vision-capable free model "
-                f"{OPENROUTER_FREE_VISION_MODELS}. If it cannot read images, "
-                "extraction will come back empty rather than failing."
-            )
     else:
         # Auto-detect loaded model from LM Studio / Ollama to prevent static locking
         try:
