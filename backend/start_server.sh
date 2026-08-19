@@ -52,13 +52,17 @@ cat << 'EOF'
                                           . :---
                                              ..
 EOF
-echo "╔══════════════════════════════════════════╗"
-echo "║    I have the receipts – OCR Backend     ║"
-echo "╠══════════════════════════════════════════╣"
-echo "║  1) Local   – LM Studio (Port 1234)      ║"
-echo "║  2) Local   – Ollama    (Port 11434)     ║"
-echo "║  3) Cloud   – Google Gemini API          ║"
-echo "╚══════════════════════════════════════════╝"
+echo "╔══════════════════════════════════════════════════════════════╗"
+echo "║           I have the receipts – OCR Backend                  ║"
+echo "╠══════════════════════════════════════════════════════════════╣"
+echo "║  1) Local   – LM Studio (Port 1234)          private         ║"
+echo "║  2) Local   – Ollama    (Port 11434)         private         ║"
+echo "║  3) Cloud   – Google Gemini API              needs key       ║"
+echo "║  4) Cloud   – OpenRouter connector           needs key       ║"
+echo "╠══════════════════════════════════════════════════════════════╣"
+echo "║  4 runs your receipts through your own OpenRouter account,   ║"
+echo "║    on a model you choose. See README.md for details.         ║"
+echo "╚══════════════════════════════════════════════════════════════╝"
 echo ""
 echo -n "  Choose backend [current: $CURRENT_BACKEND] (press Enter to keep): "
 read -r CHOICE
@@ -78,6 +82,35 @@ case "$CHOICE" in
     NEW_BACKEND="gemini"
     NEW_MODEL="gemini-2.0-flash"
     NEW_URL=""
+    ;;
+  4)
+    NEW_BACKEND="openrouter"
+    NEW_URL=""   # OpenRouter ignores OCR_BACKEND_URL — see ocr._local_backend_url
+    # No default model: OpenRouter serves hundreds at wildly different prices
+    # and capabilities, so the choice has to be the user's.
+    CURRENT_MODEL=$(grep -E '^OCR_MODEL=' ../.env 2>/dev/null | cut -d= -f2- | tr -d ' ')
+    case "$CURRENT_MODEL" in
+      */*) ;;                # already an OpenRouter-style id
+      *) CURRENT_MODEL="" ;; # a local model name (llava:7b) is not a valid one
+    esac
+    echo ""
+    echo "  Model ID — must accept image input. Free, image-capable and"
+    echo "  zero-retention options are listed at:"
+    echo "  https://openrouter.ai/models?zdr=true&max_price=0&input_modalities=image"
+    echo -n "  Model${CURRENT_MODEL:+ [current: $CURRENT_MODEL]}: "
+    read -r ENTERED_MODEL
+    NEW_MODEL="${ENTERED_MODEL:-$CURRENT_MODEL}"
+    if [ -z "$NEW_MODEL" ]; then
+      echo -e "\033[1;31m  ✗ No model given — OCR will fail until OCR_MODEL is set in .env.\033[0m"
+    fi
+    # A model the user typed by hand is a deliberate choice, so record the
+    # paid opt-in rather than making them discover a second env var. The
+    # code-level guard stays for anyone hand-editing .env.
+    case "$NEW_MODEL" in
+      "" ) ;;
+      *:free ) NEW_PAID="0" ;;
+      * ) NEW_PAID="1" ;;
+    esac
     ;;
   "")
     NEW_BACKEND="$CURRENT_BACKEND"
@@ -116,9 +149,42 @@ else
   if [ -n "$NEW_URL" ]; then echo "OCR_BACKEND_URL=$NEW_URL" >> ../.env; fi
 fi
 
+# Only written when option 4 was chosen with a model — pressing Enter to keep
+# the current backend leaves whatever is already on file untouched.
+if [ -n "$NEW_PAID" ]; then
+  if grep -q "^OPENROUTER_ALLOW_PAID=" ../.env 2>/dev/null; then
+    sed "s|^OPENROUTER_ALLOW_PAID=.*|OPENROUTER_ALLOW_PAID=$NEW_PAID|" ../.env > ../.env.tmp && mv ../.env.tmp ../.env
+  else
+    echo "OPENROUTER_ALLOW_PAID=$NEW_PAID" >> ../.env
+  fi
+fi
+
 echo ""
 echo "  ✓ OCR backend set to: $NEW_BACKEND ($NEW_MODEL)"
 echo ""
+
+if [ "$NEW_BACKEND" = "openrouter" ]; then
+  if ! grep -qE '^OPENROUTER_API_KEY=.+' ../.env 2>/dev/null; then
+    echo -e "\033[1;31m  ✗ OPENROUTER_API_KEY is not set in .env — OCR will fail.\033[0m"
+    echo "    Get a free key at https://openrouter.ai/keys (no payment method needed)."
+    echo ""
+  fi
+
+  CURRENT_TRAINING=$(grep -E '^OPENROUTER_ALLOW_TRAINING=' ../.env 2>/dev/null | cut -d= -f2 | tr -d ' ')
+  if [ "$CURRENT_TRAINING" = "1" ]; then
+    echo -e "\033[1;33m  ⚠ OPENROUTER_ALLOW_TRAINING=1 — the serving provider may retain\033[0m"
+    echo -e "\033[1;33m    and train on your receipts.\033[0m"
+  else
+    echo "  🔒 Sending provider.data_collection=deny — providers that train on"
+    echo "     your data are refused."
+  fi
+
+  case "$NEW_MODEL" in
+    *:free) ;;
+    ?*) echo "  💳 $NEW_MODEL is a paid model — it bills your OpenRouter credits." ;;
+  esac
+  echo ""
+fi
 
 if [ "$NEW_BACKEND" = "local" ]; then
   while true; do

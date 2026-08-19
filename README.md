@@ -2,6 +2,17 @@
 
 A self-hosted, AI-powered receipt tracker that builds a personal price history database from your grocery receipts. Built with **FastAPI**, **SQLite**, **HTMX**, **Tailscale** and **Google Gemini**.
 
+## 🧪 Quick Demo (No Receipts Needed)
+
+Want to see the app with real-looking data before scanning your first receipt? Run the demo seed script:
+
+```bash
+cd backend
+uv run python scripts/seed_demo.py
+```
+
+This populates the database with ~4months of ~52 fictional receipts across multiple stores enough to make all dashboards charts and trends pages populate.
+
 ## 🚀 Key Features
 
 ### 📄 Intelligent Receipt Processing
@@ -146,41 +157,19 @@ Different models specialize in specific tasks — architectural planning, precis
 5.  **Optional: Run Tailscale or similar on your device to remotely and securely connect to your server**
 
 
-## 🧪 Quick Demo (No Receipts Needed)
+## 🔀 OpenRouter Connector
 
-Want to see the app with real-looking data before scanning your first receipt? Run the demo seed script:
+Option 4 in `./start_server.sh` runs receipts through **your own** OpenRouter account, on a model you choose. For users who already have OpenRouter credits and provider preferences.
 
 ```bash
-cd backend
-uv run python scripts/seed_demo.py
+# root .env
+OCR_BACKEND=openrouter
+OPENROUTER_API_KEY=sk-or-v1-...            # https://openrouter.ai/keys
+OCR_MODEL=google/gemma-4-26b-a4b-it:free   # any model accepting image input
 ```
+**Privacy Note.** When using OpenRoutes receipts leave your machine. Every request carries `provider.data_collection=deny`, so OpenRouter refuses providers that retain or train on inputs, enforced server-side. Whether a given model still has an endpoint under that policy depends on its providers — some free models do, some don't, and a model with none returns a 404 explaining the options. You can remove that request paramenter from @/app/services/ocr.py ```return {"provider": {"data_collection": "deny"}}```
 
-This populates the database with ~50 fictional receipts (~300 line items, 93 products) spanning ~15 weeks — enough to make every dashboard chart and trends page come alive. No real retailers appear; the data is entirely invented.
-
-Twelve made-up stores each have their own personality and catalog:
-
-| Store | Shopping pattern |
-|---|---|
-| **SpaceWay** | The routine weekly supermarket run |
-| **VendorVics** | Bi-weekly budget trips |
-| **WhollyFUD** | Occasional premium/organic hauls |
-| **The Flesh Prince** | Protein restocks |
-| **The FeedLoft** | Monthly bulk-warehouse hauls |
-| **LuridLurie's Gas** | Impulse gas-station stops |
-| **Salsa Emporium** | Salsa pilgrimages |
-| **B2BSaasoons** | Quarterly seasoning procurement (enterprise pricing) |
-| **L'UnOeufPun Bakery** | Weekend pastry runs |
-| **Tartanula's**, **BundtCake & More** | Dessert emergencies |
-| **Peptide Inferance Exchange** | Online supplement orders |
-
-The generator is deliberately opinionated so the analytics have something to chew on:
-
-- **Price trends** — every product is assigned a shape (steady, noisy, inflation, sale, volatile), so price-history graphs and the X-Ray Price Volatility Radar show distinct curves instead of uniform noise.
-- **Store overlap** — staples (eggs, milk, pasta, sparkling water) are stocked at several stores at different prices, giving the store-comparison charts real material.
-- **Nutrition gaps** — 78 of 93 products carry per-100g nutrient data; the rest are left unmatched on purpose so the X-Ray queue, coverage badges, and "Missing USDA Data" slice demo honestly.
-- **Mixed units** — items sold by weight carry an explicit `lb` weight on the line; packaged items record their size in oz, exercising both unit-price paths.
-
-Seeding is reproducible (`random.seed(42)`) and idempotent for stores/categories/items; re-running it adds another batch of receipts. Every demo receipt is tagged `DEMO_DATA` in its notes field.
+<https://openrouter.ai/models?zdr=true&max_price=0&input_modalities=image>
 
 
 ## 📦 Dependency Management

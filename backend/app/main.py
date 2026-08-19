@@ -76,6 +76,25 @@ async def lifespan(_app: FastAPI):
         if backend == "local":
             ocr_model = os.getenv("OCR_MODEL", "llava:7b")
             ocr_url = os.getenv("OCR_BACKEND_URL", "http://localhost:11434/v1")
+        elif backend == "openrouter":
+            from app.services.ocr import OPENROUTER_URL
+
+            ocr_model = os.getenv("OCR_MODEL") or "not set"
+            ocr_url = os.getenv("OPENROUTER_BASE_URL") or OPENROUTER_URL
+            if not os.getenv("OPENROUTER_API_KEY"):
+                print("⚠ OCR_BACKEND=openrouter but OPENROUTER_API_KEY is not set — OCR will fail.")
+            if not os.getenv("OCR_MODEL"):
+                print("⚠ OCR_BACKEND=openrouter but OCR_MODEL is not set — OCR will fail.")
+            print(
+                "⚠ OpenRouter is a hosted third party: receipt images leave this machine. "
+                "Sending provider.data_collection=deny"
+                + (
+                    " (DISABLED via OPENROUTER_ALLOW_TRAINING=1)"
+                    if os.getenv("OPENROUTER_ALLOW_TRAINING") == "1"
+                    else ""
+                )
+                + "."
+            )
         print(f"Application startup: OCR backend = {backend.upper()} ({ocr_model} @ {ocr_url})")
     # Clean up any orphaned receipts stuck in "processing" due to unexpected shutdown
     try:
