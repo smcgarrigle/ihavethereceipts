@@ -6,24 +6,21 @@
 <div class="space-y-6">
     <!-- Page Header -->
     <div>
-        <h1 class="text-3xl font-bold text-textBase flex items-center">
-            Receipts
-            {% if ocr_usage is defined %}
-            <span class="debug-badge ml-4" title="Daily API Usage">
-                {{ ocr_model }} | Used: {{ ocr_usage }}
-            </span>
-            {% endif %}
-        </h1>
+        <h1 class="text-3xl font-bold text-textBase">Receipts</h1>
         <p class="text-textMuted mt-1">Upload and manage your grocery receipts</p>
     </div>
 
     <!-- Upload Section -->
     <div class="bg-bgCard rounded-lg shadow dark:shadow-gray-900/50 p-6">
-        <div class="flex justify-between items-center mb-4">
-            <h2 class="text-lg font-semibold text-textBase">Upload Receipt</h2>
-            <div class="flex gap-2">
+        <div class="mb-4">
+            <h2 class="text-lg font-semibold text-textBase mb-3">Upload Receipt</h2>
+            <!-- The heading plus three buttons on one row overflowed narrow
+                 viewports and scrolled the page sideways. The heading now owns
+                 its line; the methods share a second one — equal thirds on
+                 mobile so all three always fit, content-width from sm up. -->
+            <div class="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
                 <a href="/receipts/bulk"
-                    class="text-sm px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded hover:bg-blue-200 dark:hover:bg-blue-900/50 transition flex items-center gap-1 no-underline font-medium">
+                    class="text-sm px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded hover:bg-blue-200 dark:hover:bg-blue-900/50 transition flex items-center justify-center gap-1 no-underline font-medium">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
@@ -31,7 +28,7 @@
                     Bulk Upload
                 </a>
                 <button @click="$dispatch('open-manual-modal')"
-                    class="text-sm px-3 py-1.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded hover:bg-green-200 dark:hover:bg-green-900/50 transition flex items-center gap-1 font-medium">
+                    class="text-sm px-3 py-1.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded hover:bg-green-200 dark:hover:bg-green-900/50 transition flex items-center justify-center gap-1 font-medium">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z">
@@ -40,7 +37,7 @@
                     Manual Entry
                 </button>
                 <button @click="$dispatch('open-paste-modal')"
-                    class="text-sm px-3 py-1.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 rounded hover:bg-purple-200 dark:hover:bg-purple-900/50 transition flex items-center gap-1 font-medium">
+                    class="text-sm px-3 py-1.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 rounded hover:bg-purple-200 dark:hover:bg-purple-900/50 transition flex items-center justify-center gap-1 font-medium">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2">

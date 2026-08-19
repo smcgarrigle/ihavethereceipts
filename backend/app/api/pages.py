@@ -122,16 +122,7 @@ def post_clear_demo(db: Session = Depends(get_db)):
 
 @router.get("/receipts", response_class=HTMLResponse)
 def receipts_page(request: Request, db: Session = Depends(get_db)):
-    import os
-
-    from app.services.ocr import get_backend, get_daily_usage
-
-    backend = get_backend()
-    ocr_model_name = (
-        os.getenv("OCR_MODEL", "llava:7b")
-        if backend == "local"
-        else os.getenv("GEMINI_MODEL_NAME", "gemini-flash")
-    )
+    # The model/usage badge that needed these moved to the settings page.
     from app.models import Receipt, Store
 
     # Get all stores that have receipts, normalized to avoid duplicates (e.g. iHerb vs Iherb)
@@ -148,12 +139,7 @@ def receipts_page(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse(
         request,
         "pages/receipts.html",
-        {
-            "ocr_usage": get_daily_usage(),
-            "ocr_model": ocr_model_name,
-            "ocr_backend": get_backend(),
-            "stores": sorted_stores,
-        },
+        {"stores": sorted_stores},
     )
 
 

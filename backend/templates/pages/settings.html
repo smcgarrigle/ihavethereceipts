@@ -29,6 +29,27 @@
         </div>
     </div>
 
+    <!-- Active OCR model + today's usage. Moved off the receipts page header,
+         where the badge sat beside the h1 and pushed the page sideways. -->
+    {% if ocr_model is defined %}
+    <div class="rounded-2xl border border-borderDefault bg-bgCard p-5">
+        <div class="flex flex-wrap items-center gap-x-10 gap-y-4">
+            <div>
+                <div class="text-[10px] text-textMuted font-semibold tracking-wider uppercase">OCR Model</div>
+                <div class="text-sm font-mono text-textBase mt-1 break-all">{{ ocr_model }}</div>
+            </div>
+            <div>
+                <div class="text-[10px] text-textMuted font-semibold tracking-wider uppercase">Backend</div>
+                <div class="text-sm font-mono text-textBase mt-1">{{ ocr_backend|title }}</div>
+            </div>
+            <div>
+                <div class="text-[10px] text-textMuted font-semibold tracking-wider uppercase">Used Today</div>
+                <div class="text-sm font-mono text-textBase mt-1">{{ ocr_usage }}</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- USDA Lookup Global Toggle -->
     <div class="rounded-2xl border border-borderDefault bg-bgCard p-5"
          x-data="{
