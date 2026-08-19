@@ -1,6 +1,6 @@
 # 🧾 IHaveTheReceipts
 
-A self-hosted, AI-powered receipt tracker that builds a personal price history database from your grocery receipts. Built with **FastAPI**, **SQLite**, **HTMX**, and **Google Gemini**.
+A self-hosted, AI-powered receipt tracker that builds a personal price history database from your grocery receipts. Built with **FastAPI**, **SQLite**, **HTMX**, **Tailscale** and **Google Gemini**.
 
 ## 🧪 Quick Demo (No Receipts Needed)
 
@@ -35,6 +35,7 @@ This populates the database with ~4months of ~52 fictional receipts across multi
 - **Trends Page**: Visualize price history for any item with interactive charts.
 - **Store Comparison**: See which store offers the best price for your favorite items.
 - **Spending History**: Searchable, filterable history of every dollar spent.
+- **Build your own**: Connect an agentic harness e.g Antigravity to the code and prompt the analytics you want to see.
 
 ### 🧠 Advanced Item Management
 - **Duplicate Detection**: Fuzzy matching identifies duplicate items across receipts (e.g., "Bananas" vs "Banana Organic").
@@ -45,7 +46,7 @@ This populates the database with ~4months of ~52 fictional receipts across multi
 ### 🥦 Nutrition Insights
 - **Automatic Enrichment**: Items are matched against the **USDA FoodData Central** database for nutrition facts, brands, and categories.
 - **User-Entered Nutrition Data**: When databases don't know a product, enter or correct nutrition facts from the item's insights page — your values take precedence everywhere.
-- **Honest Coverage**: The trends page shows exactly what share of your spending has nutrition data, so charts never silently overstate coverage.
+- **Honest Coverage**: The trends page shows exactly what share of your spending has nutrition data coverage, so charts never silently overstate coverage.
 - **Extensible Sources**: The enrichment layer is pluggable — an [OpenFoodFacts](https://world.openfoodfacts.org/) integration is scaffolded.
 
 ### 🔐 Your Data, In and Out
@@ -56,6 +57,7 @@ This populates the database with ~4months of ~52 fictional receipts across multi
 - **Responsive UI**: Fully optimized for phones with a collapsible hamburger menu and touch-friendly controls.
 - **Multi-Theme Engine**: Light, Dark, Forest, and Sunset themes — all CSS-variable based, dark mode first.
 - **Drawers**: Complex data on the Items page is tucked into collapsible drawers for a clean mobile experience.
+- **Remote upload**: Mesh VPN/ZTNA like Tailscale or Twingate provide direct mobile upload from your phone camera to your home server.
 
 ## 🛠️ Technology Stack
 
@@ -65,6 +67,7 @@ This populates the database with ~4months of ~52 fictional receipts across multi
 - **Alembic**: Database migration tool — the single schema authority, runs at startup.
 - **Jinja2**: Python templating engine for server-driven HTML fragments.
 - **Pydantic v2**: Data validation and schema management.
+- **Tailscale**: Use Tailscale or similar to remotely upload images directly from your phone.
 
 ### 🛠️ Developer Tools & Quality
 - **Ruff**: Python linter and code formatter.
@@ -93,10 +96,10 @@ This populates the database with ~4months of ~52 fictional receipts across multi
 
 This project is developed through **Ensemble AI Programming** — a coordinated group of AI harnesses and models, each with a distinct role:
 
-- **Primary Harness**: [Antigravity](https://antigravity.google) (Google) drives the main implementation work, with **Gemini Flash** and **Gemini 3.5** as the primary coding models.
+- **Primary Harness**: [Antigravity](https://antigravity.google) (Google) drives the main implementation work, with **Gemini Pro/Flash** and **Gemini 3.5** as the primary coding models.
 - **Review & Improvement**: **Anthropic Claude** (Opus, Sonnet, and Fable via Claude Code/Claude CLI) runs code review, refactoring, and hardening passes.
 - **Independent Sanity Reviews**: Periodic whole-project reviews with **Z.ai (GLM)** and other models — a deliberately different model family to catch blind spots the primary models might share.
-- **Runtime OCR**: **Gemini Flash** (cloud) or **IBM Granite 3.3 Vision / Qwen2-VL** (local) perform the actual receipt extraction inside the app.
+- **Runtime OCR**: **Gemini Flash** (cloud) or **IBM Granite 3.* Vision / Qwen2.5-VL** (local) perform the actual receipt extraction inside the app.
 
 Different models specialize in specific tasks — architectural planning, precise code execution, adversarial review, and OCR parsing — so no single model's weaknesses go unchecked.
 
@@ -145,12 +148,13 @@ Different models specialize in specific tasks — architectural planning, precis
 
 3.  **Optional: Local AI models (LM Studio or Ollama)**:
     ```bash
-    # LM Studio: download from https://lmstudio.ai and load a Qwen2-VL or Granite model
+    # LM Studio: download from https://lmstudio.ai and load a qwen2.5-vl or Granite model
     # Ollama:
-    ollama pull granite3.3-vision:2b   # or qwen2-vl
+    ollama pull granite3.3-vision:2b   # or qwen2.5-vl
     ```
 
 4.  **Access App**: Open `http://127.0.0.1:8000`
+5.  **Optional: Run Tailscale or similar on your device to remotely and securely connect to your server**
 
 
 ## 🔀 OpenRouter Connector
@@ -166,10 +170,6 @@ OCR_MODEL=google/gemma-4-26b-a4b-it:free   # any model accepting image input
 **Privacy Note.** When using OpenRoutes receipts leave your machine. Every request carries `provider.data_collection=deny`, so OpenRouter refuses providers that retain or train on inputs, enforced server-side. Whether a given model still has an endpoint under that policy depends on its providers — some free models do, some don't, and a model with none returns a 404 explaining the options. You can remove that request paramenter from @/app/services/ocr.py ```return {"provider": {"data_collection": "deny"}}```
 
 <https://openrouter.ai/models?zdr=true&max_price=0&input_modalities=image>
-
-
-
-
 
 
 ## 📦 Dependency Management
@@ -231,7 +231,7 @@ See [ROADMAP.md](ROADMAP.md) for the full strategic backlog. Highlights:
 - [ ] **PWA / Offline Mode**: Scan receipts in-store without connectivity.
 
 
-## 🐧 Running on Linux (Ubuntu / Debian)
+## 🐧 Running on Linux - Windows 11 WSL2 (Ubuntu / Debian)
 
 Install system dependencies before running `uv sync`:
 
