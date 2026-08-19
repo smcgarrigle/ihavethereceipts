@@ -10,8 +10,8 @@ Want to see the app with real-looking data before scanning your first receipt? R
 cd backend
 uv run python scripts/seed_demo.py
 ```
-
 This populates the database with ~4months of ~52 fictional receipts across multiple stores enough to make all dashboards charts and trends pages populate.
+<img width="2880" height="7768" alt="dashboard" src="https://github.com/user-attachments/assets/547466cf-ecca-4df2-8e7f-adde010f6608" />
 
 ## 🚀 Key Features
 
