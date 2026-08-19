@@ -6,10 +6,12 @@ analytics pages come alive without uploading any real receipts.
 
 Twelve fictional stores with distinct personalities (a bulk warehouse, a
 salsa boutique, a gas station, a protein-powder exchange, two bakeries…)
-generate ~15 weeks of purchase history. Roughly two-thirds of the food
-catalog carries per-100g nutrient data so the nutrition analytics, coverage
-badges, and X-Ray queue all demo realistically — including what *missing*
-data looks like.
+generate ~15 weeks of purchase history. Most of the food catalog carries
+per-100g nutrient data — but not all of it — so the nutrition analytics,
+coverage badges, and X-Ray queue all demo realistically, including what
+*missing* data looks like.
+
+No real retailers or products appear here; every name is invented.
 
 Usage:
     cd backend
@@ -36,7 +38,7 @@ STORES = [
     {"name": "VendorVics", "address": "42 Bargain Blvd"},
     {"name": "SpaceWay", "address": "1 Orbital Parkway"},
     {"name": "WhollyFUD", "address": "108 Enlightenment Way"},
-    {"name": "MeatBagFuels", "address": "7 Carnivore Court"},
+    {"name": "The Flesh Prince", "address": "90210 Bel-Air Butchery"},
     {"name": "Salsa Emporium", "address": "5 Scoville Square"},
     {"name": "The FeedLoft", "address": "500 Bulk Warehouse Dr"},
     {"name": "B2BSaasoons", "address": "Suite 200, Enterprise Park"},
@@ -377,7 +379,7 @@ STORE_CATALOG: dict[str, list[str]] = {
         "Artisanal Trail Mix 1lb",
         "Floss Picks 150ct",
     ],
-    "MeatBagFuels": [
+    "The Flesh Prince": [
         "Free-Range Chicken Breast",
         "Beef That's Mostly Lean",
         "Brisket of Destiny",
@@ -518,8 +520,8 @@ def build_schedule() -> list[tuple[str, date, list[str]]]:
     trips("VendorVics", [14, 12, 10, 8, 6, 4, 2], 5, 10)
     # WhollyFUD premium trips
     trips("WhollyFUD", [13, 9, 5, 2], 5, 9)
-    # MeatBagFuels protein restocks
-    trips("MeatBagFuels", [12, 9, 6, 3, 1], 3, 6)
+    # The Flesh Prince protein restocks
+    trips("The Flesh Prince", [12, 9, 6, 3, 1], 3, 6)
     # The FeedLoft monthly bulk hauls
     trips("The FeedLoft", [13, 8, 4], 8, 13)
     # LuridLurie's Gas — impulse stops
