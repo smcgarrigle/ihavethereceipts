@@ -110,11 +110,14 @@ def _render_settings_page(request: Request, db: Session) -> HTMLResponse:
     from app.services.ocr import get_backend, get_daily_usage
 
     backend = get_backend()
-    ocr_model_name = (
-        os.getenv("OCR_MODEL", "llava:7b")
-        if backend == "local"
-        else os.getenv("GEMINI_MODEL_NAME", "gemini-flash")
-    )
+    if backend == "gemini":
+        ocr_model_name = os.getenv("GEMINI_MODEL_NAME", "gemini-flash")
+    elif backend == "openrouter":
+        # OpenRouter has no default model; an unset value is a real state the
+        # user needs to see, not something to paper over with a placeholder.
+        ocr_model_name = os.getenv("OCR_MODEL") or "not set"
+    else:
+        ocr_model_name = os.getenv("OCR_MODEL", "llava:7b")
 
     return templates.TemplateResponse(
         request,
