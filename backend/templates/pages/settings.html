@@ -277,13 +277,13 @@
                       hx-target="#analytics-rules-list"
                       hx-swap="innerHTML"
                       hx-include="[name='scope'][value='analytics']"
-                      class="flex gap-2 mt-2">
+                      class="flex flex-col sm:flex-row gap-2 mt-2">
                     <input type="hidden" name="scope" value="analytics">
                     <input type="text" name="pattern" placeholder="e.g. supplements"
-                           class="flex-1 px-3 py-2 rounded-lg bg-bgMain border border-borderDefault text-sm text-textBase placeholder-textMuted focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                           class="flex-1 min-w-0 px-3 py-2 rounded-lg bg-bgMain border border-borderDefault text-sm text-textBase placeholder-textMuted focus:outline-none focus:ring-2 focus:ring-indigo-500"
                            required>
                     <input type="text" name="reason" placeholder="Reason (optional)"
-                           class="w-48 px-3 py-2 rounded-lg bg-bgMain border border-borderDefault text-sm text-textBase placeholder-textMuted focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                           class="w-full sm:w-48 px-3 py-2 rounded-lg bg-bgMain border border-borderDefault text-sm text-textBase placeholder-textMuted focus:outline-none focus:ring-2 focus:ring-indigo-500">
                     <button type="submit"
                             class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors">
                         Add
@@ -312,13 +312,13 @@
                 <form hx-post="/settings/exclusions/rules"
                       hx-target="#predictions-rules-list"
                       hx-swap="innerHTML"
-                      class="flex gap-2 mt-2">
+                      class="flex flex-col sm:flex-row gap-2 mt-2">
                     <input type="hidden" name="scope" value="predictions">
                     <input type="text" name="pattern" placeholder="e.g. Alcohol"
-                           class="flex-1 px-3 py-2 rounded-lg bg-bgMain border border-borderDefault text-sm text-textBase placeholder-textMuted focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                           class="flex-1 min-w-0 px-3 py-2 rounded-lg bg-bgMain border border-borderDefault text-sm text-textBase placeholder-textMuted focus:outline-none focus:ring-2 focus:ring-indigo-500"
                            required>
                     <input type="text" name="reason" placeholder="Reason (optional)"
-                           class="w-48 px-3 py-2 rounded-lg bg-bgMain border border-borderDefault text-sm text-textBase placeholder-textMuted focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                           class="w-full sm:w-48 px-3 py-2 rounded-lg bg-bgMain border border-borderDefault text-sm text-textBase placeholder-textMuted focus:outline-none focus:ring-2 focus:ring-indigo-500">
                     <button type="submit"
                             class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors">
                         Add
@@ -349,7 +349,7 @@
                       hx-swap="innerHTML"
                       class="flex gap-2 mt-2">
                     <input type="text" name="value" placeholder="e.g. Sponsored"
-                           class="flex-1 px-3 py-2 rounded-lg bg-bgMain border border-borderDefault text-sm text-textBase placeholder-textMuted focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                           class="flex-1 min-w-0 px-3 py-2 rounded-lg bg-bgMain border border-borderDefault text-sm text-textBase placeholder-textMuted focus:outline-none focus:ring-2 focus:ring-indigo-500"
                            required>
                     <button type="submit"
                             class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors">
@@ -381,7 +381,7 @@
                       hx-swap="innerHTML"
                       class="flex gap-2 mt-2">
                     <input type="text" name="value" placeholder="e.g. , Vegan"
-                           class="flex-1 px-3 py-2 rounded-lg bg-bgMain border border-borderDefault text-sm text-textBase placeholder-textMuted focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                           class="flex-1 min-w-0 px-3 py-2 rounded-lg bg-bgMain border border-borderDefault text-sm text-textBase placeholder-textMuted focus:outline-none focus:ring-2 focus:ring-indigo-500"
                            required>
                     <button type="submit"
                             class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors">
