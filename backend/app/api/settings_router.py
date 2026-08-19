@@ -102,6 +102,20 @@ def _render_settings_page(request: Request, db: Session) -> HTMLResponse:
     )
     ocr = _load_ocr_filters()
     flags = _load_feature_flags()
+
+    # Active OCR model + today's call count. Previously a badge in the receipts
+    # page header; it belongs here next to the OCR success rating.
+    import os
+
+    from app.services.ocr import get_backend, get_daily_usage
+
+    backend = get_backend()
+    ocr_model_name = (
+        os.getenv("OCR_MODEL", "llava:7b")
+        if backend == "local"
+        else os.getenv("GEMINI_MODEL_NAME", "gemini-flash")
+    )
+
     return templates.TemplateResponse(
         request,
         "pages/settings.html",
@@ -113,6 +127,9 @@ def _render_settings_page(request: Request, db: Session) -> HTMLResponse:
             "usda_lookup_enabled": flags.get("usda_lookup_enabled", True),
             "nutrition_outlier_percentile": flags.get("nutrition_outlier_percentile", 95),
             "protein_roi_target": flags.get("protein_roi_target", 0.20),
+            "ocr_backend": backend,
+            "ocr_model": ocr_model_name,
+            "ocr_usage": get_daily_usage(),
         },
     )
 

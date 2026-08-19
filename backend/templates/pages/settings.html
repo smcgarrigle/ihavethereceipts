@@ -29,6 +29,27 @@
         </div>
     </div>
 
+    <!-- Active OCR model + today's usage. Moved off the receipts page header,
+         where the badge sat beside the h1 and pushed the page sideways. -->
+    {% if ocr_model is defined %}
+    <div class="rounded-2xl border border-borderDefault bg-bgCard p-5">
+        <div class="flex flex-wrap items-center gap-x-10 gap-y-4">
+            <div>
+                <div class="text-[10px] text-textMuted font-semibold tracking-wider uppercase">OCR Model</div>
+                <div class="text-sm font-mono text-textBase mt-1 break-all">{{ ocr_model }}</div>
+            </div>
+            <div>
+                <div class="text-[10px] text-textMuted font-semibold tracking-wider uppercase">Backend</div>
+                <div class="text-sm font-mono text-textBase mt-1">{{ ocr_backend|title }}</div>
+            </div>
+            <div>
+                <div class="text-[10px] text-textMuted font-semibold tracking-wider uppercase">Used Today</div>
+                <div class="text-sm font-mono text-textBase mt-1">{{ ocr_usage }}</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- USDA Lookup Global Toggle -->
     <div class="rounded-2xl border border-borderDefault bg-bgCard p-5"
          x-data="{
@@ -256,13 +277,13 @@
                       hx-target="#analytics-rules-list"
                       hx-swap="innerHTML"
                       hx-include="[name='scope'][value='analytics']"
-                      class="flex gap-2 mt-2">
+                      class="flex flex-col sm:flex-row gap-2 mt-2">
                     <input type="hidden" name="scope" value="analytics">
                     <input type="text" name="pattern" placeholder="e.g. supplements"
-                           class="flex-1 px-3 py-2 rounded-lg bg-bgMain border border-borderDefault text-sm text-textBase placeholder-textMuted focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                           class="flex-1 min-w-0 px-3 py-2 rounded-lg bg-bgMain border border-borderDefault text-sm text-textBase placeholder-textMuted focus:outline-none focus:ring-2 focus:ring-indigo-500"
                            required>
                     <input type="text" name="reason" placeholder="Reason (optional)"
-                           class="w-48 px-3 py-2 rounded-lg bg-bgMain border border-borderDefault text-sm text-textBase placeholder-textMuted focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                           class="w-full sm:w-48 px-3 py-2 rounded-lg bg-bgMain border border-borderDefault text-sm text-textBase placeholder-textMuted focus:outline-none focus:ring-2 focus:ring-indigo-500">
                     <button type="submit"
                             class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors">
                         Add
@@ -291,13 +312,13 @@
                 <form hx-post="/settings/exclusions/rules"
                       hx-target="#predictions-rules-list"
                       hx-swap="innerHTML"
-                      class="flex gap-2 mt-2">
+                      class="flex flex-col sm:flex-row gap-2 mt-2">
                     <input type="hidden" name="scope" value="predictions">
                     <input type="text" name="pattern" placeholder="e.g. Alcohol"
-                           class="flex-1 px-3 py-2 rounded-lg bg-bgMain border border-borderDefault text-sm text-textBase placeholder-textMuted focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                           class="flex-1 min-w-0 px-3 py-2 rounded-lg bg-bgMain border border-borderDefault text-sm text-textBase placeholder-textMuted focus:outline-none focus:ring-2 focus:ring-indigo-500"
                            required>
                     <input type="text" name="reason" placeholder="Reason (optional)"
-                           class="w-48 px-3 py-2 rounded-lg bg-bgMain border border-borderDefault text-sm text-textBase placeholder-textMuted focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                           class="w-full sm:w-48 px-3 py-2 rounded-lg bg-bgMain border border-borderDefault text-sm text-textBase placeholder-textMuted focus:outline-none focus:ring-2 focus:ring-indigo-500">
                     <button type="submit"
                             class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors">
                         Add
@@ -328,7 +349,7 @@
                       hx-swap="innerHTML"
                       class="flex gap-2 mt-2">
                     <input type="text" name="value" placeholder="e.g. Sponsored"
-                           class="flex-1 px-3 py-2 rounded-lg bg-bgMain border border-borderDefault text-sm text-textBase placeholder-textMuted focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                           class="flex-1 min-w-0 px-3 py-2 rounded-lg bg-bgMain border border-borderDefault text-sm text-textBase placeholder-textMuted focus:outline-none focus:ring-2 focus:ring-indigo-500"
                            required>
                     <button type="submit"
                             class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors">
@@ -360,7 +381,7 @@
                       hx-swap="innerHTML"
                       class="flex gap-2 mt-2">
                     <input type="text" name="value" placeholder="e.g. , Vegan"
-                           class="flex-1 px-3 py-2 rounded-lg bg-bgMain border border-borderDefault text-sm text-textBase placeholder-textMuted focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                           class="flex-1 min-w-0 px-3 py-2 rounded-lg bg-bgMain border border-borderDefault text-sm text-textBase placeholder-textMuted focus:outline-none focus:ring-2 focus:ring-indigo-500"
                            required>
                     <button type="submit"
                             class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors">
