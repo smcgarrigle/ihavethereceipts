@@ -53,7 +53,7 @@ fixation, and similar) generally don't apply — see section 7.
 ```bash
 git status          # confirm no untracked sensitive files
 git diff --cached   # review staged content before committing
-grep -r "AIza" .    # spot-check for accidentally hardcoded API keys
+grep -r "AIza" .    # spot-check for accidentally hardcoded Gemini API keys (use other prefixes to match the API keys you're using)
 ```
 
 ---
@@ -71,7 +71,7 @@ grep -r "AIza" .    # spot-check for accidentally hardcoded API keys
 
 By default (`make run`), the app binds to `127.0.0.1:8000` — reachable only from the machine
 it runs on. The app has no authentication, so loopback is the safe default. The options below
-widen that deliberately.
+widen that.
 
 ### Tailnet-only via Tailscale Serve (recommended for phones/other devices)
 Keep the loopback bind and put Tailscale in front:
@@ -82,7 +82,7 @@ This publishes the app at `https://<your-machine>.<tailnet>.ts.net` over HTTPS, 
 **only** by devices signed into your tailnet — not the LAN, not the internet. Confirm with
 `tailscale serve status`, which should report `(tailnet only)`.
 
-> ⚠️ `tailscale funnel` is **not** the same thing — it publishes to the whole internet. Do not
+> ⚠️ `tailscale funnel` is **not** the same thing — it publishes to the public internet. Do not
 > use it with this app unless you have added authentication first (see below).
 
 ### LAN-wide (`make run-lan`)
@@ -91,7 +91,7 @@ including guests and untrusted IoT devices. Acceptable only on a network you ful
 only if your router does not forward port 8000 to the internet.
 
 ### Public internet exposure (Tailscale Funnel, VPS, or port-forwarding)
-If you expose the app publicly, you **must** add authentication. The app currently has none.
+If you expose the app publicly, you **must** add authentication if you wish to protect your data. The app currently has none.
 Options in order of simplicity:
 
 1. **HTTP Basic Auth via a reverse proxy** (nginx, Caddy) — one username/password guards the entire app. Caddy example:
@@ -103,13 +103,13 @@ Options in order of simplicity:
 2. **Tailscale ACLs** — restrict funnel access to specific Tailscale users only.
 3. **`TRUSTED_IPS` allowlist** — add middleware to reject requests from outside a known CIDR range.
 
-> ⚠️ **Do not rely on "security through obscurity"** (e.g., a non-standard port). The app has no CSRF protection on several state-changing endpoints and no rate limiting on the OCR upload endpoint.
+> ⚠️ Do not rely on "security through obscurity" (e.g., a non-standard port). CSRF validation and upload rate limiting (20 requests/minute per IP) are enforced, but the app still has no authentication — anyone who can reach the port has full access to your data.
 
 ---
 
 ## 4. File Upload Security
 
-The OCR receipt upload endpoint (`POST /receipts/upload`) accepts images and PDFs.
+The OCR receipt upload endpoint (`POST /api/receipts/upload`) accepts images and PDFs.
 
 - **MIME type validation** is done server-side via `python-magic`. Do not disable it.
 - **File size** is currently uncapped — on a public deployment, add an `upload_max_size` limit in the FastAPI endpoint or via a reverse proxy (`client_max_body_size` in nginx).
@@ -147,7 +147,6 @@ These are absent by design for a single-user local tool — do not add them unle
 
 - Authentication / login
 - Session management
-- CSRF tokens (no multi-user state to protect)
 - Account lockout
 - Password hashing
 - OAuth / SSO
