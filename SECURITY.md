@@ -60,7 +60,7 @@ grep -r "AIza" .    # spot-check for accidentally hardcoded Gemini API keys (use
 
 ## 2. API Key Management
 
-- **Never hardcode** `GEMINI_API_KEY` or any other secret in source files or templates.
+- **Never hardcode** `GEMINI_API_KEY` or any other API key or secret in source files or templates.
 - Store all secrets in `.env` (root or `backend/.env` — both are gitignored).
 - If you suspect a key was committed, **revoke it immediately** in [Google AI Studio](https://aistudio.google.com) before attempting to clean git history.
 - Rotate your key periodically. Gemini free-tier keys are rate-limited but not scoped — a leaked key can exhaust your quota.
@@ -111,9 +111,9 @@ Options in order of simplicity:
 
 The OCR receipt upload endpoint (`POST /api/receipts/upload`) accepts images and PDFs.
 
-- **MIME type validation** is done server-side via `python-magic`. Do not disable it.
-- **File size** is currently uncapped — on a public deployment, add an `upload_max_size` limit in the FastAPI endpoint or via a reverse proxy (`client_max_body_size` in nginx).
-- Uploaded files are stored in `data/uploads/` which is **not served statically** — they are read by the OCR service and not directly accessible via URL.
+- **File type validation** relies on the client-supplied `Content-Type` header (`image/jpeg`, `image/png`, `application/pdf`), which a non-browser client can forge. File contents are not inspected, and the stored extension is taken from the uploaded filename. Adding a magic-byte check and an extension allowlist is worthwhile before any public exposure.
+- **File size** is capped twice: `ContentLengthLimitMiddleware` rejects requests over 15MB with a 413, and the upload endpoint rejects files over 10MB with a 400.
+- Uploaded files are stored in `data/uploads/` and **are served statically** at `/uploads/<filename>`, so anything accepted is retrievable by URL. `X-Content-Type-Options: nosniff` limits what a browser will do with a mislabelled file, but do not treat this directory as private.
 - `pdf2image` shells out to `poppler` — ensure poppler is kept up to date (`sudo apt upgrade poppler-utils`).
 
 ---
@@ -132,8 +132,8 @@ The OCR receipt upload endpoint (`POST /api/receipts/upload`) accepts images and
 
 | Header | Value / Notes |
 | :--- | :--- |
-| `Content-Security-Policy` | Configured in middleware — review if adding new external resources |
-| `X-Frame-Options` | `DENY` — prevents clickjacking |
+| `Content-Security-Policy` | `default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'` — `unsafe-eval` is required by Alpine.js and is deliberate |
+| `X-Frame-Options` | `SAMEORIGIN` — prevents cross-origin framing |
 | `X-Content-Type-Options` | `nosniff` |
 | `Referrer-Policy` | `strict-origin-when-cross-origin` |
 
