@@ -24,6 +24,12 @@ MIN_PURCHASES = 3
 # to habit changes instead of being anchored by months-old intervals.
 MAX_CADENCE_INTERVALS = 8
 
+# Regularity bands on the coefficient of variation (std dev / mean interval).
+# Below REGULAR_CV the cycle is dependable; above ERRATIC_CV the average
+# describes nothing real.
+REGULAR_CV = 0.5
+ERRATIC_CV = 1.0
+
 # Items not purchased in this many days are marked stale
 STALE_THRESHOLD_DAYS = 180
 
@@ -135,8 +141,21 @@ def get_item_cadences(db: Session) -> list[dict[str, Any]]:
         # than the full archive once enough history has accumulated.
         intervals = intervals[-MAX_CADENCE_INTERVALS:]
 
-        avg_interval = statistics.mean(intervals)
+        # Median, not mean: interval spread is huge (CV ~1.3 across real data),
+        # so a single bulk-buy gap drags a mean well off the habit.
+        avg_interval = statistics.median(intervals)
         std_interval = statistics.stdev(intervals) if len(intervals) >= 2 else 0.0
+
+        # Coefficient of variation (std dev / mean) — spread relative to the
+        # item's own cycle, so weekly and yearly items compare on one scale.
+        interval_mean = statistics.mean(intervals)
+        cv = (std_interval / interval_mean) if interval_mean > 0 else 0.0
+        if cv < REGULAR_CV:
+            regularity = "regular"
+        elif cv < ERRATIC_CV:
+            regularity = "loose"
+        else:
+            regularity = "erratic"
 
         last_purchased = sorted_dates[-1]
         predicted_exhaustion = last_purchased + timedelta(days=avg_interval)
@@ -178,6 +197,8 @@ def get_item_cadences(db: Session) -> list[dict[str, Any]]:
                 "purchase_count": len(sorted_dates),
                 "avg_interval": round(avg_interval, 1),
                 "std_interval": round(std_interval, 1),
+                "cv": round(cv, 2),
+                "regularity": regularity,
                 "last_purchased": last_purchased.isoformat(),
                 "predicted_exhaustion": predicted_exhaustion.isoformat(),
                 "confidence_window": confidence_window,

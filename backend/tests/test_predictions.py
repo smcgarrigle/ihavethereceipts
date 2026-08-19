@@ -208,3 +208,39 @@ class TestPredictionAPI:
         response = client.get("/restock")
         assert response.status_code == 200
         assert "Restock Predictions" in response.text
+
+
+class TestMedianCadenceAndRegularity:
+    """Median interval + regularity labels (see predictions.REGULAR_CV)."""
+
+    def test_median_ignores_a_single_outlier_gap(self, db):
+        """
+        One bulk-buy gap should not drag the cycle. Intervals 7,7,7,120 give a
+        mean of ~35 days but a median of 7 — the habit is weekly.
+        """
+        from app.services.predictions import get_item_cadences
+
+        base = datetime(2026, 1, 1)
+        offsets = [0, 7, 14, 21, 141]  # three 7-day gaps, then a 120-day gap
+        dates = [base + timedelta(days=o) for o in offsets]
+        _create_item_with_purchases(db, "Weekly Bread", "TestMart", dates)
+
+        c = get_item_cadences(db)[0]
+        assert c["avg_interval"] == 7.0, "median must not be pulled by the 120-day gap"
+
+    def test_regularity_labels_track_variability(self, db):
+        """A metronomic item is 'regular'; a wildly spaced one is 'erratic'."""
+        from app.services.predictions import get_item_cadences
+
+        base = datetime(2026, 1, 1)
+        steady = [base + timedelta(days=14 * i) for i in range(5)]
+        _create_item_with_purchases(db, "Steady Milk", "TestMart", steady)
+
+        jumpy = [base + timedelta(days=o) for o in (0, 2, 40, 45, 200)]
+        _create_item_with_purchases(db, "Jumpy Sauce", "TestMart", jumpy)
+
+        by_name = {c["item_name"]: c for c in get_item_cadences(db)}
+        assert by_name["Steady Milk"]["cv"] == 0.0
+        assert by_name["Steady Milk"]["regularity"] == "regular"
+        assert by_name["Jumpy Sauce"]["cv"] > 1.0
+        assert by_name["Jumpy Sauce"]["regularity"] == "erratic"
