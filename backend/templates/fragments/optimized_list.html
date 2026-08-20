@@ -32,6 +32,16 @@
                             <span>{{ item.category }}</span>
                             <span>&bull;</span>
                             <span class="font-mono">~{{ item.avg_interval|int }}d cycle</span>
+                            {% if item.regularity %}
+                            <span>&bull;</span>
+                            <span class="font-semibold
+                                {% if item.regularity == 'regular' %}text-emerald-600 dark:text-emerald-400
+                                {% elif item.regularity == 'loose' %}text-amber-600 dark:text-amber-400
+                                {% else %}text-textSubtle{% endif %}"
+                                title="Purchase gaps vary by {{ (item.cv * 100)|int }}% of the cycle length. Lower is more predictable.">
+                                {{ item.regularity }}
+                            </span>
+                            {% endif %}
                         </div>
                     </div>
                     <div class="text-right">
