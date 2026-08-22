@@ -675,8 +675,12 @@ def categories_page(request: Request):
 
 
 @router.get("/trends", response_class=HTMLResponse)
-def trends_page(request: Request):
-    return templates.TemplateResponse(request, "pages/trends.html")
+def trends_page(request: Request, db: Session = Depends(get_db)):
+    # The per-store cards are rendered from the user's own stores, so the
+    # canvases must exist before initStoreCharts() runs on first paint.
+    from app.api.trends import get_top_stores
+
+    return templates.TemplateResponse(request, "pages/trends.html", {"stores": get_top_stores(db)})
 
 
 @router.get("/xray", response_class=HTMLResponse)

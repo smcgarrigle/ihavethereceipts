@@ -283,47 +283,38 @@
             </div>
         </div>
 
+        {% if stores %}
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8" id="storeChartsContainer">
-            <!-- Amazon Fresh -->
+            {% for store in stores %}
             <div class="bg-bgCard rounded-3xl shadow-xl p-6 border border-borderDefault">
                 <h3 class="text-lg font-bold text-textBase mb-4 flex items-center gap-2">
-                    Amazon Fresh
+                    {{ store.name }}
                 </h3>
                 <div class="h-[300px] w-full relative">
-                    <canvas id="chart-amazon-fresh" role="img" aria-label="Amazon Fresh top item price trends line chart"></canvas>
+                    <canvas id="chart-store-{{ store.id }}"
+                            data-store-id="{{ store.id }}"
+                            data-store-name="{{ store.name }}"
+                            role="img"
+                            aria-label="{{ store.name }} top item price trends line chart"></canvas>
+                    <p class="store-chart-empty absolute inset-0 hidden items-center justify-center
+                              text-center text-sm text-textMuted px-6">
+                        No price history for {{ store.name }} in this period yet — upload more
+                        receipts from this store to see item price trends.
+                    </p>
                 </div>
             </div>
-
-            <!-- Amazon.com -->
-            <div class="bg-bgCard rounded-3xl shadow-xl p-6 border border-borderDefault">
-                <h3 class="text-lg font-bold text-textBase mb-4 flex items-center gap-2">
-                    Amazon.com
-                </h3>
-                <div class="h-[300px] w-full relative">
-                    <canvas id="chart-amazon-com" role="img" aria-label="Amazon.com top item price trends line chart"></canvas>
-                </div>
-            </div>
-
-            <!-- Whole Foods Market -->
-            <div class="bg-bgCard rounded-3xl shadow-xl p-6 border border-borderDefault">
-                <h3 class="text-lg font-bold text-textBase mb-4 flex items-center gap-2">
-                    Whole Foods Market
-                </h3>
-                <div class="h-[300px] w-full relative">
-                    <canvas id="chart-wholefoods" role="img" aria-label="Whole Foods Market top item price trends line chart"></canvas>
-                </div>
-            </div>
-
-            <!-- Costco -->
-            <div class="bg-bgCard rounded-3xl shadow-xl p-6 border border-borderDefault">
-                <h3 class="text-lg font-bold text-textBase mb-4 flex items-center gap-2">
-                    Costco
-                </h3>
-                <div class="h-[300px] w-full relative">
-                    <canvas id="chart-costco" role="img" aria-label="Costco top item price trends line chart"></canvas>
-                </div>
-            </div>
+            {% endfor %}
         </div>
+        {% else %}
+        <div id="storeChartsContainer"
+             class="bg-bgCard rounded-3xl shadow-xl p-10 border border-borderDefault text-center">
+            <p class="text-lg font-bold text-textBase mb-2">No stores yet</p>
+            <p class="text-sm text-textMuted">
+                Per-store price trends appear here once you upload receipts. Each of your most
+                frequently visited stores gets its own chart of top item prices over time.
+            </p>
+        </div>
+        {% endif %}
     </div>
 
 
@@ -554,10 +545,17 @@
         }
         if (data.usda) { usdaChartInstance.data.labels = data.usda.labels; usdaChartInstance.data.datasets = data.usda.datasets; usdaChartInstance.update(); }
 
-        if (data.store_fresh) { storeChartInstances['chart-amazon-fresh'].data.labels = data.store_fresh.labels; storeChartInstances['chart-amazon-fresh'].data.datasets = data.store_fresh.datasets; storeChartInstances['chart-amazon-fresh'].update(); }
-        if (data.store_com) { storeChartInstances['chart-amazon-com'].data.labels = data.store_com.labels; storeChartInstances['chart-amazon-com'].data.datasets = data.store_com.datasets; storeChartInstances['chart-amazon-com'].update(); }
-        if (data.store_wholefoods) { storeChartInstances['chart-wholefoods'].data.labels = data.store_wholefoods.labels; storeChartInstances['chart-wholefoods'].data.datasets = data.store_wholefoods.datasets; storeChartInstances['chart-wholefoods'].update(); }
-        if (data.store_costco) { storeChartInstances['chart-costco'].data.labels = data.store_costco.labels; storeChartInstances['chart-costco'].data.datasets = data.store_costco.datasets; storeChartInstances['chart-costco'].update(); }
+        if (data.stores) {
+            Object.keys(data.stores).forEach(function (storeId) {
+                const canvasId = 'chart-store-' + storeId;
+                const chart = storeChartInstances[canvasId];
+                if (!chart) return;
+                chart.data.labels = data.stores[storeId].labels;
+                chart.data.datasets = data.stores[storeId].datasets;
+                chart.update();
+                toggleStoreEmptyState(canvasId);
+            });
+        }
 
         if (data.basket) { basketChartInstance.data.labels = data.basket.labels; basketChartInstance.data.datasets = data.basket.datasets; basketChartInstance.update(); }
         if (data.store_diff) { storeDiffChartInstance.data.labels = data.store_diff.labels; storeDiffChartInstance.data.datasets = data.store_diff.datasets; storeDiffChartInstance.update(); }
@@ -888,16 +886,33 @@
         });
     }
 
-    function initStoreCharts() {
-        initStoreChart('chart-amazon-fresh');
-        initStoreChart('chart-amazon-com');
-        initStoreChart('chart-wholefoods');
-        initStoreChart('chart-costco');
+    function storeCanvases() {
+        return Array.from(document.querySelectorAll('#storeChartsContainer canvas[data-store-id]'));
     }
 
-    async function loadStoreData(storeName, canvasId) {
+    function initStoreCharts() {
+        storeCanvases().forEach(function (c) { initStoreChart(c.id); });
+    }
+
+    // Swap the canvas for an explanatory message when a store has no history
+    // in the selected period, so the card never renders as a blank box.
+    function toggleStoreEmptyState(canvasId) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+        const chart = storeChartInstances[canvasId];
+        const msg = canvas.parentElement.querySelector('.store-chart-empty');
+        if (!msg) return;
+        const hasData = !!chart && chart.data.datasets.some(function (d) {
+            return d.data && d.data.some(function (v) { return v !== null && v !== undefined; });
+        });
+        msg.classList.toggle('hidden', hasData);
+        msg.classList.toggle('flex', !hasData);
+        canvas.style.visibility = hasData ? '' : 'hidden';
+    }
+
+    async function loadStoreData(storeId, canvasId) {
         try {
-            const response = await fetch(`/api/trends/store-top-items?store=${encodeURIComponent(storeName)}&time_range=${currentTimeRange}`);
+            const response = await fetch(`/api/trends/store-top-items?store_id=${encodeURIComponent(storeId)}&time_range=${currentTimeRange}`);
             const data = await response.json();
 
             if (data && data.labels && data.datasets) {
@@ -907,7 +922,9 @@
                 chart.update();
             }
         } catch (error) {
-            console.error(`Error loading data for ${storeName}:`, error);
+            console.error(`Error loading store ${storeId}:`, error);
+        } finally {
+            toggleStoreEmptyState(canvasId);
         }
     }
 
@@ -955,10 +972,7 @@
     async function loadAllTrendData() {
         // Fetch Store Charts
         await Promise.all([
-            loadStoreData('Amazon Fresh', 'chart-amazon-fresh'),
-            loadStoreData('Amazon.com', 'chart-amazon-com'),
-            loadStoreData('Whole Foods', 'chart-wholefoods'),
-            loadStoreData('Costco', 'chart-costco'),
+            ...storeCanvases().map(function (c) { return loadStoreData(c.dataset.storeId, c.id); }),
             loadNutritionData()
         ]);
 
