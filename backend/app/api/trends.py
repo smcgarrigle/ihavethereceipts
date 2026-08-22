@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
@@ -403,11 +403,41 @@ def get_inflation_data(db: Session = Depends(get_db)):
     return results[-26:]  # Last 6 months of weeks
 
 
+def get_top_stores(db: Session, limit: int = 4) -> list[dict]:
+    """The stores with the most receipts, for the per-store trend cards.
+
+    The cards used to be hardcoded to four real chains, which left them
+    permanently blank for anyone shopping elsewhere. Deriving them from the
+    data means the panel reflects whatever the user actually uploaded.
+    """
+    from sqlalchemy import func
+
+    from app.models import Receipt, Store
+
+    rows = (
+        db.query(Store.id, Store.name, func.count(Receipt.id).label("receipts"))
+        .join(Receipt, Receipt.store_id == Store.id)
+        .group_by(Store.id, Store.name)
+        .order_by(func.count(Receipt.id).desc(), Store.name.asc())
+        .limit(limit)
+        .all()
+    )
+    return [{"id": r.id, "name": r.name} for r in rows]
+
+
 @router.get("/store-top-items")
-def get_store_top_items(store: str, time_range: str = "year", db: Session = Depends(get_db)):
+def get_store_top_items(
+    store: str | None = None,
+    store_id: int | None = None,
+    time_range: str = "year",
+    db: Session = Depends(get_db),
+):
     """
     Get the top 5 most frequently purchased items for a specific store
     and their weekly price history.
+
+    Pass store_id for an exact match; store (a name substring) is kept for
+    backward compatibility but is ambiguous when names overlap.
     """
     from datetime import datetime, timedelta
 
@@ -426,7 +456,12 @@ def get_store_top_items(store: str, time_range: str = "year", db: Session = Depe
         start_date = None
 
     # 1. Find store
-    store_obj = db.query(Store).filter(Store.name.ilike(f"%{store}%")).first()
+    if store_id is not None:
+        store_obj = db.query(Store).filter(Store.id == store_id).first()
+    elif store:
+        store_obj = db.query(Store).filter(Store.name.ilike(f"%{store}%")).first()
+    else:
+        raise HTTPException(status_code=422, detail="Provide either store_id or store")
     if not store_obj:
         return {"labels": [], "datasets": []}
 
@@ -759,11 +794,13 @@ def get_all_charts_fragment(
     # 3. USDA
     usda = get_usda_product_types(usda_time_range, db)
 
-    # 4. Stores
-    store_fresh = get_store_top_items("Amazon Fresh", time_range, db)
-    store_com = get_store_top_items("Amazon.com", time_range, db)
-    store_wholefoods = get_store_top_items("Whole Foods", time_range, db)
-    store_costco = get_store_top_items("Costco", time_range, db)
+    # 4. Stores — derived from the data, keyed by store id (see get_top_stores)
+    stores = {
+        str(s["id"]): get_store_top_items(
+            store=None, store_id=s["id"], time_range=time_range, db=db
+        )
+        for s in get_top_stores(db)
+    }
 
     # 5. Low-data
     basket = get_basket_composition(time_range, db)
@@ -784,10 +821,7 @@ def get_all_charts_fragment(
                 weekly: {json.dumps(weekly)},
                 nutrition: {json.dumps(nutrition)},
                 usda: {json.dumps(usda)},
-                store_fresh: {json.dumps(store_fresh)},
-                store_com: {json.dumps(store_com)},
-                store_wholefoods: {json.dumps(store_wholefoods)},
-                store_costco: {json.dumps(store_costco)},
+                stores: {json.dumps(stores)},
                 basket: {json.dumps(basket)},
                 store_diff: {json.dumps(store_diff)},
                 weekly_traj: {json.dumps(weekly_traj)},
