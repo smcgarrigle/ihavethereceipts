@@ -9,9 +9,12 @@ with zero server required.
 
 What makes the snapshot work statically:
 - HTMX GET fragments are saved at their literal URL paths, so hx-get requests
-  resolve to real files. Static file servers ignore query strings, so filter
-  re-requests (e.g. trends date ranges) re-serve the base snapshot instead of
-  404ing.
+  resolve to real files.
+- Static file servers ignore query strings, which would make every filtered
+  request re-serve the unfiltered snapshot — the charts would redraw with
+  identical data and no error. So each filter combination is pre-rendered to
+  its own file under api-variants/, and a shim rewrites matching fetch() and
+  XHR requests to that file. See PARAM_MATRIX.
 - A "demo mode" shim is injected into every page: it blocks non-GET requests
   (HTMX or fetch), blocks form submissions, and shows a toast explaining that
   the demo is read-only.
@@ -31,6 +34,9 @@ redirect sticks.
 from __future__ import annotations
 
 import argparse
+import hashlib
+import itertools
+import json
 import os
 import re
 import shutil
@@ -38,6 +44,7 @@ import sys
 import tempfile
 from collections import deque
 from pathlib import Path
+from urllib.parse import quote, urlencode
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 ROOT_DIR = BACKEND_DIR.parent
@@ -82,6 +89,89 @@ URL_PATTERNS = [
 
 SKIP_PREFIXES = ("/api/export",)  # download endpoints; pointless in a snapshot
 STATIC_EXCLUDES = {"uploads", "duplicates_report.html", "other_categories.html"}
+
+# --- Filter variants ---------------------------------------------------------
+# Static hosts ignore query strings, so `?time_range=all` would silently re-serve
+# the unfiltered snapshot — charts redraw with identical data and the UI looks
+# broken in the worst way (no error, just a filter that does nothing). Instead we
+# pre-render every filter combination the UI can request to its own file and ship
+# a URL->file map; a client-side shim rewrites matching requests to that file.
+#
+# These values must mirror the controls in templates/pages/trends.html: the
+# time_range <select>, the setTimeRange/setUsdaTimeRange/setNutrient buttons.
+# check_param_matrix() re-derives them from the template and warns on drift.
+TIME_RANGES = ["3m", "6m", "ytd", "year", "all"]
+USDA_TIME_RANGES = ["3m", "6m", "year", "all"]
+NUTRIENTS = ["sodium", "sugar", "fat", "protein"]
+
+# (path, {param: [values]}) — expanded to the full cartesian product.
+PARAM_MATRIX: list[tuple[str, dict[str, list[str]]]] = [
+    (
+        "/api/trends/fragment/all-charts",
+        {
+            "time_range": TIME_RANGES,
+            "usda_time_range": USDA_TIME_RANGES,
+            "nutrient_type": NUTRIENTS,
+        },
+    ),
+    (
+        "/api/trends/nutrition-trends",
+        {"time_range": TIME_RANGES, "nutrient_type": NUTRIENTS},
+    ),
+    ("/api/trends/usda-product-types", {"time_range": USDA_TIME_RANGES}),
+]
+
+# No leading underscore: GitHub Pages runs Jekyll, which skips _-prefixed paths.
+VARIANT_DIR = "api-variants"
+API_MAP_FILE = "api-map.js"
+
+# Redirect filtered requests to their pre-rendered variant file. Static hosts
+# ignore query strings, so without this a filter change re-serves the base
+# snapshot and silently displays unfiltered data. Both transports need patching:
+# chart data uses fetch(), the trends filter form uses htmx (XHR).
+API_MAP_SHIM = """
+<script src="/api-map.js"></script>
+<script>
+(function () {
+  var MAP = window.__DEMO_API_MAP__ || {};
+
+  // Canonical key: pathname + query sorted by name, matching the build side.
+  function resolve(url) {
+    try {
+      var u = new URL(url, window.location.href);
+      if (!u.search) return null;
+      var keys = [];
+      u.searchParams.forEach(function (_v, k) {
+        if (keys.indexOf(k) === -1) keys.push(k);
+      });
+      keys.sort();
+      var qs = keys.map(function (k) {
+        return encodeURIComponent(k) + '=' + encodeURIComponent(u.searchParams.get(k));
+      }).join('&');
+      return MAP[u.pathname + '?' + qs] || null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  var realFetch = window.fetch;
+  window.fetch = function (input, init) {
+    var url = (typeof input === 'string') ? input : (input && input.url);
+    var hit = url ? resolve(url) : null;
+    if (hit) return realFetch.call(this, hit, init);
+    return realFetch.apply(this, arguments);
+  };
+
+  var realOpen = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function (method, url) {
+    var hit = (String(method).toUpperCase() === 'GET' && url) ? resolve(url) : null;
+    var args = Array.prototype.slice.call(arguments);
+    if (hit) args[1] = hit;
+    return realOpen.apply(this, args);
+  };
+})();
+</script>
+"""
 
 DEMO_SHIM = """
 <div id="static-demo-badge" style="position:fixed;bottom:14px;right:14px;z-index:9999;
@@ -182,6 +272,94 @@ def entity_urls() -> list[str]:
         db.close()
 
 
+def canonical(path: str, params: dict[str, str]) -> str:
+    """URL key with query params sorted by name — the shim builds the same string.
+
+    quote_via=quote matches JS encodeURIComponent (%20, not +), so a value with a
+    space can never produce a key the shim is unable to look up.
+    """
+    return path + "?" + urlencode(sorted(params.items()), quote_via=quote)
+
+
+def param_variants() -> list[tuple[str, dict[str, str]]]:
+    """Every (path, params) combination the filter UI can request."""
+    from app.database import SessionLocal
+    from app.models import Store
+
+    db = SessionLocal()
+    try:
+        store_ids = [str(sid) for (sid,) in db.query(Store.id)]
+    finally:
+        db.close()
+
+    matrix = [
+        *PARAM_MATRIX,
+        # store_id is data-dependent, so it is expanded from the seeded DB.
+        (
+            "/api/trends/store-top-items",
+            {"store_id": store_ids, "time_range": TIME_RANGES},
+        ),
+    ]
+
+    variants: list[tuple[str, dict[str, str]]] = []
+    for path, spec in matrix:
+        names = list(spec)
+        for combo in itertools.product(*(spec[n] for n in names)):
+            variants.append((path, dict(zip(names, combo, strict=True))))
+    return variants
+
+
+def crawl_variants(out: Path, client) -> tuple[dict[str, str], list[str]]:
+    """Render each filter combination to its own file; return the URL->file map."""
+    api_map: dict[str, str] = {}
+    warnings: list[str] = []
+    (out / VARIANT_DIR).mkdir(parents=True, exist_ok=True)
+
+    for path, params in param_variants():
+        resp = client.get(path, params=params)
+        if resp.status_code != 200:
+            warnings.append(f"{resp.status_code} {canonical(path, params)}")
+            continue
+        key = canonical(path, params)
+        ext = ".json" if "json" in resp.headers.get("content-type", "") else ".html"
+        name = hashlib.sha1(key.encode()).hexdigest()[:16] + ext
+        (out / VARIANT_DIR / name).write_bytes(resp.content)
+        api_map[key] = f"/{VARIANT_DIR}/{name}"
+
+    return api_map, warnings
+
+
+def write_api_map(out: Path, api_map: dict[str, str]) -> None:
+    """Emit the map as a plain script so it is parsed before any request fires."""
+    payload = json.dumps(api_map, separators=(",", ":"), sort_keys=True)
+    (out / API_MAP_FILE).write_text(f"window.__DEMO_API_MAP__ = {payload};\n", encoding="utf-8")
+
+
+def check_param_matrix() -> list[str]:
+    """Warn if trends.html offers filter values the matrix doesn't cover."""
+    template = BACKEND_DIR / "templates" / "pages" / "trends.html"
+    if not template.exists():
+        return []
+    text = template.read_text(encoding="utf-8")
+    found = {
+        "time_range": set(re.findall(r"setTimeRange\('([^']+)'\)", text))
+        | set(re.findall(r"<option value=\"([^\"]+)\"", text)),
+        "usda_time_range": set(re.findall(r"setUsdaTimeRange\('([^']+)'\)", text)),
+        "nutrient_type": set(re.findall(r"setNutrient\('([^']+)'\)", text)),
+    }
+    covered = {
+        "time_range": set(TIME_RANGES),
+        "usda_time_range": set(USDA_TIME_RANGES),
+        "nutrient_type": set(NUTRIENTS),
+    }
+    return [
+        f"{name}: template offers {sorted(found[name] - covered[name])} "
+        f"which PARAM_MATRIX does not cover"
+        for name in found
+        if found[name] - covered[name]
+    ]
+
+
 def copy_static_assets(out: Path) -> None:
     src = BACKEND_DIR / "static"
     dest = out / "static"
@@ -193,7 +371,7 @@ def copy_static_assets(out: Path) -> None:
     )
 
 
-def crawl(out: Path) -> tuple[int, list[str], set[str]]:
+def crawl(out: Path) -> tuple[int, list[str], set[str], int]:
     from fastapi.testclient import TestClient
 
     from app.main import app
@@ -210,6 +388,11 @@ def crawl(out: Path) -> tuple[int, list[str], set[str]]:
             if url not in visited:
                 visited.add(url)
                 queue.append(url)
+
+        # Rendered before the page crawl so the map file exists alongside it.
+        api_map, variant_warnings = crawl_variants(out, client)
+        warnings.extend(variant_warnings)
+        write_api_map(out, api_map)
 
         while queue:
             path = queue.popleft()
@@ -237,13 +420,15 @@ def crawl(out: Path) -> tuple[int, list[str], set[str]]:
                         visited.add(found)
                         queue.append(found)
                 if is_page(path):
-                    text = text.replace("</body>", DEMO_SHIM + "</body>", 1)
+                    # API_MAP_SHIM first so DEMO_SHIM's write-blocking fetch
+                    # wrapper ends up outermost and still sees every call.
+                    text = text.replace("</body>", API_MAP_SHIM + DEMO_SHIM + "</body>", 1)
                 dest.write_text(text, encoding="utf-8")
             else:
                 dest.write_bytes(resp.content)
             saved += 1
 
-    return saved, warnings, write_only
+    return saved, warnings, write_only, len(api_map)
 
 
 def rewrite_base_path(out: Path, base_path: str) -> int:
@@ -305,14 +490,21 @@ def main() -> int:
         shutil.rmtree(out)
     out.mkdir(parents=True)
 
+    for drift in check_param_matrix():
+        print(f"  ⚠️  filter drift — {drift}")
+
     copy_static_assets(out)
-    saved, warnings, write_only = crawl(out)
+    saved, warnings, write_only, variants = crawl(out)
+
+    # GitHub Pages runs Jekyll by default, which would skip some paths.
+    (out / ".nojekyll").write_text("", encoding="utf-8")
 
     if args.base_path:
         count = rewrite_base_path(out, args.base_path)
         print(f"🔗 Rewrote root-relative URLs in {count} files for base path {args.base_path!r}")
 
     print(f"\n✅ Snapshot complete: {saved} responses saved")
+    print(f"   {variants} filter variants pre-rendered into {VARIANT_DIR}/")
     print(f"   {len(write_only)} write-only/parameterized endpoints skipped (shim blocks them)")
     for warning in warnings:
         print(f"  ⚠️  {warning}")
