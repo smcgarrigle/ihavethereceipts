@@ -125,6 +125,22 @@ PARAM_MATRIX: list[tuple[str, dict[str, list[str]]]] = [
 VARIANT_DIR = "api-variants"
 API_MAP_FILE = "api-map.js"
 
+# Bare-root links ("/" and "/?x=1") for --base-path hosting. The main rewrite
+# anchors on a known top-level directory name, which these have no room for, so
+# they need their own pass or the wordmark and Dashboard link escape the
+# subdirectory and land on the host root.
+#
+# Anchored to attributes and URL assignments on purpose: a blanket rule for any
+# quoted "/" would also hit string literals that are not URLs. The pages contain
+# `e.key === '/'` (the press-/-to-search shortcut), which such a rule would
+# silently break.
+ROOT_PATTERNS = [
+    re.compile(r'(?P<lead>(?:href|src|action|hx-get|hx-post)=")/(?=[?#"])'),
+    re.compile(
+        r"""(?P<lead>(?:fetch\(|window\.location(?:\.href)?\s*=|location(?:\.href)?\s*=)\s*['"])/(?=[?#'"])"""
+    ),
+]
+
 # Redirect filtered requests to their pre-rendered variant file. Static hosts
 # ignore query strings, so without this a filter change re-serves the base
 # snapshot and silently displays unfiltered data. Both transports need patching:
@@ -448,10 +464,28 @@ def rewrite_base_path(out: Path, base_path: str) -> int:
         except UnicodeDecodeError:
             continue
         new = pattern.sub(lambda m: m.group("q") + base + "/" + m.group("path"), text)
+        for root_pattern in ROOT_PATTERNS:
+            new = root_pattern.sub(rf"\g<lead>{base}/", new)
         if new != text:
             file.write_text(new, encoding="utf-8")
             rewritten += 1
     return rewritten
+
+
+def check_base_path(out: Path, base_path: str) -> list[str]:
+    """Report root-relative refs the rewrite missed — they escape the subdirectory.
+
+    A missed "/" sends the logo and Dashboard link to the host root instead of the
+    project site, so this runs on every --base-path build.
+    """
+    base = "/" + base_path.strip("/")
+    attr_ref = re.compile(r'(?:href|src|action|hx-get|hx-post)="(/[^"]*)"')
+    missed: dict[str, int] = {}
+    for file in out.rglob("*.html"):
+        for ref in attr_ref.findall(file.read_text(encoding="utf-8")):
+            if not ref.startswith(base + "/") and ref != base:
+                missed[ref] = missed.get(ref, 0) + 1
+    return [f'{count}x unprefixed ref "{ref}"' for ref, count in sorted(missed.items())]
 
 
 def check_internal_refs(out: Path, expected_missing: set[str]) -> list[str]:
@@ -502,6 +536,8 @@ def main() -> int:
     if args.base_path:
         count = rewrite_base_path(out, args.base_path)
         print(f"🔗 Rewrote root-relative URLs in {count} files for base path {args.base_path!r}")
+        for escaped in check_base_path(out, args.base_path):
+            print(f"  ⚠️  escapes the base path — {escaped}")
 
     print(f"\n✅ Snapshot complete: {saved} responses saved")
     print(f"   {variants} filter variants pre-rendered into {VARIANT_DIR}/")
