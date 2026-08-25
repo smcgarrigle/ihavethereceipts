@@ -39,14 +39,16 @@
     <div id="htmx-scripts"></div>
 
 
-    <!-- 1. Store Top Items Price Charts -->
+    <!-- 1. Nutrition X-Ray, then per-store price charts. Both are driven by the
+         time range below, which is why it sits with the page heading rather than
+         with either section. -->
     <div class="space-y-6">
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
             <div>
                 <h1 class="text-3xl font-bold text-textBase flex items-center gap-3">
-                    <span class="text-2xl">📈</span> STORE PRICE TRENDS
+                    <span class="text-2xl">🧬</span> NUTRITION X-RAY
                 </h1>
-                <p class="text-textMuted mt-1">Price volatility for your top 5 items at your most frequented stores</p>
+                <p class="text-textMuted mt-1">Nutrient trends across everything you've purchased</p>
             </div>
 
             <div class="flex bg-bgSkeleton rounded-lg p-1 overflow-x-auto max-w-full no-scrollbar">
@@ -281,6 +283,14 @@
                     </div>
                 </div>
             </div>
+        </div>
+
+        <!-- 2. Per-store price charts -->
+        <div class="pt-4">
+            <h2 class="text-2xl font-bold text-textBase flex items-center gap-3">
+                <span class="text-2xl">📈</span> STORE PRICE TRENDS
+            </h2>
+            <p class="text-textMuted mt-1">Price volatility for your top 5 items at your most frequented stores</p>
         </div>
 
         {% if stores %}
