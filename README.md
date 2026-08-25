@@ -11,9 +11,10 @@ cd backend
 uv run python scripts/seed_demo.py
 ```
 This populates the database with ~4months of ~52 fictional receipts across multiple stores enough to make all dashboards charts and trends pages populate.
-<img width="1024" height="4275" alt="dark-082426-dashboard" src="https://github.com/user-attachments/assets/7833b1dc-2d30-4b50-98dc-db169bdaf5ec" />
-<img width="1024" height="768" alt="ocr-082426-receipt-processing" src="https://github.com/user-attachments/assets/d5990cbd-1631-4642-a91c-520fcf09d609" />
 
+<img width="1024" height="4275" alt="dark-082426-dashboard" src="https://github.com/user-attachments/assets/7833b1dc-2d30-4b50-98dc-db169bdaf5ec" />
+
+<img width="1024" height="768" alt="ocr-082426-receipt-processing" src="https://github.com/user-attachments/assets/d5990cbd-1631-4642-a91c-520fcf09d609" />
 
 ## 🚀 Key Features
 
