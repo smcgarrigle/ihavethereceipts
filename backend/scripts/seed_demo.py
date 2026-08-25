@@ -64,6 +64,83 @@ CATEGORIES = [
     "Other",
 ]
 
+# Real USDA FoodData Central IDs for each nutrient profile, so demo items link
+# to a page that actually resolves on fdc.nal.usda.gov and the USDA product-type
+# chart has something to group. Looked up once against the FDC search API and
+# baked in — seeding must not require a network call or an API key.
+#
+# Three profiles (casein, corn_nuts, creatine) have no accurate FDC match and
+# stay NULL on purpose: partial coverage is realistic and exercises the
+# nutrition-coverage UI.
+_FDC_IDS = {
+    "almond_butter": 2262074,
+    "apple": 1750340,
+    "avocado": 2710824,
+    "bacon": 749420,
+    "bagel": 174899,
+    "banana": 1105073,
+    "beef": 2514744,
+    "berries": 2346411,
+    "black_beans": 173734,
+    "bread": 2758994,
+    "broccoli": 747447,
+    "bundt": 173243,
+    "butter": 790508,
+    "carrot": 2258587,
+    "cheddar": 328637,
+    "chicken": 2646170,
+    "chips": 169677,
+    "cold_brew": 171881,
+    "collagen": 2587229,
+    "croissant": 174987,
+    "dark_chocolate": 170273,
+    "edamame": 2758981,
+    "eggs": 323604,
+    "energy_drink": 2710756,
+    "flour": 789890,
+    "garlic_powder": 171325,
+    "greek_yogurt": 330137,
+    "ham": 746952,
+    "hot_sauce": 174527,
+    "hummus": 321358,
+    "jam": 169641,
+    "jerky": 2705860,
+    "kombucha": 2710509,
+    "lamb": 2727570,
+    "milk": 746782,
+    "oat_milk": 2257046,
+    "oats": 2346396,
+    "oj": 2003591,
+    "olive_oil": 748608,
+    "paprika": 171329,
+    "pasta": 2758998,
+    "pepper": 2258590,
+    "pesto": 171582,
+    "pizza": 172041,
+    "protein_bar": 173158,
+    "queso": 171584,
+    "quiche": 2708732,
+    "quinoa": 2512372,
+    "rice": 2512381,
+    "rice_cakes": 167967,
+    "salmon": 2684441,
+    "salsa": 746777,
+    "shortbread": 174087,
+    "shrimp": 2684443,
+    "slush": 2710576,
+    "sparkling": 174842,
+    "spinach": 1999632,
+    "sports_drink": 2710771,
+    "sushi": 2708959,
+    "taquito": 169772,
+    "tart": 172784,
+    "tomato": 321360,
+    "tomato_sauce": 2685579,
+    "tortilla_chips": 1879353,
+    "trail_mix": 167561,
+    "whey": 173180,
+}
+
 # Per-100g nutrient profiles (approximate real-world values).
 # Keys follow the OpenFoodFacts convention used by nutrition_utils.
 # (kcal, carbs_g, sugars_g, protein_g, fat_g, satfat_g, sodium_g)
@@ -590,12 +667,15 @@ def seed() -> None:
                 category_id=cat_map[cat_name].id,
                 nutrients=nutrients,
                 nutrition_source="demo" if nutrients else None,
+                fdc_id=_FDC_IDS.get(profile),
             )
             db.add(item_obj)
             db.flush()
             item_obj_map[item_name] = item_obj
+        fdc_count = sum(1 for i in item_obj_map.values() if i.fdc_id)
         print(
-            f"  ✓ {len(ITEM_CATALOG)} items in catalog ({nutrient_count} with nutrition data)"
+            f"  ✓ {len(ITEM_CATALOG)} items in catalog "
+            f"({nutrient_count} with nutrition data, {fdc_count} matched to USDA FDC)"
         )
 
         # ---- Receipts & ReceiptItems ----
