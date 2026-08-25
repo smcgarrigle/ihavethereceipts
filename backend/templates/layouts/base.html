@@ -174,7 +174,7 @@
                             <a href="/trends" class="block px-4 py-2 text-sm text-textMuted hover:text-textBase hover:bg-bgMain transition">📈 Trends</a>
                             <a href="/restock" class="block px-4 py-2 text-sm text-textMuted hover:text-textBase hover:bg-bgMain transition">🔮 Predictions</a>
                             <a href="/best-value/produce" class="block px-4 py-2 text-sm text-textMuted hover:text-textBase hover:bg-bgMain transition">🏆 Best Value</a>
-                            <a href="/xray" class="block px-4 py-2 text-sm text-textMuted hover:text-textBase hover:bg-bgMain transition">🔬 Nutrition X-Ray</a>
+                            <a href="/xray" class="block px-4 py-2 text-sm text-textMuted hover:text-textBase hover:bg-bgMain transition">🔬 Receipt X-Ray</a>
                         </div>
                     </div>
 
@@ -325,7 +325,7 @@
                 <a href="/best-value/produce" {% if path.startswith('/best-value') %}aria-current="page"{% endif %}
                     class="{{ mob_on if path.startswith('/best-value') else mob_off }}">🏆 Best Value</a>
                 <a href="/xray" {% if path.startswith('/xray') %}aria-current="page"{% endif %}
-                    class="{{ mob_on if path.startswith('/xray') else mob_off }}">🔬 Nutrition X-Ray</a>
+                    class="{{ mob_on if path.startswith('/xray') else mob_off }}">🔬 Receipt X-Ray</a>
 
                 <p class="px-3 pt-3 pb-1 text-xs font-bold uppercase tracking-widest text-textSubtle">Add</p>
                 <a href="/receipts" class="{{ mob_off }}">📄 Upload receipt</a>
