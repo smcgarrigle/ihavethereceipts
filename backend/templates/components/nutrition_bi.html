@@ -4,7 +4,9 @@
    old dashboard shell never displayed. #}
 <div class="grid grid-cols-1 lg:grid-cols-5 gap-8"
      x-data="{
-           showMissing: true,
+           {# Off by default: the "Missing USDA Data" slice dominates the breakdown
+              and buries the real macro split. Toggle on to see coverage. #}
+           showMissing: false,
            biData: null,
            init() {
                fetch('/api/analytics/bi-dashboard')

@@ -14,27 +14,33 @@
 {% endblock %}
 
 {% block content %}
+{# One time_range control per section, all driving the same hidden field, so each
+   section states the range it is showing. setTimeRange() re-syncs every group by
+   [data-range], which is why these carry no ids — three copies would collide. #}
+{% macro time_range_group(label) %}
+<div class="time-range-group flex bg-bgSkeleton rounded-lg p-1 overflow-x-auto max-w-full no-scrollbar"
+     role="group" aria-label="{{ label }}">
+    {# 3m came from the old Global Filters select; kept here so removing that card
+       does not quietly drop a range the user could previously pick. #}
+    {% for value, text in [('3m', '3 Months'), ('6m', '6 Months'), ('ytd', 'YTD'), ('year', '1 Year'), ('all', 'All Time')] %}
+    <button type="button" onclick="setTimeRange('{{ value }}')" data-range="{{ value }}"
+        class="{% if value == '6m' %}px-4 py-1.5 text-sm font-bold rounded-md bg-bgInput shadow-sm text-textBase transition-all whitespace-nowrap{% else %}px-4 py-1.5 text-sm font-medium rounded-md text-textMuted hover:text-gray-900 dark:hover:text-white transition-all whitespace-nowrap{% endif %}">{{ text }}</button>
+    {% endfor %}
+</div>
+{% endmacro %}
 <div class="space-y-12">
     {% include "components/insights_subnav.html" %}
 
-    <!-- Global Chart Filters (HTMX) -->
-    <div class="bg-bgCard rounded-2xl shadow p-4 flex flex-col md:flex-row gap-4 justify-between items-center border border-borderDefault">
-        <div class="flex items-center gap-3">
-            <span class="text-2xl">⚙️</span>
-            <span class="font-bold text-textBase">Global Filters</span>
-        </div>
-        <form hx-get="/api/trends/fragment/all-charts" hx-target="#htmx-scripts" hx-trigger="change" class="flex flex-wrap gap-4 items-center">
-            <select name="time_range" aria-label="Time range"
-                class="bg-bgSkeleton text-textBase rounded-lg px-3 py-2 text-sm border-none focus:ring-2 focus:ring-blue-500 font-medium">
-                <option value="3m">Last 3 Months</option>
-                <option value="6m" selected>Last 6 Months</option>
-                <option value="year">Last 1 Year</option>
-                <option value="all">All Time</option>
-            </select>
-            <input type="hidden" name="usda_time_range" id="usda_time_range_input" value="6m">
-            <input type="hidden" name="nutrient_type" id="nutrient_type_input" value="sugar">
-        </form>
-    </div>
+    {# Carries the chart filter state. It has no UI of its own — the visible
+       controls are the per-section time_range groups below (see the time_range
+       macro) and the USDA group, which write into these fields and fire the
+       change that reloads every chart. Must remain the first <form> on the
+       page: the setters trigger it as htmx.trigger("form", "change"). #}
+    <form hx-get="/api/trends/fragment/all-charts" hx-target="#htmx-scripts" hx-trigger="change" class="hidden">
+        <input type="hidden" name="time_range" id="time_range_input" value="6m">
+        <input type="hidden" name="usda_time_range" id="usda_time_range_input" value="6m">
+        <input type="hidden" name="nutrient_type" id="nutrient_type_input" value="sugar">
+    </form>
 
     <div id="htmx-scripts"></div>
 
@@ -51,12 +57,7 @@
                 <p class="text-textMuted mt-1">Nutrient trends across everything you've purchased</p>
             </div>
 
-            <div class="flex bg-bgSkeleton rounded-lg p-1 overflow-x-auto max-w-full no-scrollbar">
-                <button onclick="setTimeRange('6m')" id="btn-6m" class="px-4 py-1.5 text-sm font-bold rounded-md bg-bgInput shadow-sm text-textBase transition-all whitespace-nowrap">6 Months</button>
-                <button onclick="setTimeRange('ytd')" id="btn-ytd" class="px-4 py-1.5 text-sm font-medium rounded-md text-textMuted hover:text-gray-900 dark:hover:text-white transition-all whitespace-nowrap">YTD</button>
-                <button onclick="setTimeRange('year')" id="btn-year" class="px-4 py-1.5 text-sm font-medium rounded-md text-textMuted hover:text-gray-900 dark:hover:text-white transition-all whitespace-nowrap">1 Year</button>
-                <button onclick="setTimeRange('all')" id="btn-all" class="px-4 py-1.5 text-sm font-medium rounded-md text-textMuted hover:text-gray-900 dark:hover:text-white transition-all whitespace-nowrap">All Time</button>
-            </div>
+            {{ time_range_group('Time range for nutrition charts') }}
         </div>
 
         <!-- NUTRITIONAL ANALYTICS & MACRO PROFILE SECTION -->
@@ -286,11 +287,15 @@
         </div>
 
         <!-- 2. Per-store price charts -->
-        <div class="pt-4">
-            <h2 class="text-2xl font-bold text-textBase flex items-center gap-3">
-                <span class="text-2xl">📈</span> STORE PRICE TRENDS
-            </h2>
-            <p class="text-textMuted mt-1">Price volatility for your top 5 items at your most frequented stores</p>
+        <div class="pt-4 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
+            <div>
+                <h2 class="text-2xl font-bold text-textBase flex items-center gap-3">
+                    <span class="text-2xl">📈</span> STORE PRICE TRENDS
+                </h2>
+                <p class="text-textMuted mt-1">Price volatility for your top 5 items at your most frequented stores</p>
+            </div>
+
+            {{ time_range_group('Time range for store price charts') }}
         </div>
 
         {% if stores %}
@@ -330,11 +335,15 @@
 
     <!-- Low-Data Bootstrap Charts -->
     <div class="space-y-6 pt-8 border-t border-borderDefault">
-        <div>
-            <h2 class="text-2xl font-bold text-textBase flex items-center gap-3">
-                <span class="text-2xl">📊</span> QUICK INSIGHTS
-            </h2>
-            <p class="text-textMuted mt-1">High-value visualizations that work with minimal data</p>
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
+            <div>
+                <h2 class="text-2xl font-bold text-textBase flex items-center gap-3">
+                    <span class="text-2xl">📊</span> QUICK INSIGHTS
+                </h2>
+                <p class="text-textMuted mt-1">High-value visualizations that work with minimal data</p>
+            </div>
+
+            {{ time_range_group('Time range for quick insights charts') }}
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -692,24 +701,22 @@
         }
 
 
+    const TIME_RANGE_ON = "px-4 py-1.5 text-sm font-bold rounded-md bg-bgInput shadow-sm text-textBase transition-all whitespace-nowrap";
+    const TIME_RANGE_OFF = "px-4 py-1.5 text-sm font-medium rounded-md text-textMuted hover:text-gray-900 dark:hover:text-white transition-all whitespace-nowrap";
+
     function setTimeRange(range) {
-        document.querySelector("form select[name='time_range']").value = range;
+        document.getElementById("time_range_input").value = range;
         htmx.trigger("form", "change");
 
         currentTimeRange = range;
 
-        // Update button styles
-        const buttons = ['6m', 'ytd', 'year', 'all'];
-        buttons.forEach(b => {
-            const el = document.getElementById(`btn-${b}`);
-            if (b === range) {
-                el.className = "px-4 py-1.5 text-sm font-bold rounded-md bg-bgInput shadow-sm text-textBase transition-all whitespace-nowrap";
-            } else {
-                el.className = "px-4 py-1.5 text-sm font-medium rounded-md text-textMuted hover:text-gray-900 dark:hover:text-white transition-all whitespace-nowrap";
-            }
+        // Every section carries its own copy of this control, so they all have to
+        // move together — otherwise one section would advertise a range it isn't
+        // showing.
+        document.querySelectorAll('.time-range-group [data-range]').forEach(function (el) {
+            el.className = el.dataset.range === range ? TIME_RANGE_ON : TIME_RANGE_OFF;
         });
-
-        }
+    }
 
 
     function setNutrient(nutrient) {
