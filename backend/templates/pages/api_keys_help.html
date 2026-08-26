@@ -19,6 +19,18 @@
         <p>The Receipts uses up to three services: <strong class="text-textBase">USDA FoodData Central</strong> for nutrition data, <strong class="text-textBase">Open Food Facts</strong> for product lookups (no key needed!), and <strong class="text-textBase">Google Gemini</strong> for reading your receipt photos.</p>
     </div>
 
+    <!-- Reading receipt photos does not require any key at all. -->
+    <div class="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-5 text-sm text-textMuted space-y-2">
+        <p><strong class="text-textBase">🔒 Prefer to keep everything on your own machine?</strong> You don't need a key to read receipt photos. The Receipts can run a local vision model instead, so your receipts never leave your computer — and it's free.</p>
+        <p>Set <code class="bg-bgSkeleton px-1 py-0.5 rounded font-mono text-[11px]">OCR_BACKEND</code> in your <code class="bg-bgSkeleton px-1 py-0.5 rounded font-mono text-[11px]">.env</code> to one of:</p>
+        <ul class="list-disc list-inside space-y-1 ml-1">
+            <li><code class="bg-bgSkeleton px-1 py-0.5 rounded font-mono text-[11px]">local</code> — the default. A vision model such as LLaVA or Qwen2.5-VL via <strong class="text-textBase">Ollama</strong> or <strong class="text-textBase">LM Studio</strong>. Point <code class="bg-bgSkeleton px-1 py-0.5 rounded font-mono text-[11px]">OCR_BACKEND_URL</code> at it.</li>
+            <li><code class="bg-bgSkeleton px-1 py-0.5 rounded font-mono text-[11px]">gemini</code> — Google's hosted model. Fastest and most accurate; needs the key below.</li>
+            <li><code class="bg-bgSkeleton px-1 py-0.5 rounded font-mono text-[11px]">openrouter</code> — your own OpenRouter account.</li>
+        </ul>
+        <p class="text-[11px] text-textSubtle">Digital PDF invoices (Whole Foods, Amazon Fresh) are parsed directly and need no vision model at all, whichever backend you pick.</p>
+    </div>
+
     <!-- USDA FDC -->
     <div class="rounded-2xl border border-borderDefault bg-bgCard p-6 space-y-4">
         <div class="flex items-center gap-3">

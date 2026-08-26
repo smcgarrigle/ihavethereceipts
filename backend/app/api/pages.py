@@ -92,6 +92,20 @@ def root(request: Request, db: Session = Depends(get_db)):
     is_demo = any(r.notes == "DEMO_DATA" for r in all_receipts)
     has_gemini_key = bool(os.getenv("GEMINI_API_KEY"))
 
+    # Image OCR needs a vision model, which can be local or hosted — Gemini is one
+    # option, not a requirement. Only mention it when no cloud key is configured
+    # and the user has not dismissed the suggestion.
+    from app.api.settings_router import _load_feature_flags
+    from app.core.config import settings
+    from app.services.ocr import get_backend
+
+    ocr_backend = get_backend()
+    show_ocr_hint = (
+        not has_gemini_key
+        and ocr_backend != "openrouter"
+        and not _load_feature_flags().get("ocr_hint_dismissed", False)
+    )
+
     return templates.TemplateResponse(
         request,
         "pages/dashboard.html",
@@ -102,6 +116,9 @@ def root(request: Request, db: Session = Depends(get_db)):
             "savings_percent": round(savings_percent, 1),
             "is_demo": is_demo,
             "has_gemini_key": has_gemini_key,
+            "show_ocr_hint": show_ocr_hint,
+            "ocr_backend": ocr_backend,
+            "ocr_backend_url": settings.OCR_BACKEND_URL,
         },
     )
 
