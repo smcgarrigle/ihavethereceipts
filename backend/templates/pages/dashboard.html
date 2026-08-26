@@ -27,31 +27,48 @@
     </div>
     {% endif %}
 
-    {% if not has_gemini_key %}
-    <!-- Gemini API Key Setup Warning -->
-    <div class="bg-gradient-to-r from-amber-500/10 to-orange-500/10 dark:from-amber-950/20 dark:to-orange-950/20 border border-amber-200 dark:border-amber-900/50 rounded-xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+    {% if show_ocr_hint %}
+    <!-- Image OCR backend hint. Local models are fully supported, so this offers
+         the hosted option rather than presenting it as a requirement. -->
+    <div x-data="{ shown: true }" x-show="shown" x-transition.opacity
+         class="bg-bgCard border border-borderDefault rounded-xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div class="flex items-start space-x-3">
-            <span class="bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 p-2 rounded-lg mt-0.5">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <span class="bg-bgSkeleton text-textMuted p-2 rounded-lg mt-0.5">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
             </span>
             <div>
-                <h4 class="font-bold text-textBase">Gemini API Key Required for Image OCR</h4>
+                <h4 class="font-bold text-textBase">Image OCR is running on a local model</h4>
                 <p class="text-xs text-textMuted mt-1 leading-relaxed">
-                    Currently running OCR in offline/local mode. To unlock fast, highly-accurate cloud-based receipt image scanning,
-                    create a free Gemini API key and add it to your local <code class="bg-bgSkeleton px-1 py-0.5 rounded font-mono text-[11px]">.env</code> file:
-                    <code class="bg-bgSkeleton px-1 py-0.5 rounded font-mono text-[11px]">GEMINI_API_KEY=your_api_key</code>.
+                    Receipt images are read by
+                    <code class="bg-bgSkeleton px-1 py-0.5 rounded font-mono text-[11px]">{{ ocr_backend }}</code>
+                    at <code class="bg-bgSkeleton px-1 py-0.5 rounded font-mono text-[11px]">{{ ocr_backend_url }}</code>
+                    — private, offline and free. Keep it, or switch to a hosted model
+                    (Gemini or OpenRouter) if you'd rather trade privacy for speed and accuracy.
                 </p>
                 <p class="text-[11px] text-textSubtle mt-1.5 font-medium">
-                    💡 <strong>Note:</strong> Bulk digital PDF uploads (such as Whole Foods or Amazon Fresh digital invoices) do not require Gemini and work completely offline.
+                    💡 Digital PDF invoices (Whole Foods, Amazon Fresh) are parsed directly and
+                    need no vision model at all.
                 </p>
             </div>
         </div>
-        <a href="https://aistudio.google.com/" target="_blank" rel="noopener noreferrer"
-           class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-xs uppercase tracking-wider transition-all shadow-sm flex-shrink-0 text-center">
-            Get API Key
-        </a>
+        <div class="flex items-center gap-2 flex-shrink-0">
+            <a href="/help/api-keys"
+               class="px-4 py-2 bg-bgSkeleton hover:bg-bgHover text-textBase font-bold rounded-lg text-xs uppercase tracking-wider transition-all text-center">
+                Compare options
+            </a>
+            <button type="button"
+                    @click="shown = false;
+                            fetch('/settings/flags/ocr-hint?dismissed=true', {
+                                method: 'POST',
+                                headers: { 'X-CSRF-Token': document.querySelector('meta[name=csrf-token]')?.content || '' }
+                            })"
+                    class="px-3 py-2 text-textMuted hover:text-textBase text-xs font-semibold transition-colors"
+                    aria-label="Dismiss OCR backend hint">
+                Dismiss
+            </button>
+        </div>
     </div>
     {% endif %}
 

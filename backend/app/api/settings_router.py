@@ -264,6 +264,19 @@ def toggle_usda_lookup(enabled: bool) -> JSONResponse:
     return JSONResponse({"success": True, "usda_lookup_enabled": enabled})
 
 
+@router.post("/flags/ocr-hint")
+def dismiss_ocr_hint(dismissed: bool = True) -> JSONResponse:
+    """Hide the dashboard's cloud-OCR suggestion.
+
+    Local models are a supported OCR backend, so a user running one has already
+    made their choice and should not keep being told about Gemini.
+    """
+    flags = _load_feature_flags()
+    flags["ocr_hint_dismissed"] = dismissed
+    _save_feature_flags(flags)
+    return JSONResponse({"success": True, "ocr_hint_dismissed": dismissed})
+
+
 @router.post("/flags/nutrition-outlier-percentile")
 def set_nutrition_outlier_percentile(percentile: int) -> JSONResponse:
     """Set the percentile cutoff for nutrition outlier capping (0 = off)."""
