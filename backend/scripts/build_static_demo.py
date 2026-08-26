@@ -196,6 +196,86 @@ API_MAP_SHIM = """
 </script>
 """
 
+# The receipts list is filtered and sorted through a query string
+# (/api/receipts/list?sort=…&stores=…), which a static host drops — so every
+# store pill click re-served the unfiltered list and appeared to do nothing.
+#
+# Pre-rendering is not viable here: stores are multi-select, so covering the
+# combinations means the power set of 12 stores times 2 sorts — over 8000 files.
+# The rendered cards already carry data-store, so the demo applies the same
+# filter client-side after the swap, covering every combination with no extra
+# files.
+LIST_FILTER_SHIM = """
+<script>
+(function () {
+  var lastQuery = null;
+
+  // Record the query before the api-map shim rewrites the URL.
+  var realOpen = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function (method, url) {
+    try {
+      if (String(url).indexOf('/api/receipts/list') !== -1) {
+        lastQuery = new URL(String(url), window.location.href).searchParams;
+      }
+    } catch (e) { /* leave lastQuery alone and fall through */ }
+    return realOpen.apply(this, arguments);
+  };
+
+  // data-store is HTML-escaped in the fragment (L&#x27;UnOeufPun), so compare
+  // against the decoded text rather than the raw attribute.
+  function decodeStore(value) {
+    var el = document.createElement('textarea');
+    el.innerHTML = value;
+    return el.value;
+  }
+
+  /* Rewrite the response before htmx swaps it in, rather than hiding cards
+     afterwards: post-swap styling gets discarded when htmx settles the new
+     content, so the list flashed filtered and then reverted to all 52. */
+  document.body.addEventListener('htmx:beforeSwap', function (e) {
+    var target = e.detail && e.detail.target;
+    if (!target || target.id !== 'receipts-container') return;
+    if (!lastQuery || typeof e.detail.serverResponse !== 'string') return;
+
+    var storesParam = lastQuery.get('stores');
+    var wanted = storesParam ? storesParam.split(',') : null;
+    var wantAsc = lastQuery.get('sort') === 'asc';
+    if (!wanted && !wantAsc) return;  // nothing to change
+
+    var doc;
+    try {
+      doc = new DOMParser().parseFromString(e.detail.serverResponse, 'text/html');
+    } catch (err) {
+      return;  // leave the response untouched rather than blanking the list
+    }
+
+    var cards = Array.prototype.slice.call(doc.querySelectorAll('[data-store]'));
+    if (!cards.length) return;
+
+    var kept = cards.filter(function (card) {
+      var store = decodeStore(card.getAttribute('data-store') || '');
+      return !wanted || wanted.indexOf(store) !== -1;
+    });
+
+    var parent = cards[0].parentNode;
+    cards.forEach(function (card) { parent.removeChild(card); });
+    (wantAsc ? kept.slice().reverse() : kept).forEach(function (card) {
+      parent.appendChild(card);
+    });
+
+    if (!kept.length) {
+      var msg = doc.createElement('p');
+      msg.style.cssText = 'padding:2rem;text-align:center;font-size:.875rem;opacity:.7';
+      msg.textContent = 'No receipts from the selected stores.';
+      parent.appendChild(msg);
+    }
+
+    e.detail.serverResponse = doc.body.innerHTML;
+  });
+})();
+</script>
+"""
+
 # Demo-only stand-in for the receipt upload, using the app's own ingestion UI.
 #
 # Two things have to be worked around in a snapshot. The POST cannot happen, and
@@ -575,7 +655,14 @@ def crawl(out: Path) -> tuple[int, list[str], set[str], int]:
                     # wrapper ends up outermost and still sees every call.
                     # UPLOAD_SHIM before DEMO_SHIM so its submit handler is
                     # registered first and wins for the upload form.
-                    text = text.replace("</body>", API_MAP_SHIM + upload + DEMO_SHIM + "</body>", 1)
+                    # LIST_FILTER_SHIM after API_MAP_SHIM so its XHR patch wraps
+                    # that one and sees the original URL, query string intact,
+                    # before the api-map rewrite points it at a variant file.
+                    text = text.replace(
+                        "</body>",
+                        API_MAP_SHIM + LIST_FILTER_SHIM + upload + DEMO_SHIM + "</body>",
+                        1,
+                    )
                 dest.write_text(text, encoding="utf-8")
             else:
                 dest.write_bytes(resp.content)
