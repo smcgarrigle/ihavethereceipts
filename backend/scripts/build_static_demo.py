@@ -196,106 +196,67 @@ API_MAP_SHIM = """
 </script>
 """
 
-# Demo-only replacement for the receipt upload flow. The real POST is blocked in a
-# static snapshot, so the button would just raise the read-only toast — a dead end
-# on the one screen that shows what the app is for. This plays a scripted OCR
-# sequence and then opens a seeded receipt.
+# Demo-only stand-in for the receipt upload, using the app's own ingestion UI.
 #
-# Deliberately NOT part of the app: in the live app OCR takes a variable amount of
-# time and returns real data, so a fixed 4s run landing on a fixed receipt would
-# misrepresent it. It exists only in the snapshot.
+# Two things have to be worked around in a snapshot. The POST cannot happen, and
+# DEMO_SHIM's submit handler calls stopPropagation() during the document capture
+# phase — which halts the event before it reaches the form, so Alpine's
+# @submit="startProgress()" never runs and htmx never fires, meaning
+# @htmx:before-request never dispatches 'process-start'. Left alone, the upload
+# screen is a dead end showing only the read-only toast.
+#
+# So this drives the real mechanisms directly: the component's own
+# startProgress(), and the same 'process-start' event the form dispatches, which
+# base.html turns into the shopping-cart toast. Nothing here reimplements that
+# UI — it only triggers it and then opens a seeded receipt.
+#
+# The one intentional divergence: startProgress()'s interval is calibrated to
+# reach 100% over 45s, which in a 4s demo would crawl to ~9% before snapping to
+# 100%. The ramp is retimed to finish within the demo window instead.
 #
 # __RECEIPT_PATH__ is substituted at build time and left root-relative so
 # rewrite_base_path() picks it up for subdirectory hosting.
-TERMINAL_SHIM = """
-<style>
-  #ocr-term-overlay{position:fixed;inset:0;z-index:10000;display:none;
-    align-items:center;justify-content:center;background:rgba(8,12,20,.82);padding:20px}
-  #ocr-term-overlay.on{display:flex}
-  #ocr-term{width:min(680px,100%);background:#0d1b17;border:1px solid #1f3d33;
-    border-radius:6px;box-shadow:0 24px 60px rgba(0,0,0,.55);overflow:hidden;
-    font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#4ade80}
-  #ocr-term .bar{display:flex;justify-content:space-between;gap:12px;
-    background:#12241d;border-bottom:1px solid #1f3d33;padding:7px 12px;
-    color:#7dd3a8;font-size:11px;letter-spacing:.08em}
-  #ocr-term .body{padding:14px 14px 16px;min-height:210px;white-space:pre-wrap;word-break:break-word}
-  #ocr-term .foot{display:flex;justify-content:space-between;gap:12px;
-    background:#12241d;border-top:1px solid #1f3d33;padding:6px 12px;
-    color:#7dd3a8;font-size:10px;letter-spacing:.08em}
-  #ocr-term .prog{height:8px;background:#0d1b17;border-top:1px solid #1f3d33}
-  #ocr-term .prog i{display:block;height:100%;width:0;background:#22c55e;transition:width .18s linear}
-  #ocr-term .note{padding:0 14px 12px;color:#5f8f77;font-size:10.5px;letter-spacing:.04em}
-  @media (prefers-reduced-motion:reduce){#ocr-term .prog i{transition:none}}
-</style>
-<div id="ocr-term-overlay" role="dialog" aria-modal="true" aria-label="Receipt processing">
-  <div id="ocr-term">
-    <div class="bar"><span>TERM // GROCERY_OCR</span><span id="ocr-term-status">CONNECTING</span></div>
-    <div class="body" id="ocr-term-body" aria-live="polite"></div>
-    <div class="note">Static demo — this is a scripted sequence. Your file is never uploaded or read.</div>
-    <div class="prog"><i id="ocr-term-prog"></i></div>
-    <div class="foot"><span id="ocr-term-rid">RID: —</span><span>EXTRACTING DATA... AI ENGINE ACTIVE</span></div>
-  </div>
-</div>
+UPLOAD_SHIM = """
 <script>
 (function () {
   var TARGET = "__RECEIPT_PATH__";
-  var RID = "__RECEIPT_ID__";
   var RUN_MS = 4000;
-
-  // Real model names from the app's config, not invented ones — this page is public.
-  var LINES = [
-    '============== INITIALIZING VISION PIPELINE ==============',
-    '[INIT] Establishing secure link to OCR Gateway...',
-    '[INFO] Target payload Receipt ID: ' + RID + ' acquired.',
-    '[TASK] Serializing image bytes for transport... [########] 100%',
-    '',
-    '==== NEURAL INFERENCE ENGINE START ====',
-    'Querying model registry for available AI engines...',
-    ' > FOUND CLOUD MODEL: gemini-flash-latest',
-    ' > FOUND CLOUD MODEL: gemini-flash',
-    ' > FOUND CLOUD MODEL: gemini-1.5-flash',
-    ' > FOUND CLOUD MODEL: gemini-pro',
-    ' > FOUND LOCAL MODEL: llava:7b',
-    '[OK] Line items extracted. Opening receipt...'
-  ];
 
   function isUploadForm(f) {
     var v = f && f.getAttribute && f.getAttribute('hx-post');
     return !!v && v.indexOf('/api/receipts/upload') !== -1;
   }
 
-  function run() {
-    var overlay = document.getElementById('ocr-term-overlay');
-    var body = document.getElementById('ocr-term-body');
-    var prog = document.getElementById('ocr-term-prog');
-    var status = document.getElementById('ocr-term-status');
-    document.getElementById('ocr-term-rid').textContent = 'RID: ' + RID;
-    body.textContent = '';
-    overlay.classList.add('on');
+  function run(form) {
+    // The real toast, with the message the form itself sends.
+    window.dispatchEvent(new CustomEvent('process-start', {
+      detail: { message: 'Uploading and Processing Receipt...' }
+    }));
 
-    var reduced = window.matchMedia &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduced) {
-      body.textContent = LINES.join('\\n');
-      prog.style.width = '100%';
-      status.textContent = 'COMPLETE';
-      setTimeout(go, 1200);
-      return;
+    var data = (window.Alpine && Alpine.$data) ? Alpine.$data(form) : null;
+    if (data && typeof data.startProgress === 'function') {
+      data.startProgress();  // real code path: uploading = true, spinner, interval
+      // Replace the 45s ramp with one that completes inside the demo window.
+      if (data.progressInterval) clearInterval(data.progressInterval);
+      var started = Date.now();
+      data.progressInterval = setInterval(function () {
+        var pct = Math.min(100, ((Date.now() - started) / RUN_MS) * 100);
+        data.progress = pct;
+        if (pct >= 100) clearInterval(data.progressInterval);
+      }, 50);
     }
 
-    var step = RUN_MS / (LINES.length + 1);
-    LINES.forEach(function (line, i) {
-      setTimeout(function () {
-        body.textContent += (i ? '\\n' : '') + line;
-        prog.style.width = Math.round(((i + 1) / LINES.length) * 100) + '%';
-        if (i === 5) status.textContent = 'INFERENCE';
-        if (i === LINES.length - 1) status.textContent = 'COMPLETE';
-      }, step * i);
-    });
-    setTimeout(go, RUN_MS);
+    setTimeout(function () {
+      // Mirror @htmx:after-request before leaving.
+      if (data) {
+        if (data.progressInterval) clearInterval(data.progressInterval);
+        data.progress = 100;
+        data.uploading = false;
+      }
+      window.dispatchEvent(new CustomEvent('process-end'));
+      window.location.href = TARGET;
+    }, RUN_MS);
   }
-
-  function go() { window.location.href = TARGET; }
 
   // Capture on document, registered before the read-only shim's own submit
   // handler, so this wins for the upload form and that one still handles the rest.
@@ -304,7 +265,7 @@ TERMINAL_SHIM = """
     if (!isUploadForm(f)) return;
     e.preventDefault();
     e.stopImmediatePropagation();
-    run();
+    run(f);
   }, true);
 })();
 </script>
@@ -530,8 +491,8 @@ def check_param_matrix() -> list[str]:
     ]
 
 
-def terminal_shim() -> str:
-    """The OCR sequence, pointed at the most recent seeded receipt.
+def upload_shim() -> str:
+    """The upload stand-in, pointed at the most recent seeded receipt.
 
     Newest so the demo reads as "the receipt you just uploaded" rather than
     dropping the visitor on an arbitrary old one.
@@ -546,10 +507,7 @@ def terminal_shim() -> str:
         db.close()
     if not row:
         return ""  # no receipts seeded: leave the read-only toast in place
-    receipt_id = str(row[0])
-    return TERMINAL_SHIM.replace("__RECEIPT_PATH__", f"/receipts/{receipt_id}/review").replace(
-        "__RECEIPT_ID__", receipt_id
-    )
+    return UPLOAD_SHIM.replace("__RECEIPT_PATH__", f"/receipts/{row[0]}/review")
 
 
 def copy_static_assets(out: Path) -> None:
@@ -585,7 +543,7 @@ def crawl(out: Path) -> tuple[int, list[str], set[str], int]:
         api_map, variant_warnings = crawl_variants(out, client)
         warnings.extend(variant_warnings)
         write_api_map(out, api_map)
-        terminal = terminal_shim()
+        upload = upload_shim()
 
         while queue:
             path = queue.popleft()
@@ -615,11 +573,9 @@ def crawl(out: Path) -> tuple[int, list[str], set[str], int]:
                 if is_page(path):
                     # API_MAP_SHIM first so DEMO_SHIM's write-blocking fetch
                     # wrapper ends up outermost and still sees every call.
-                    # TERMINAL_SHIM before DEMO_SHIM so its submit handler is
+                    # UPLOAD_SHIM before DEMO_SHIM so its submit handler is
                     # registered first and wins for the upload form.
-                    text = text.replace(
-                        "</body>", API_MAP_SHIM + terminal + DEMO_SHIM + "</body>", 1
-                    )
+                    text = text.replace("</body>", API_MAP_SHIM + upload + DEMO_SHIM + "</body>", 1)
                 dest.write_text(text, encoding="utf-8")
             else:
                 dest.write_bytes(resp.content)
