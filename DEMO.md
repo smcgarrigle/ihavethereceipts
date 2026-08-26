@@ -6,29 +6,32 @@ A frozen, read-only copy of the whole app running on fictional data, hosted on
 GitHub Pages with no server and no database. Every page, chart and tooltip is
 real — it's the actual app, crawled and saved to disk.
 
-## Build it
+## Build it, serve it and preview it
 
 ```bash
+#build
 make demo
 ```
 
-Then preview at http://127.0.0.1:8080:
-
 ```bash
+#serve
 python3 -m http.server -d site/demo 8080
 ```
+
+Then preview at http://127.0.0.1:8080:
 
 ## How it works
 
 `backend/scripts/build_static_demo.py` does four things:
 
 1. Seeds a **throwaway** SQLite database with `seed_demo.py` — 52 fictional
-   receipts, 12 joke stores, ~93 items. Your real `grocery.db` is never touched.
+   receipts, 12 fictional stores with ~93 items. Your real `grocery.db` is never touched.
 2. Boots the FastAPI app in-process and crawls every page, HTMX fragment and
    JSON endpoint the UI touches (~352 responses) into `site/demo/`.
 3. Rewrites root-relative URLs for the `/ihavethereceipts` subpath.
 4. Injects small demo-only scripts (below) before `</body>`.
 
+## Important
 `site/demo/` is gitignored and **never committed** — CI rebuilds it each deploy,
 so it can't go stale against the templates.
 
@@ -48,7 +51,7 @@ help:
 
 Everything else that writes is blocked with a "read-only demo" toast.
 
-## What genuinely can't work
+## What does not work
 
 USDA and product-lookup searches hit live third-party APIs with unbounded
 queries. Those stay unavailable.
