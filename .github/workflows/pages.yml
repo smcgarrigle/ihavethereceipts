@@ -1,0 +1,88 @@
+name: Deploy demo to GitHub Pages
+
+# The static demo is a frozen snapshot of the app running on seeded, fictional
+# data (backend/scripts/build_static_demo.py). Rebuilt on demand, and whenever
+# something that can change what the snapshot looks like lands on main.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/pages.yml"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never let two deploys race; let an in-flight build finish rather than
+# cancelling it, so a half-uploaded artifact is never published.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v1
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: "backend/pyproject.toml"
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          uv sync --extra dev
+
+      - name: Build static demo
+        env:
+          # Item-insights pages embed USDA nutrition fetched at build time
+          # (app/api/pages.py). Without this the pages still build, but the
+          # nutrition sections come out empty and the demo loses a headline
+          # feature. Set it as a repository secret.
+          FDC_API_KEY: ${{ secrets.FDC_API_KEY }}
+        run: |
+          # Pages serves a project site under /<repo>, so root-relative URLs need
+          # that prefix. Derived from GITHUB_REPOSITORY (always set, unlike the
+          # event payload) and survives a repo rename. On a custom domain or a
+          # user/org site the correct base path is "" instead.
+          BASE_PATH="/${GITHUB_REPOSITORY#*/}"
+          echo "Building for base path: $BASE_PATH"
+          cd backend
+          uv run python scripts/build_static_demo.py \
+            --out "../site/demo" \
+            --base-path "$BASE_PATH"
+
+      - name: Verify the snapshot looks deployable
+        run: |
+          cd site/demo
+          test -f index.html || { echo "::error::no index.html in snapshot"; exit 1; }
+          test -f .nojekyll || { echo "::error::missing .nojekyll"; exit 1; }
+          test -f api-map.js || { echo "::error::missing api-map.js"; exit 1; }
+          variants=$(find api-variants -type f | wc -l)
+          [ "$variants" -gt 0 ] || { echo "::error::no filter variants built"; exit 1; }
+          echo "index.html + .nojekyll + api-map.js present, $variants filter variants"
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/demo
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
