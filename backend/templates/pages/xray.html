@@ -138,6 +138,47 @@
         transform: scale(1.8);
         z-index: 10;
     }
+    .dot-chart-dot:focus-visible {
+        outline: 2px solid var(--text-base);
+        outline-offset: 2px;
+        opacity: 1;
+    }
+    /* Pinned dot keeps the hover emphasis so the tip's owner stays obvious. */
+    .dot-chart-dot.dot-active {
+        opacity: 1;
+        transform: scale(1.8);
+        z-index: 11;
+        box-shadow: 0 0 0 2px var(--bg-card), 0 0 0 3px currentColor;
+    }
+    .dot-tip {
+        position: absolute;
+        z-index: 20;
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        padding: 5px 8px;
+        border-radius: 5px;
+        background: var(--bg-card);
+        border: 1px solid var(--border-default);
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+        pointer-events: none;
+        white-space: nowrap;
+        line-height: 1.35;
+    }
+    .dot-tip-store {
+        font-size: 0.65rem;
+        font-weight: 700;
+        color: var(--text-base);
+    }
+    .dot-tip-meta {
+        font-size: 0.58rem;
+        color: var(--text-muted);
+        display: flex;
+        gap: 4px;
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .dot-chart-dot { transition: none; }
+    }
     /* DNA stacked bars */
     .dna-row {
         display: flex;
@@ -272,15 +313,17 @@
                     <div class="hbar" style="margin-bottom: 0.5rem;">
                         <div class="hbar-label" x-text="item.name" :title="item.name"></div>
                         <div class="hbar-track" style="position:relative">
-                            <!-- Range bar showing min→max spread -->
+                            <!-- Range bar showing min→max spread, scaled to the
+                                 dearest item in the whole chart so every row sits
+                                 on one comparable axis. -->
                             <div class="range-bar-inner"
-                                 :style="`left: ${(item.min / (data.price_volatility[0]?.max || 1)) * 100}%;
-                                          width: ${(item.spread / (data.price_volatility[0]?.max || 1)) * 100}%;
+                                 :style="`left: ${volPct(item.min)}%;
+                                          width: ${Math.max(volPct(item.spread), 1.5)}%;
                                           background: ${getVolatilityColor(item.spread_pct)};`">
                             </div>
                             <!-- Average price dot -->
                             <div class="range-bar-dot"
-                                 :style="`left: ${(item.avg / (data.price_volatility[0]?.max || 1)) * 100}%`"
+                                 :style="`left: ${volPct(item.avg)}%`"
                                  :title="'Avg: $' + item.avg">
                             </div>
                         </div>
@@ -425,15 +468,43 @@
                 <div class="xray-title">⑤ Receipt Complexity Map</div>
                 <div class="xray-subtitle">Each dot = one receipt. Size = total $. Position = items vs. categories.</div>
 
-                <div class="dot-chart" id="complexity-chart">
+                <div class="dot-chart" id="complexity-chart" @click.outside="activeDot = null">
                     <template x-for="(r, i) in data.receipt_complexity" :key="i">
                         <div class="dot-chart-dot"
+                             role="button" tabindex="0"
+                             :aria-expanded="activeDot === i"
+                             @click.stop="activeDot = (activeDot === i ? null : i)"
+                             @keydown.enter.prevent="activeDot = (activeDot === i ? null : i)"
+                             @keydown.space.prevent="activeDot = (activeDot === i ? null : i)"
                              :style="`bottom: ${getComplexityY(r)}%;
                                       left: ${getComplexityX(r)}%;
                                       width: ${getComplexitySize(r)}px;
                                       height: ${getComplexitySize(r)}px;
                                       background: ${getStoreColor(r.store)};`"
+                             :class="activeDot === i ? 'dot-active' : ''"
+                             :aria-label="r.store + ', ' + r.date + ', ' + r.items + ' items, $' + r.total"
                              :title="r.store + ' · ' + r.date + ' · ' + r.items + ' items · $' + r.total">
+                        </div>
+                    </template>
+
+                    <!-- Pinned detail for the clicked dot. Anchored to the same
+                         coordinates as the dot, and flipped to the other side near
+                         an edge so it never spills out of the plot area. -->
+                    <template x-if="activeDot !== null && data.receipt_complexity[activeDot]">
+                        <div class="dot-tip"
+                             x-transition.opacity.duration.120ms
+                             :style="`bottom: calc(${getComplexityY(data.receipt_complexity[activeDot])}% + 14px);
+                                      left: ${getComplexityX(data.receipt_complexity[activeDot])}%;
+                                      transform: translateX(${getComplexityX(data.receipt_complexity[activeDot]) > 65 ? '-100%' : '-50%'});`">
+                            <span class="dot-tip-store" x-text="data.receipt_complexity[activeDot].store"></span>
+                            <span class="dot-tip-meta">
+                                <span x-text="'$' + data.receipt_complexity[activeDot].total"></span>
+                                <span aria-hidden="true">·</span>
+                                <span x-text="data.receipt_complexity[activeDot].date"></span>
+                            </span>
+                            <span class="dot-tip-meta" x-text="
+                                plural(data.receipt_complexity[activeDot].items, 'item') + ' · ' +
+                                plural(data.receipt_complexity[activeDot].categories, 'category', 'categories')"></span>
                         </div>
                     </template>
                     <!-- Axis labels -->
@@ -463,6 +534,27 @@ function xrayDashboard() {
     return {
         loading: true,
         data: null,
+        // Which complexity dot is pinned open, by index. Click-to-open, because the
+        // native title tooltip only appears on hover and never on touch.
+        activeDot: null,
+
+        /** Position on the volatility axis, as a % of the dearest item's max price.
+         *
+         * Scaling to the whole series matters: this used to divide by row 0's max,
+         * so any item priced above the top row computed left > 100% and its bar
+         * rendered off the track — most rows looked blank.
+         */
+        /** "1 item" / "3 items" — irregular plurals pass an explicit form. */
+        plural(count, singular, pluralForm) {
+            return count + ' ' + (count === 1 ? singular : (pluralForm || singular + 's'));
+        },
+
+        volPct(value) {
+            const rows = this.data?.price_volatility || [];
+            const ceiling = Math.max(...rows.map(r => r.max || 0), 0);
+            if (!ceiling) return 0;
+            return Math.min((value / ceiling) * 100, 100);
+        },
 
         // Category color palette (Tufte-approved muted tones)
         categoryColors: {

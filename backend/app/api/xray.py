@@ -90,7 +90,9 @@ def receipt_xray_data(db: Session = Depends(get_db)):
             )
 
     volatility_data.sort(key=lambda x: x["spread_pct"], reverse=True)
-    chart_1 = volatility_data[:15]
+    # Well short of the number that qualify, so the card stays readable rather than
+    # listing every item that has been bought three times.
+    chart_1 = volatility_data[:20]
 
     # ── 2. STORE DNA FINGERPRINT ───────────────────────────────────────
     # What does each store's "basket signature" look like?
