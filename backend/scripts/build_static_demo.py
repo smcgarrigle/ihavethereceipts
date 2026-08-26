@@ -121,6 +121,13 @@ PARAM_MATRIX: list[tuple[str, dict[str, list[str]]]] = [
     ("/api/trends/usda-product-types", {"time_range": USDA_TIME_RANGES}),
 ]
 
+# store_id is data-dependent, so its variants are expanded from the seeded DB
+# rather than declared above.
+STORE_TOP_ITEMS_PATH = "/api/trends/store-top-items"
+
+# Served from VARIANT_DIR via the api-map shim, not from their literal path.
+PARAMETERIZED_PATHS = {path for path, _ in PARAM_MATRIX} | {STORE_TOP_ITEMS_PATH}
+
 # No leading underscore: GitHub Pages runs Jekyll, which skips _-prefixed paths.
 VARIANT_DIR = "api-variants"
 API_MAP_FILE = "api-map.js"
@@ -185,6 +192,120 @@ API_MAP_SHIM = """
     if (hit) args[1] = hit;
     return realOpen.apply(this, args);
   };
+})();
+</script>
+"""
+
+# Demo-only replacement for the receipt upload flow. The real POST is blocked in a
+# static snapshot, so the button would just raise the read-only toast — a dead end
+# on the one screen that shows what the app is for. This plays a scripted OCR
+# sequence and then opens a seeded receipt.
+#
+# Deliberately NOT part of the app: in the live app OCR takes a variable amount of
+# time and returns real data, so a fixed 4s run landing on a fixed receipt would
+# misrepresent it. It exists only in the snapshot.
+#
+# __RECEIPT_PATH__ is substituted at build time and left root-relative so
+# rewrite_base_path() picks it up for subdirectory hosting.
+TERMINAL_SHIM = """
+<style>
+  #ocr-term-overlay{position:fixed;inset:0;z-index:10000;display:none;
+    align-items:center;justify-content:center;background:rgba(8,12,20,.82);padding:20px}
+  #ocr-term-overlay.on{display:flex}
+  #ocr-term{width:min(680px,100%);background:#0d1b17;border:1px solid #1f3d33;
+    border-radius:6px;box-shadow:0 24px 60px rgba(0,0,0,.55);overflow:hidden;
+    font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#4ade80}
+  #ocr-term .bar{display:flex;justify-content:space-between;gap:12px;
+    background:#12241d;border-bottom:1px solid #1f3d33;padding:7px 12px;
+    color:#7dd3a8;font-size:11px;letter-spacing:.08em}
+  #ocr-term .body{padding:14px 14px 16px;min-height:210px;white-space:pre-wrap;word-break:break-word}
+  #ocr-term .foot{display:flex;justify-content:space-between;gap:12px;
+    background:#12241d;border-top:1px solid #1f3d33;padding:6px 12px;
+    color:#7dd3a8;font-size:10px;letter-spacing:.08em}
+  #ocr-term .prog{height:8px;background:#0d1b17;border-top:1px solid #1f3d33}
+  #ocr-term .prog i{display:block;height:100%;width:0;background:#22c55e;transition:width .18s linear}
+  #ocr-term .note{padding:0 14px 12px;color:#5f8f77;font-size:10.5px;letter-spacing:.04em}
+  @media (prefers-reduced-motion:reduce){#ocr-term .prog i{transition:none}}
+</style>
+<div id="ocr-term-overlay" role="dialog" aria-modal="true" aria-label="Receipt processing">
+  <div id="ocr-term">
+    <div class="bar"><span>TERM // GROCERY_OCR</span><span id="ocr-term-status">CONNECTING</span></div>
+    <div class="body" id="ocr-term-body" aria-live="polite"></div>
+    <div class="note">Static demo — this is a scripted sequence. Your file is never uploaded or read.</div>
+    <div class="prog"><i id="ocr-term-prog"></i></div>
+    <div class="foot"><span id="ocr-term-rid">RID: —</span><span>EXTRACTING DATA... AI ENGINE ACTIVE</span></div>
+  </div>
+</div>
+<script>
+(function () {
+  var TARGET = "__RECEIPT_PATH__";
+  var RID = "__RECEIPT_ID__";
+  var RUN_MS = 4000;
+
+  // Real model names from the app's config, not invented ones — this page is public.
+  var LINES = [
+    '============== INITIALIZING VISION PIPELINE ==============',
+    '[INIT] Establishing secure link to OCR Gateway...',
+    '[INFO] Target payload Receipt ID: ' + RID + ' acquired.',
+    '[TASK] Serializing image bytes for transport... [########] 100%',
+    '',
+    '==== NEURAL INFERENCE ENGINE START ====',
+    'Querying model registry for available AI engines...',
+    ' > FOUND CLOUD MODEL: gemini-flash-latest',
+    ' > FOUND CLOUD MODEL: gemini-flash',
+    ' > FOUND CLOUD MODEL: gemini-1.5-flash',
+    ' > FOUND CLOUD MODEL: gemini-pro',
+    ' > FOUND LOCAL MODEL: llava:7b',
+    '[OK] Line items extracted. Opening receipt...'
+  ];
+
+  function isUploadForm(f) {
+    var v = f && f.getAttribute && f.getAttribute('hx-post');
+    return !!v && v.indexOf('/api/receipts/upload') !== -1;
+  }
+
+  function run() {
+    var overlay = document.getElementById('ocr-term-overlay');
+    var body = document.getElementById('ocr-term-body');
+    var prog = document.getElementById('ocr-term-prog');
+    var status = document.getElementById('ocr-term-status');
+    document.getElementById('ocr-term-rid').textContent = 'RID: ' + RID;
+    body.textContent = '';
+    overlay.classList.add('on');
+
+    var reduced = window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced) {
+      body.textContent = LINES.join('\\n');
+      prog.style.width = '100%';
+      status.textContent = 'COMPLETE';
+      setTimeout(go, 1200);
+      return;
+    }
+
+    var step = RUN_MS / (LINES.length + 1);
+    LINES.forEach(function (line, i) {
+      setTimeout(function () {
+        body.textContent += (i ? '\\n' : '') + line;
+        prog.style.width = Math.round(((i + 1) / LINES.length) * 100) + '%';
+        if (i === 5) status.textContent = 'INFERENCE';
+        if (i === LINES.length - 1) status.textContent = 'COMPLETE';
+      }, step * i);
+    });
+    setTimeout(go, RUN_MS);
+  }
+
+  function go() { window.location.href = TARGET; }
+
+  // Capture on document, registered before the read-only shim's own submit
+  // handler, so this wins for the upload form and that one still handles the rest.
+  document.addEventListener('submit', function (e) {
+    var f = e.target && e.target.closest ? e.target.closest('form') : null;
+    if (!isUploadForm(f)) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    run();
+  }, true);
 })();
 </script>
 """
@@ -274,15 +395,19 @@ def seed_database() -> None:
 
 def entity_urls() -> list[str]:
     from app.database import SessionLocal
-    from app.models import Item, Receipt
+    from app.models import Item, Receipt, Store
 
     db = SessionLocal()
     try:
         urls = [f"/items/{item_id}/insights" for (item_id,) in db.query(Item.id)]
         urls += [f"/receipts/{receipt_id}/review" for (receipt_id,) in db.query(Receipt.id)]
-        # JSON consumed by the price-history modal's runtime fetch() — the URL is
-        # built in a JS template literal, so the crawler's regexes never see it.
+        # JSON consumed by runtime fetch()es whose URLs are built in JS template
+        # literals, so the crawler's regexes never see them. Anything added here
+        # must also be listed in TEMPLATE_LITERAL_PREFIXES so the build fails loudly
+        # if it stops being reachable.
         urls += [f"/api/analytics/price-trends/{item_id}" for (item_id,) in db.query(Item.id)]
+        # Feeds the dashboard's "Spend by Store" spending-history modal.
+        urls += [f"/api/analytics/store-history/{store_id}" for (store_id,) in db.query(Store.id)]
         return urls
     finally:
         db.close()
@@ -310,11 +435,7 @@ def param_variants() -> list[tuple[str, dict[str, str]]]:
 
     matrix = [
         *PARAM_MATRIX,
-        # store_id is data-dependent, so it is expanded from the seeded DB.
-        (
-            "/api/trends/store-top-items",
-            {"store_id": store_ids, "time_range": TIME_RANGES},
-        ),
+        (STORE_TOP_ITEMS_PATH, {"store_id": store_ids, "time_range": TIME_RANGES}),
     ]
 
     variants: list[tuple[str, dict[str, str]]] = []
@@ -351,6 +472,39 @@ def write_api_map(out: Path, api_map: dict[str, str]) -> None:
     (out / API_MAP_FILE).write_text(f"window.__DEMO_API_MAP__ = {payload};\n", encoding="utf-8")
 
 
+def check_template_literal_fetches(out: Path) -> list[str]:
+    """Warn when a `fetch(`/api/…${x}`)` endpoint has no snapshot behind it.
+
+    These URLs are invisible to the crawler's regexes, so they only get captured
+    because entity_urls() or PARAM_MATRIX names them explicitly. When a template
+    adds a new one, nothing fails — the endpoint just 404s at runtime and the
+    widget renders empty, which is how the Spend by Store modal shipped blank.
+    Non-GET calls are excluded: the read-only shim blocks those by design.
+    """
+    literal = re.compile(r"fetch\(`(/api/[^`]+)`(?P<rest>\s*,\s*\{[^}]*\})?")
+    missing: list[str] = []
+    seen: set[str] = set()
+    for template in (BACKEND_DIR / "templates").rglob("*.html"):
+        text = template.read_text(encoding="utf-8")
+        for match in literal.finditer(text):
+            url, rest = match.group(1), match.group("rest") or ""
+            if re.search(r"method\s*:\s*['\"](?!GET)", rest, re.IGNORECASE):
+                continue  # write call; the shim blocks it on purpose
+            # Everything before the first ${…} or ?query is the static prefix.
+            prefix = re.split(r"\$\{|\?", url)[0].rstrip("/")
+            if prefix in seen or prefix in PARAMETERIZED_PATHS:
+                continue  # variants live in VARIANT_DIR, not at the literal path
+            seen.add(prefix)
+            # The prefix itself must exist — as a file for a fixed URL, or as a
+            # non-empty directory for the "/{id}" form. Checking the parent instead
+            # would pass on any sibling endpoint and miss the gap entirely.
+            target = out / prefix.lstrip("/")
+            has_snapshot = target.is_file() or (target.is_dir() and any(target.iterdir()))
+            if not has_snapshot:
+                missing.append(f"{prefix} ({template.name}) has no snapshot — widget will be empty")
+    return missing
+
+
 def check_param_matrix() -> list[str]:
     """Warn if trends.html offers filter values the matrix doesn't cover."""
     template = BACKEND_DIR / "templates" / "pages" / "trends.html"
@@ -374,6 +528,28 @@ def check_param_matrix() -> list[str]:
         for name in found
         if found[name] - covered[name]
     ]
+
+
+def terminal_shim() -> str:
+    """The OCR sequence, pointed at the most recent seeded receipt.
+
+    Newest so the demo reads as "the receipt you just uploaded" rather than
+    dropping the visitor on an arbitrary old one.
+    """
+    from app.database import SessionLocal
+    from app.models import Receipt
+
+    db = SessionLocal()
+    try:
+        row = db.query(Receipt.id).order_by(Receipt.purchase_date.desc(), Receipt.id.desc()).first()
+    finally:
+        db.close()
+    if not row:
+        return ""  # no receipts seeded: leave the read-only toast in place
+    receipt_id = str(row[0])
+    return TERMINAL_SHIM.replace("__RECEIPT_PATH__", f"/receipts/{receipt_id}/review").replace(
+        "__RECEIPT_ID__", receipt_id
+    )
 
 
 def copy_static_assets(out: Path) -> None:
@@ -409,6 +585,7 @@ def crawl(out: Path) -> tuple[int, list[str], set[str], int]:
         api_map, variant_warnings = crawl_variants(out, client)
         warnings.extend(variant_warnings)
         write_api_map(out, api_map)
+        terminal = terminal_shim()
 
         while queue:
             path = queue.popleft()
@@ -438,7 +615,11 @@ def crawl(out: Path) -> tuple[int, list[str], set[str], int]:
                 if is_page(path):
                     # API_MAP_SHIM first so DEMO_SHIM's write-blocking fetch
                     # wrapper ends up outermost and still sees every call.
-                    text = text.replace("</body>", API_MAP_SHIM + DEMO_SHIM + "</body>", 1)
+                    # TERMINAL_SHIM before DEMO_SHIM so its submit handler is
+                    # registered first and wins for the upload form.
+                    text = text.replace(
+                        "</body>", API_MAP_SHIM + terminal + DEMO_SHIM + "</body>", 1
+                    )
                 dest.write_text(text, encoding="utf-8")
             else:
                 dest.write_bytes(resp.content)
@@ -538,6 +719,9 @@ def main() -> int:
         print(f"🔗 Rewrote root-relative URLs in {count} files for base path {args.base_path!r}")
         for escaped in check_base_path(out, args.base_path):
             print(f"  ⚠️  escapes the base path — {escaped}")
+
+    for gap in check_template_literal_fetches(out):
+        print(f"  ⚠️  unreachable endpoint — {gap}")
 
     print(f"\n✅ Snapshot complete: {saved} responses saved")
     print(f"   {variants} filter variants pre-rendered into {VARIANT_DIR}/")
