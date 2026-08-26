@@ -4,7 +4,10 @@ A self-hosted, AI-powered receipt tracker that builds a personal price history d
 
 ## 🧪 Quick Demo (No Receipts Needed)
 
-Want to see the app with real-looking data before scanning your first receipt? Run the demo seed script:
+**Just want a look?** Try the [live demo](https://smcgarrigle.github.io/ihavethereceipts/) — the
+whole app on fictional data, no install. See [DEMO.md](DEMO.md) for how it's built.
+
+To run it locally with the same data, use the demo seed script:
 
 ```bash
 cd backend
