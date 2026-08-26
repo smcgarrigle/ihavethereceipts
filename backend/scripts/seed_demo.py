@@ -554,9 +554,7 @@ _item_trends: dict[str, str] = {}
 
 def _trend(item_name: str) -> str:
     if item_name not in _item_trends:
-        _item_trends[item_name] = random.choices(TREND_SHAPES, weights=_TREND_WEIGHTS)[
-            0
-        ]
+        _item_trends[item_name] = random.choices(TREND_SHAPES, weights=_TREND_WEIGHTS)[0]
     return _item_trends[item_name]
 
 
@@ -743,11 +741,19 @@ def seed() -> None:
 
             for li in line_items_data:
                 item_obj = item_obj_map.get(li["name"])
+                # ReceiptItem.price is a PER-QUANTITY price: the app reads spend as
+                # price * quantity (analytics.py, receipts.py, receipts_review.py).
+                # Storing the line total here double-counted every qty>1 line, which
+                # inflated spend and made the review page's total-mismatch warning
+                # fire on most receipts. Divide so price * quantity == the line total
+                # for both modes: weight-priced lines carry quantity 1, so they keep
+                # the full line total, while a qty-2 line stores the per-unit price.
+                qty = li["quantity"] or 1.0
                 ri = ReceiptItem(
                     receipt_id=receipt.id,
                     item_id=item_obj.id if item_obj else None,
                     quantity=li["quantity"],
-                    price=li["total"],
+                    price=round(li["total"] / qty, 2),
                     unit_price=li["unit_price"],
                     unit_type=li["unit_type"],
                     weight=li["weight"],
@@ -756,16 +762,12 @@ def seed() -> None:
                 receipt_item_count += 1
 
         db.commit()
-        print(
-            f"\n  ✅ Created {receipt_count} receipts with {receipt_item_count} line items"
-        )
+        print(f"\n  ✅ Created {receipt_count} receipts with {receipt_item_count} line items")
         if schedule:
             print(f"  📅 Date range: {schedule[0][1]} → {schedule[-1][1]}")
         print(f"  🏪 Stores: {', '.join(s['name'] for s in STORES)}")
-        print(
-            f"  🛒 {len(ITEM_CATALOG)} unique products across {len(CATEGORIES)} categories"
-        )
-        shape_counts = {s: 0 for s in TREND_SHAPES}
+        print(f"  🛒 {len(ITEM_CATALOG)} unique products across {len(CATEGORIES)} categories")
+        shape_counts = dict.fromkeys(TREND_SHAPES, 0)
         for shape in _item_trends.values():
             shape_counts[shape] += 1
         print(f"  📈 Price-trend shapes: {shape_counts}")
