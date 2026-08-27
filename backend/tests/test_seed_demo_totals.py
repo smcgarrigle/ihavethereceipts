@@ -19,6 +19,43 @@ from app.models import Receipt, ReceiptItem
 SEED_DEMO = Path(__file__).resolve().parent.parent / "scripts" / "seed_demo.py"
 
 
+def _load_catalogs():
+    """Read the two catalogs without running the seed."""
+    import ast
+
+    tree = ast.parse(SEED_DEMO.read_text())
+    found = {}
+    for node in tree.body:
+        target = node.targets[0] if isinstance(node, ast.Assign) else getattr(node, "target", None)
+        name = getattr(target, "id", None)
+        if name in {"ITEM_CATALOG", "STORE_CATALOG"}:
+            found[name] = ast.literal_eval(node.value)
+    return found["ITEM_CATALOG"], found["STORE_CATALOG"]
+
+
+def test_every_stocked_item_exists_in_the_catalog():
+    """STORE_CATALOG names are looked up in ITEM_CATALOG during seeding.
+
+    A rename on one side and not the other raises KeyError partway through, which
+    is a confusing way to find out. Fail here with the actual names instead.
+    """
+    items, stores = _load_catalogs()
+    unknown = {
+        store: [name for name in names if name not in items] for store, names in stores.items()
+    }
+    unknown = {store: bad for store, bad in unknown.items() if bad}
+    assert not unknown, f"STORE_CATALOG names missing from ITEM_CATALOG: {unknown}"
+
+
+def test_every_catalogued_item_is_stocked_somewhere():
+    """An item no store sells never reaches a receipt, so it silently does nothing."""
+    items, stores = _load_catalogs()
+    stocked = {name for names in stores.values() for name in names}
+    assert not (set(items) - stocked), (
+        f"ITEM_CATALOG entries no store stocks: {sorted(set(items) - stocked)}"
+    )
+
+
 @pytest.fixture
 def seeded(db):
     """Seed the throwaway test database and hand back a session over it."""

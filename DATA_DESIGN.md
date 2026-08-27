@@ -68,7 +68,7 @@ erDiagram
         int receipt_id FK
         int item_id FK
         float quantity
-        float price "Line item total"
+        float price "Per-quantity price — spend is price * quantity"
         text notes "JSON: Discounts/Fees breakdown"
         float unit_price "Calculated effective price"
         string unit_type "oz, lb, unit, etc."
@@ -179,8 +179,8 @@ Individual line items extracted from a receipt. Maps a `receipt` to an `item`.
 | `receipt_id` | Integer | ForeignKey to `receipts`. |
 | `item_id` | Integer | ForeignKey to `items`. |
 | `quantity` | Float | Number of units purchased. |
-| `price` | Float | The final amount paid for this line (including fees/discounts). |
-| `unit_price` | Float | The **true price per unit** ($ / lb or $ / unit). |
+| `price` | Float | **Per-quantity price**, after fees/discounts. The line total is `price × quantity` — the app reads spend that way everywhere (`analytics.py`, `receipts.py`, `receipts_review.py`), so storing a line total here silently double-counts every row with `quantity > 1`. Weight-priced lines carry `quantity = 1`, so for those `price` *is* the line total. |
+| `unit_price` | Float | The **true price per unit of measure** ($ / lb or $ / oz) — used for cross-store comparison, not for computing the line total. Differs from `price` whenever `unit_type` is a weight. |
 | `unit_type` | String | The unit of measure (lb, oz, each, etc.). |
 | `weight` | Float | Total weight for weight-based items (nullable). |
 | `original_unit_price` | Float | Price before any line-item discount was applied. |
@@ -226,7 +226,28 @@ Audit trail for item merges. If "Milk A" is merged into "Milk B", this table rec
 Several fields (`ocr_data`, `receipt_items.notes`, `merge_logs.receipt_item_ids`, `items.nutrients`, `items.custom_nutrients`) use `Text` or `JSON` column types to store structured data. In the backend, these are parsed into Pydantic models or Python dictionaries at read time.
 
 ### Bi-directional Pricing
-The application enforces `Total = Qty × UnitPrice`. When units (oz, lb) are present, it calculates density pricing to enable cross-store comparisons (e.g., a 12 oz juice at Store A vs. a 1 L juice at Store B). **Note:** Always use `(Price × Qty) / TotalWeight` for unit price — not `Price / (Weight × Qty)`, which causes $0.00 rounding errors.
+
+The invariant, for anything that writes `receipt_items`:
+
+```
+line total  =  price × quantity
+```
+
+`price` is per-quantity, never the line total. Every spend figure in the app is
+derived by multiplying (`analytics.py` ×4, `receipts.py`, `receipts_review.py`),
+and the review page's total-mismatch warning compares that sum against
+`receipts.total_amount`. An importer or seed script that puts a line total in
+`price` inflates all spend and trips that warning on most receipts — this has
+happened once already, in `seed_demo.py`, and is now guarded by
+`tests/test_seed_demo_totals.py`.
+
+Weight-priced lines carry `quantity = 1`, so `price` equals the line total for
+those, and `unit_price` holds the per-lb figure.
+
+When units (oz, lb) are present the app also calculates density pricing for
+cross-store comparison (e.g. a 12 oz juice at Store A vs a 1 L juice at Store B).
+**Note:** Always use `(Price × Qty) / TotalWeight` for unit price — not
+`Price / (Weight × Qty)`, which causes $0.00 rounding errors.
 
 ### Nutrition Merge Strategy
 `items.custom_nutrients` overlays `items.nutrients` at read time via the `effective_nutrients` property. This means user corrections (manual entry from the Item Insights page) always take precedence over automatically enriched FDC data without destroying the original payload.

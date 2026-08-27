@@ -18,7 +18,7 @@ make demo
 python3 -m http.server -d site/demo 8080
 ```
 
-Then preview at http://127.0.0.1:8080:
+Then preview at http://127.0.0.1:8080/
 
 ## How it works
 
@@ -35,10 +35,7 @@ Then preview at http://127.0.0.1:8080:
 `site/demo/` is gitignored and **never committed** — CI rebuilds it each deploy,
 so it can't go stale against the templates.
 
-## The awkward bits
-
-A static host has no server and ignores query strings, so three things needed
-help:
+## Some internet magic
 
 - **Filters** (`?time_range=…`) would silently re-serve unfiltered data. Each
   combination is pre-rendered to `api-variants/`, and a shim redirects matching
@@ -48,6 +45,7 @@ help:
   `htmx:beforeSwap`.
 - **Uploading a receipt** can't happen, so clicking Upload plays a scripted OCR
   sequence and opens a seeded receipt. It says so on screen; no file is read.
+  **client-side search shim** Showing demo data.
 
 Everything else that writes is blocked with a "read-only demo" toast.
 
