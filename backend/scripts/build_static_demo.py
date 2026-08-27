@@ -131,6 +131,7 @@ PARAMETERIZED_PATHS = {path for path, _ in PARAM_MATRIX} | {STORE_TOP_ITEMS_PATH
 # No leading underscore: GitHub Pages runs Jekyll, which skips _-prefixed paths.
 VARIANT_DIR = "api-variants"
 API_MAP_FILE = "api-map.js"
+SEARCH_INDEX_FILE = "search-index.js"
 
 # Bare-root links ("/" and "/?x=1") for --base-path hosting. The main rewrite
 # anchors on a known top-level directory name, which these have no room for, so
@@ -192,6 +193,118 @@ API_MAP_SHIM = """
     if (hit) args[1] = hit;
     return realOpen.apply(this, args);
   };
+})();
+</script>
+"""
+
+# Nav-bar search calls /api/search?q=…, and the query space is unbounded, so no
+# amount of pre-rendering covers it — the crawled snapshot is an empty response,
+# which is why the box silently returned nothing.
+#
+# Every item page IS in the snapshot though, so the demo ships a small index and
+# searches it in the browser. Results are real seeded items linking to real
+# pages; only the matching moved. Mirrors _search_items(): case-insensitive
+# substring, best matches first, capped at 8, and nothing under 2 characters.
+SEARCH_SHIM = """
+<script src="/search-index.js"></script>
+<script>
+(function () {
+  var INDEX = window.__DEMO_SEARCH__ || [];
+  var lastQuery = '';
+
+  var realOpen = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function (method, url) {
+    try {
+      if (String(url).indexOf('/api/search') !== -1) {
+        lastQuery = new URL(String(url), window.location.href).searchParams.get('q') || '';
+      }
+    } catch (e) { /* keep the previous query rather than guessing */ }
+    return realOpen.apply(this, arguments);
+  };
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c];
+    });
+  }
+
+  function rank(item, q) {
+    var name = item.name.toLowerCase();
+    if (name === q) return 0;
+    if (name.indexOf(q) === 0) return 1;       // starts with
+    if (name.indexOf(' ' + q) !== -1) return 2; // starts a word
+    return name.indexOf(q) !== -1 ? 3 : -1;
+  }
+
+  function row(item) {
+    var meta = ['<span class="text-[10px] font-medium px-1.5 py-0.5 rounded-full ' +
+                'bg-indigo-500/10 text-indigo-400">' + esc(item.category) + '</span>'];
+    var dot = '<span class="text-xs text-textMuted">·</span>';
+    if (item.store) {
+      meta.push(dot, '<span class="text-xs text-textMuted truncate max-w-[120px]">' +
+                esc(item.store) + '</span>');
+    }
+    if (item.price !== null && item.price !== undefined) {
+      meta.push(dot, '<span class="text-xs font-medium text-emerald-400">$' +
+                Number(item.price).toFixed(2) + '</span>');
+    }
+    if (item.date) {
+      meta.push(dot, '<span class="text-xs text-textMuted">' + esc(item.date) + '</span>');
+    }
+    return '' +
+      '<li><a href="' + `/items/${item.id}/insights` + '" ' +
+      'class="flex items-center gap-3 px-4 py-3 hover:bg-bgMain transition-colors group">' +
+        '<div class="flex-shrink-0 w-9 h-9 rounded-lg bg-indigo-500/15 flex items-center ' +
+        'justify-center text-indigo-400 text-base">' + item.emoji + '</div>' +
+        '<div class="flex-1 min-w-0">' +
+          '<p class="text-sm font-medium text-textBase truncate group-hover:text-indigo-400 ' +
+          'transition-colors">' + esc(item.name) + '</p>' +
+          '<div class="flex items-center gap-1.5 mt-0.5 flex-wrap">' + meta.join('') + '</div>' +
+        '</div>' +
+        '<svg class="w-4 h-4 text-textMuted opacity-0 group-hover:opacity-100 transition-opacity ' +
+        'flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+        '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>' +
+        '</svg></a></li>';
+  }
+
+  var SHELL = 'absolute top-full left-0 right-0 mt-1 z-50 rounded-xl border ' +
+              'border-borderDefault bg-bgCard shadow-2xl';
+
+  function render(q) {
+    if (!q || q.trim().length < 2) return '';
+    var needle = q.trim().toLowerCase();
+    var hits = INDEX
+      .map(function (i) { return {i: i, r: rank(i, needle)}; })
+      .filter(function (x) { return x.r !== -1; })
+      .sort(function (a, b) { return a.r - b.r || a.i.name.localeCompare(b.i.name); })
+      .slice(0, 8)
+      .map(function (x) { return x.i; });
+
+    if (!hits.length) {
+      return '<div id="search-dropdown" class="' + SHELL + ' p-4 text-center" x-data ' +
+             '@click.outside="$dispatch(\\'search-close\\')">' +
+             '<p class="text-sm text-textMuted">No items found for ' +
+             '<span class="font-medium text-textBase">"' + esc(q) + '"</span></p></div>';
+    }
+
+    return '<div id="search-dropdown" class="' + SHELL + ' overflow-hidden" x-data ' +
+           '@click.outside="$dispatch(\\'search-close\\')">' +
+           '<ul class="divide-y divide-borderDefault max-h-96 overflow-y-auto">' +
+           hits.map(row).join('') + '</ul>' +
+           '<div class="px-4 py-2.5 border-t border-borderDefault bg-bgMain flex items-center ' +
+           'justify-between"><p class="text-xs text-textMuted">' + hits.length + ' result' +
+           (hits.length === 1 ? '' : 's') + ' for <span class="font-medium text-textBase">"' +
+           esc(q) + '"</span></p>' +
+           '<a href="' + '/search?q=' + encodeURIComponent(q) + '" ' +
+           'class="text-xs font-medium text-indigo-400 hover:text-indigo-300 transition-colors">' +
+           'View all</a></div></div>';
+  }
+
+  document.body.addEventListener('htmx:beforeSwap', function (e) {
+    var target = e.detail && e.detail.target;
+    if (!target || target.id !== 'search-results-container') return;
+    e.detail.serverResponse = render(lastQuery);
+  });
 })();
 </script>
 """
@@ -507,6 +620,70 @@ def crawl_variants(out: Path, client) -> tuple[dict[str, str], list[str]]:
     return api_map, warnings
 
 
+def _category_emoji(category: str) -> str:
+    """Mirror of the icon logic in fragments/search_results.html."""
+    cat = (category or "").lower()
+    for keys, emoji in (
+        (("produce", "fruit", "veg"), "🥦"),
+        (("dairy",), "🥛"),
+        (("meat", "seafood", "fish"), "🥩"),
+        (("snack", "chip"), "🍿"),
+        (("bev", "drink"), "🥤"),
+        (("bread", "bak"), "🍞"),
+    ):
+        if any(k in cat for k in keys):
+            return emoji
+    return "🛒"
+
+
+def write_search_index(out: Path) -> int:
+    """Emit the item index the demo's client-side search matches against.
+
+    Carries the same fields the server fragment shows — category, most recent
+    store, price and date — so the rendered dropdown matches the real one.
+    """
+    from app.database import SessionLocal
+    from app.models import Item, Receipt, ReceiptItem
+
+    db = SessionLocal()
+    try:
+        entries = []
+        for item in db.query(Item).all():
+            latest = (
+                db.query(ReceiptItem, Receipt)
+                .join(Receipt, ReceiptItem.receipt_id == Receipt.id)
+                .filter(ReceiptItem.item_id == item.id)
+                .filter(Receipt.purchase_date.isnot(None))
+                .order_by(Receipt.purchase_date.desc())
+                .first()
+            )
+            store = price = date = None
+            if latest:
+                receipt_item, receipt = latest
+                price = receipt_item.price
+                store = receipt.store.name if receipt.store else None
+                if receipt.purchase_date:
+                    date = receipt.purchase_date.strftime("%b %-d")
+            category = item.category.name if item.category else "Other"
+            entries.append(
+                {
+                    "id": item.id,
+                    "name": item.name,
+                    "category": category,
+                    "emoji": _category_emoji(category),
+                    "store": store,
+                    "price": price,
+                    "date": date,
+                }
+            )
+    finally:
+        db.close()
+
+    payload = json.dumps(entries, separators=(",", ":"), ensure_ascii=False)
+    (out / SEARCH_INDEX_FILE).write_text(f"window.__DEMO_SEARCH__ = {payload};\n", encoding="utf-8")
+    return len(entries)
+
+
 def write_api_map(out: Path, api_map: dict[str, str]) -> None:
     """Emit the map as a plain script so it is parsed before any request fires."""
     payload = json.dumps(api_map, separators=(",", ":"), sort_keys=True)
@@ -601,7 +778,7 @@ def copy_static_assets(out: Path) -> None:
     )
 
 
-def crawl(out: Path) -> tuple[int, list[str], set[str], int]:
+def crawl(out: Path) -> tuple[int, list[str], set[str], int, int]:
     from fastapi.testclient import TestClient
 
     from app.main import app
@@ -623,6 +800,7 @@ def crawl(out: Path) -> tuple[int, list[str], set[str], int]:
         api_map, variant_warnings = crawl_variants(out, client)
         warnings.extend(variant_warnings)
         write_api_map(out, api_map)
+        indexed = write_search_index(out)
         upload = upload_shim()
 
         while queue:
@@ -660,7 +838,12 @@ def crawl(out: Path) -> tuple[int, list[str], set[str], int]:
                     # before the api-map rewrite points it at a variant file.
                     text = text.replace(
                         "</body>",
-                        API_MAP_SHIM + LIST_FILTER_SHIM + upload + DEMO_SHIM + "</body>",
+                        API_MAP_SHIM
+                        + SEARCH_SHIM
+                        + LIST_FILTER_SHIM
+                        + upload
+                        + DEMO_SHIM
+                        + "</body>",
                         1,
                     )
                 dest.write_text(text, encoding="utf-8")
@@ -668,7 +851,7 @@ def crawl(out: Path) -> tuple[int, list[str], set[str], int]:
                 dest.write_bytes(resp.content)
             saved += 1
 
-    return saved, warnings, write_only, len(api_map)
+    return saved, warnings, write_only, len(api_map), indexed
 
 
 def rewrite_base_path(out: Path, base_path: str) -> int:
@@ -752,7 +935,7 @@ def main() -> int:
         print(f"  ⚠️  filter drift — {drift}")
 
     copy_static_assets(out)
-    saved, warnings, write_only, variants = crawl(out)
+    saved, warnings, write_only, variants, indexed = crawl(out)
 
     # GitHub Pages runs Jekyll by default, which would skip some paths.
     (out / ".nojekyll").write_text("", encoding="utf-8")
@@ -768,6 +951,7 @@ def main() -> int:
 
     print(f"\n✅ Snapshot complete: {saved} responses saved")
     print(f"   {variants} filter variants pre-rendered into {VARIANT_DIR}/")
+    print(f"   {indexed} items indexed for client-side search")
     print(f"   {len(write_only)} write-only/parameterized endpoints skipped (shim blocks them)")
     for warning in warnings:
         print(f"  ⚠️  {warning}")
