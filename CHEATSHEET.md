@@ -92,6 +92,10 @@ cd backend
 
 ## 📸 Static Demo Site
 
+Live at **https://smcgarrigle.github.io/ihavethereceipts/**, rebuilt by GitHub
+Actions on every push to `main` that touches `backend/**`. See [DEMO.md](DEMO.md)
+for how it works and what it can't do.
+
 ### Build the Demo Snapshot
 Seeds a throwaway DB (never touches `grocery.db`) and bakes the whole app into `site/demo`. Builds are atomic — a crashed build leaves the previous snapshot intact.
 ```bash
@@ -110,16 +114,19 @@ uv run python scripts/build_static_demo.py --base-path /repo-name
 python3 -m http.server -d site/demo 8080   # from repo root → http://127.0.0.1:8080
 ```
 
-### Share It via Tailscale
-If you have a Tailscale serve proxy pointing to port 8080, starting the local server makes the demo live at your machine's Tailscale hostname instantly.
+### Reach It From Your Own Devices (Tailscale)
+`tailscale serve` currently proxies **port 8000 — the main app**, tailnet-only. It
+is not pointed at the demo.
 ```bash
-tailscale serve status                     # check current proxy config
+tailscale serve status                     # what is actually proxied right now
+tailscale serve --bg 8080                  # repoint at the demo instead
 ```
-⚠️ The default `tailscale serve` is tailnet-only. To expose to the public internet:
-```bash
-tailscale funnel --bg 8080
-```
-To pull it back to tailnet-only: `tailscale funnel off && tailscale serve --bg 8080`
+
+> ⚠️ **Do not reach for `tailscale funnel` here.** Funnel publishes to the open
+> internet, and this app has **no authentication at all** — see
+> [SECURITY.md](SECURITY.md). Funnel is deliberately off. If you want the demo
+> public, use the GitHub Pages build above: it is a read-only snapshot of
+> fictional data, with no server and no database behind it.
 
 ---
 

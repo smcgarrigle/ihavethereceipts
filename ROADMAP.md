@@ -23,7 +23,7 @@ Automated background enrichment that detects FDC coverage gaps and surfaces cand
 
 ### 4. Dynamic Trends & Dashboards
 - [ ] **Interactive Chart Controllers**: Dropdown filters by date range, store, or category. Use `hx-push-url="true"` to keep state bookmarkable.
-- [ ] **Low-Data "Bootstrap" Charts**: Visualizations useful with only 5–10 receipts.
+- [x] **Low-Data "Bootstrap" Charts**: Shipped as the Quick Insights row on `/trends` — Basket Spend Composition, Identical Item Store Diff, Weekly Spend Trajectory.
 - [ ] **Shopping Habits Gallery**: Recurring trend charts with improved signal/noise filtering.
 
 ### 5. Automation & Scalability
@@ -51,6 +51,35 @@ Let users create personally meaningful categories (e.g. "Protein-Maxxing") that 
 ---
 
 ## 🏛️ Completed Milestones Archive
+
+<details>
+<summary><b>Public Static Demo (Aug 2026)</b></summary>
+
+- **GitHub Pages demo**: The whole app, frozen onto fictional data and published at
+  https://smcgarrigle.github.io/ihavethereceipts/ — no server, no database. Built by
+  `scripts/build_static_demo.py` and deployed by `.github/workflows/pages.yml` on
+  every push to `main` touching `backend/**`. Nothing is committed: CI rebuilds it
+  each deploy so it cannot go stale. See [DEMO.md](DEMO.md).
+- **Filters that actually filter**: Static hosts drop query strings, so every filter
+  re-served unfiltered data with no error. Each trends filter combination is now
+  pre-rendered to `api-variants/` behind a URL→file map; the receipts store pills
+  (multi-select, too many combinations to pre-render) and nav search are matched
+  client-side instead. All render through `htmx:beforeSwap`, since post-swap DOM
+  changes are discarded when htmx settles.
+- **Build-time guards**: The build fails rather than shipping something broken — no
+  link may escape the base path, every template-literal `fetch` of an `/api/` URL
+  must have a snapshot behind it, and the filter matrix must still match the
+  template.
+- **Insights fixes surfaced by the demo**: `/xray` tab renamed to Receipt X-Ray
+  across all three nav renderings; Store Price Trends moved to the charts it
+  describes; Best Value double-container alignment; volatility bars rescaled to the
+  whole series (most were rendering off-track); click-to-pin tooltips on the
+  complexity map.
+- **Demo seed accounting fix**: `ReceiptItem.price` is a per-quantity price, but the
+  seed stored line totals there, double-counting every qty>1 line — inflating all
+  spend figures and firing the total-mismatch warning on all 52 receipts.
+
+</details>
 
 <details>
 <summary><b>Accessibility & WCAG (Jul 2026)</b></summary>
