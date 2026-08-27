@@ -37,20 +37,44 @@ uv run pytest tests/test_manual_receipt.py
 uv run pytest -s
 ```
 
+### The `e2e` marker
+
+`pytest.ini` sets `addopts = -m "not e2e"`, so **end-to-end tests are skipped by
+default** — a normal run reports them as *deselected*, not failed. They drive a
+real browser through Playwright and need a live server, which makes them slow and
+dependent on a working browser install.
+
+```bash
+# Run only the end-to-end tests (needs a server on :8000 and Playwright browsers)
+uv run pytest -m e2e
+
+# Run everything, e2e included
+uv run pytest -m ""
+```
+
+Currently marked `e2e`: `test_a11y_axe.py` and `test_dashboard_ui.py`.
+
 ## 📂 Test Coverage Breakdown
 
-The tests are located in `backend/tests/` and cover the following core features:
+The tests live in `backend/tests/`. Grouped by what they protect:
 
-| Test File | Description | Key Scenarios |
+| Area | Files | What they guard |
 | :--- | :--- | :--- |
-| **`conftest.py`** | **Fixture Setup** | Configures the in-memory SQLite database and overrides the `get_db` FastAPI dependency to ensure tests run in isolation without affecting the real database. |
-| **`test_duplicate_flow.py`** | **Duplicate Detection** | - Uploads a receipt twice.<br>- Mocks OCR response to ensure consistent data.<br>- Verifies the "Potential Duplicate" warning appears on the review page.<br>- Deletes the duplicate receipt. |
-| **`test_manual_receipt.py`** | **Manual Entry** | - Creates a text-only manual receipt (Farmer's Market mode).<br>- Verifies default values (today's date, 0.00 total).<br>- **Critical**: Tests saving manual line items (verifying 422 validations and schema matching). |
-| **`test_external_product.py`** | **External Data** | - Mocks `OpenFoodFacts` API response.<br>- Tests product search endpoint.<br>- Tests downloading and assigning product images (mocking `urllib` to prevent real network calls). |
-| **`test_receipt_review.py`** | **Review UI** | - Verifies the Review Page loads correctly.<br>- Tests robustness against `NULL` dates or invalid JSON in `ocr_data`.<br>- Ensures the page doesn't crash (500 error) on malformed data. |
-| **`test_items.py`** | **Item Management** | - Tests `GET /api/items/list`.<br>- Verifies items are correctly grouped by Category.<br>- Checks "Uncategorized" fallback logic. |
-| **`test_template_integrity.py`** | **DOM Stability** | - Scans core pages (Dashboard, Receipts, Items, Review, Produce) for critical DOM IDs.<br>- Prevents runtime `TypeError` caused by missing elements required by JS/HTMX. |
-| **`test_dashboard_ui.py`** | **UI Interaction** | - Uses Playwright to simulate browser clicks.<br>- Verifies that modals open and content updates correctly without JS errors. |
+| **Fixtures** | `conftest.py` | In-memory SQLite plus a `get_db` override, so tests never touch the real database. |
+| **Ingestion** | `test_duplicate_flow`, `test_manual_receipt`, `test_paste_receipt`, `test_ocr_merging`, `test_folder_watch`, `test_amazon_wf_mapping` | Upload, duplicate detection, manual and paste entry, OCR merge behaviour, the inbox watcher, and retailer-specific parsing. |
+| **OCR backends** | `test_openrouter_backend`, `test_ocr_hint_banner` | Backend selection, and that the dashboard offers a hosted model rather than demanding one. |
+| **Review & saving** | `test_receipt_review`, `test_save_reviewed_categories`, `test_zero_payload_guard`, `test_zero_qty_fix`, `test_correction_loop` | Review page robustness against bad `ocr_data`, category persistence, and the guards added after the $0-total incident. |
+| **Items & matching** | `test_items`, `test_item_matcher`, `test_item_insights_bugs`, `test_size_extraction`, `test_unit_price_math`, `test_external_product` | Listing and grouping, fuzzy matching, size parsing, unit-price arithmetic, and OpenFoodFacts lookups (mocked — no real network calls). |
+| **Nutrition & USDA** | `test_nutrition_phase1`, `test_nutrition_outliers`, `test_trends_nutrition`, `test_protein_roi_target`, `test_fdc_manual_override`, `test_seed_fdc_ids` | Coverage maths, outlier capping, ROI targets, and pinned FDC ids. |
+| **Analytics** | `test_predictions`, `test_store_charts_data_driven`, `test_xray_exclusions`, `test_dashboard_integrity` | Restock cadence, per-store charts, X-Ray exclusions, and dashboard totals. |
+| **Demo seed** | `test_seed_demo_totals` | Line items must reconstruct each receipt total — catches a line total being stored where a per-quantity price belongs. |
+| **Accessibility** | `test_a11y_axe` *(e2e)*, `test_chart_a11y_labels`, `test_form_a11y_labels`, `test_img_alt_text`, `test_tablist_keyboard`, `test_category_store_stack_a11y` | axe-core smoke tests, chart and form labelling, alt text, and keyboard-reachable tabs. |
+| **Template safety** | `test_template_integrity`, `test_fragment_html_escaping` | Critical DOM ids that JS/HTMX depend on, and escaping in rendered fragments. |
+| **Cleanups** | `test_correctness_cleanup`, `test_medium_audit_cleanup` | Regression guards from past audit passes. |
+| **Browser** | `test_dashboard_ui` *(e2e)* | Playwright click-through of modals and dynamic content. |
+
+> Adding a test file? Add it to the right row above — the table is grouped, so it
+> should not need a new row.
 
 ## 🧪 Key Testing Principles
 

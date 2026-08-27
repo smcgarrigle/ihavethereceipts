@@ -8,13 +8,17 @@ This document serves as the primary blueprint for all AI agents working on this 
 
 ## Project Documentation
 - [CHEATSHEET.md](CHEATSHEET.md): Quick reference guide for users.
+- [CONTRIBUTING.md](CONTRIBUTING.md): Branch, commit and pre-commit workflow for changes.
 - [DATA_DESIGN.md](DATA_DESIGN.md): Database schema, ERD, and field definitions.
+- [DEMO.md](DEMO.md): The static GitHub Pages demo — what it is, how it's built and deployed.
 - [EXCLUSIONS.md](EXCLUSIONS.md): Logic for junk filters and analytics exclusions.
+- [HARDWARE_REQUIREMENTS.md](HARDWARE_REQUIREMENTS.md): Sizing for local OCR models and low-power hosts.
 - [PRD.md](PRD.md): Core instructions and product requirements.
 - [ROADMAP.md](ROADMAP.md): Feature backlog, strategic vision, and completed milestones.
 - [SBOM.md](SBOM.md): Software Bill of Materials — all dependencies and licenses.
 - [README.md](README.md): GitHub instructions and project sharing guide.
 - [SECURITY.md](SECURITY.md): Sensible security practices before pushing to GitHub or containerizing.
+- [TESTING.md](TESTING.md): Test suite layout, how to run it, and the e2e marker.
 
 ## 1. Core Technology Stack
 - **Backend**: Python 3.11, FastAPI
