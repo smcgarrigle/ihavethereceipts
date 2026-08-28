@@ -31,6 +31,30 @@
         <p class="text-[11px] text-textSubtle">Digital PDF invoices (Whole Foods, Amazon Fresh) are parsed directly and need no vision model at all, whichever backend you pick.</p>
     </div>
 
+    <!-- Google Gemini -->
+    <div class="rounded-2xl border border-borderDefault bg-bgCard p-6 space-y-4">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-blue-500/15 flex items-center justify-center text-xl">✨</div>
+            <div>
+                <h2 class="text-lg font-semibold text-textBase">Google Gemini</h2>
+                <p class="text-xs text-textMuted mt-0.5">The AI that reads your receipt photos and helps categorize items.</p>
+            </div>
+        </div>
+
+        <ol class="list-decimal list-inside space-y-2 text-sm text-textMuted">
+            <li>You'll need a regular (free) Google account — the same kind used for Gmail.</li>
+            <li>Go to <a href="https://aistudio.google.com" target="_blank" rel="noopener noreferrer"
+                   class="text-indigo-400 hover:text-indigo-300 underline">Google AI Studio</a> and sign in.</li>
+            <li>Click <strong class="text-textBase">Get API key</strong> (top left), then <strong class="text-textBase">Create API key</strong>.</li>
+            <li>A key beginning with <code class="bg-bgMain px-1.5 py-0.5 rounded text-xs">AIza…</code> is generated. Click the copy icon and save it somewhere safe.</li>
+        </ol>
+
+        <div class="text-xs text-textSubtle bg-bgMain rounded-xl px-4 py-3 space-y-1">
+            <p>💡 Gemini has a <strong>free tier</strong> that is plenty for scanning household receipts.</p>
+            <p>⚠️ Treat this key like a password — anyone who has it can use AI services billed to your Google account if you later enable paid usage.</p>
+        </div>
+    </div>
+
     <!-- USDA FDC -->
     <div class="rounded-2xl border border-borderDefault bg-bgCard p-6 space-y-4">
         <div class="flex items-center gap-3">
@@ -77,30 +101,6 @@
                class="text-indigo-400 hover:text-indigo-300 underline">world.openfoodfacts.org</a>
             — but The Receipts doesn't require it.
         </p>
-    </div>
-
-    <!-- Google Gemini -->
-    <div class="rounded-2xl border border-borderDefault bg-bgCard p-6 space-y-4">
-        <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-blue-500/15 flex items-center justify-center text-xl">✨</div>
-            <div>
-                <h2 class="text-lg font-semibold text-textBase">Google Gemini</h2>
-                <p class="text-xs text-textMuted mt-0.5">The AI that reads your receipt photos and helps categorize items.</p>
-            </div>
-        </div>
-
-        <ol class="list-decimal list-inside space-y-2 text-sm text-textMuted">
-            <li>You'll need a regular (free) Google account — the same kind used for Gmail.</li>
-            <li>Go to <a href="https://aistudio.google.com" target="_blank" rel="noopener noreferrer"
-                   class="text-indigo-400 hover:text-indigo-300 underline">Google AI Studio</a> and sign in.</li>
-            <li>Click <strong class="text-textBase">Get API key</strong> (top left), then <strong class="text-textBase">Create API key</strong>.</li>
-            <li>A key beginning with <code class="bg-bgMain px-1.5 py-0.5 rounded text-xs">AIza…</code> is generated. Click the copy icon and save it somewhere safe.</li>
-        </ol>
-
-        <div class="text-xs text-textSubtle bg-bgMain rounded-xl px-4 py-3 space-y-1">
-            <p>💡 Gemini has a <strong>free tier</strong> that is plenty for scanning household receipts.</p>
-            <p>⚠️ Treat this key like a password — anyone who has it can use AI services billed to your Google account if you later enable paid usage.</p>
-        </div>
     </div>
 
     <!-- Where the keys go -->
