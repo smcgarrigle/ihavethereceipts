@@ -336,4 +336,23 @@ class FDCService:
             return False
 
 
+def enrich_db_item_task(item_id: int) -> bool:
+    """Enrich one item from a background task, using its own session.
+
+    Request-scoped sessions come from a ``yield`` dependency, which FastAPI
+    tears down before background tasks run — so a task handed the request's
+    session gets a closed one. Open a fresh session here instead.
+    """
+    from app.database import SessionLocal
+
+    db = SessionLocal()
+    try:
+        return fdc_service.enrich_db_item(db, item_id)
+    except Exception:
+        logger.exception(f"Background FDC enrichment failed for item {item_id}")
+        return False
+    finally:
+        db.close()
+
+
 fdc_service = FDCService()
