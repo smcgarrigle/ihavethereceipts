@@ -56,11 +56,10 @@ def test_update_image_endpoint(client, db):
     db.commit()
     db.refresh(item)
 
-    with patch("urllib.request.urlopen") as mock_urlopen:
-        # Mock image download
-        mock_response = MagicMock()
-        mock_response.read.return_value = b"fake_image_bytes"
-        mock_urlopen.return_value.__enter__.return_value = mock_response
+    # The endpoint fetches through safe_fetch, which enforces the scheme,
+    # private-range, size, and Content-Type rules before any bytes are read.
+    with patch("app.utils.safe_fetch.fetch_remote_image") as mock_fetch:
+        mock_fetch.return_value = (b"fake_image_bytes", "jpg")
 
         # Test request
         payload = {"image_url": "http://example.com/image.jpg"}
