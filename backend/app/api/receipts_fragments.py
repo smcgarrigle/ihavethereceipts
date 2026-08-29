@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Receipt
+from app.services.spend import LINE_TOTAL, line_total
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -49,8 +50,8 @@ def get_receipt_items(receipt_id: int, db: Session = Depends(get_db)):
         if not item:
             continue
 
-        line_total = receipt_item.price * receipt_item.quantity
-        subtotal += line_total
+        line_total_value = line_total(receipt_item)
+        subtotal += line_total_value
 
         # Parse notes to show discount/fee breakdown
         breakdown_html = ""
@@ -87,7 +88,7 @@ def get_receipt_items(receipt_id: int, db: Session = Depends(get_db)):
             </div>
             <div class='text-right flex items-center space-x-2'>
                 <div>
-                    <p class='font-semibold text-gray-900 dark:text-white'>${line_total:.2f}</p>
+                    <p class='font-semibold text-gray-900 dark:text-white'>${line_total_value:.2f}</p>
                     <p class='text-xs text-gray-500 dark:text-gray-400'>${receipt_item.price:.2f} each</p>
                 </div>
                 <button
@@ -302,7 +303,7 @@ def list_receipts(
         # Items are pre-fetched via joinedload
         receipt_items = receipt.items
         item_count = len(receipt_items)
-        actual_total = sum(ri.price * ri.quantity for ri in receipt_items)
+        actual_total = sum(line_total(ri) for ri in receipt_items)
 
         display_total = (
             actual_total if (item_count > 0 and actual_total > 0) else (receipt.total_amount or 0.0)
@@ -376,7 +377,7 @@ def get_receipt_card(receipt_id: int, db: Session = Depends(get_db)):
     stats = (
         db.query(
             func.count(ReceiptItem.id).label("count"),
-            func.sum(ReceiptItem.price * ReceiptItem.quantity).label("total"),
+            func.sum(LINE_TOTAL).label("total"),
         )
         .filter(ReceiptItem.receipt_id == receipt.id)
         .first()

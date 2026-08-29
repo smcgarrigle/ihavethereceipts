@@ -14,6 +14,7 @@ from app.api.trends_nutrition import (
 )
 from app.database import get_db
 from app.models import Item, Receipt, ReceiptItem
+from app.services.spend import LINE_TOTAL
 
 router = APIRouter()
 
@@ -52,7 +53,7 @@ def get_trends_data(time_range: str = "year", db: Session = Depends(get_db)):
         db.query(
             func.strftime("%Y-%W", Receipt.purchase_date).label("week"),
             Item.category_id,
-            func.sum(ReceiptItem.price * ReceiptItem.quantity).label("total_cost"),
+            func.sum(LINE_TOTAL).label("total_cost"),
         )
         .join(Receipt, ReceiptItem.receipt_id == Receipt.id)
         .join(Item, ReceiptItem.item_id == Item.id)
@@ -161,7 +162,7 @@ def get_category_stats(db: Session = Depends(get_db)):
             Store.id.label("store_id"),
             Store.name.label("store_name"),
             func.max(Receipt.purchase_date).label("last_seen"),
-            func.sum(ReceiptItem.price * ReceiptItem.quantity).label("total_spent"),
+            func.sum(LINE_TOTAL).label("total_spent"),
             func.sum(ReceiptItem.quantity).label("total_qty"),
         )
         .join(ReceiptItem, Item.id == ReceiptItem.item_id)
@@ -212,7 +213,7 @@ def get_category_stats(db: Session = Depends(get_db)):
         db.query(
             Item.category_id,
             func.strftime("%Y-%m", Receipt.purchase_date).label("month"),
-            func.sum(ReceiptItem.price * ReceiptItem.quantity).label("total_spent"),
+            func.sum(LINE_TOTAL).label("total_spent"),
             func.sum(ReceiptItem.quantity).label("total_qty"),
         )
         .join(ReceiptItem, Item.id == ReceiptItem.item_id)
@@ -576,9 +577,7 @@ def get_basket_composition(time_range: str = "30d", db: Session = Depends(get_db
         start_date = end_date - timedelta(days=30)
 
     query = (
-        db.query(
-            Category.name, func.sum(ReceiptItem.price * ReceiptItem.quantity).label("total_spent")
-        )
+        db.query(Category.name, func.sum(LINE_TOTAL).label("total_spent"))
         .join(Item, ReceiptItem.item_id == Item.id)
         .join(Receipt, ReceiptItem.receipt_id == Receipt.id)
         .outerjoin(Category, Item.category_id == Category.id)
@@ -587,11 +586,7 @@ def get_basket_composition(time_range: str = "30d", db: Session = Depends(get_db
     if start_date:
         query = query.filter(Receipt.purchase_date >= start_date)
 
-    results = (
-        query.group_by(Category.name)
-        .order_by(func.sum(ReceiptItem.price * ReceiptItem.quantity).desc())
-        .all()
-    )
+    results = query.group_by(Category.name).order_by(func.sum(LINE_TOTAL).desc()).all()
 
     if not results:
         return {"labels": [], "datasets": []}

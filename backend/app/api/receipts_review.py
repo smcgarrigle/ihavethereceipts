@@ -18,6 +18,7 @@ from app.services.item_matcher import (
     get_best_match,
     get_store_item_ids,
 )
+from app.services.spend import line_total
 from app.utils.item_parsing import extract_weight
 
 router = APIRouter()
@@ -316,7 +317,7 @@ def save_reviewed_items(
         # Update receipt total to match sum of items and mark as completed.
         # Never clobber a known-good total with $0: fall back to the client's
         # stated total, then to whatever the receipt already had.
-        item_sum = sum(ri.price * ri.quantity for ri in receipt.items)
+        item_sum = sum(line_total(ri) for ri in receipt.items)
         receipt.total_amount = (
             item_sum if item_sum > 0 else (request.total_amount or receipt.total_amount)
         )

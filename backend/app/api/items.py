@@ -10,6 +10,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from app.database import get_db
 from app.models import Item, ReceiptItem
+from app.services.spend import LINE_TOTAL
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -38,7 +39,7 @@ def list_items(category_id: int | None = None, db: Session = Depends(get_db)):
         Item,
         func.count(ReceiptItem.id).label("purchase_count"),
         func.avg(ReceiptItem.price).label("avg_price"),
-        func.sum(ReceiptItem.price * ReceiptItem.quantity).label("total_spent"),
+        func.sum(LINE_TOTAL).label("total_spent"),
         func.min(ReceiptItem.price).label("min_price"),
         func.max(ReceiptItem.price).label("max_price"),
     ).outerjoin(ReceiptItem, Item.id == ReceiptItem.item_id)

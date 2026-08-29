@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Category, Item, Receipt, ReceiptItem, Store
+from app.services.spend import LINE_TOTAL, unit_price_of
 
 router = APIRouter()
 
@@ -29,7 +30,7 @@ def get_top_categories_html(limit: int = 8, db: Session = Depends(get_db)):
         db.query(
             Category.id,
             Category.name,
-            func.sum(ReceiptItem.price * ReceiptItem.quantity).label("total"),
+            func.sum(LINE_TOTAL).label("total"),
         )
         .join(Item, Category.id == Item.category_id)
         .join(ReceiptItem, Item.id == ReceiptItem.item_id)
@@ -39,7 +40,7 @@ def get_top_categories_html(limit: int = 8, db: Session = Depends(get_db)):
             )
         )
         .group_by(Category.id, Category.name)
-        .order_by(func.sum(ReceiptItem.price * ReceiptItem.quantity).desc())
+        .order_by(func.sum(LINE_TOTAL).desc())
         .limit(limit)
         .all()
     )
@@ -93,7 +94,7 @@ def get_category_breakdown_widget(db: Session = Depends(get_db)):
         db.query(
             Category.id,
             Category.name,
-            func.sum(ReceiptItem.price * ReceiptItem.quantity).label("total"),
+            func.sum(LINE_TOTAL).label("total"),
             func.count(func.distinct(ReceiptItem.id)).label("item_count"),
             func.count(func.distinct(Receipt.store_id)).label("store_count"),
         )
@@ -115,7 +116,7 @@ def get_category_breakdown_widget(db: Session = Depends(get_db)):
 
     # 3. Get Last Month's Stats for Comparison
     last_month_stats = (
-        db.query(Category.id, func.sum(ReceiptItem.price * ReceiptItem.quantity).label("total"))
+        db.query(Category.id, func.sum(LINE_TOTAL).label("total"))
         .join(Item, Category.id == Item.category_id)
         .join(ReceiptItem, Item.id == ReceiptItem.item_id)
         .join(Receipt, ReceiptItem.receipt_id == Receipt.id)
@@ -233,9 +234,7 @@ def get_category_breakdown_widget(db: Session = Depends(get_db)):
 def get_top_items_html(limit: int = 8, db: Session = Depends(get_db)):
     """Get HTML table for top items"""
     results = (
-        db.query(
-            Item.id, Item.name, func.sum(ReceiptItem.price * ReceiptItem.quantity).label("total")
-        )
+        db.query(Item.id, Item.name, func.sum(LINE_TOTAL).label("total"))
         .join(ReceiptItem, Item.id == ReceiptItem.item_id)
         .outerjoin(Category, Item.category_id == Category.id)
         .filter(
@@ -247,7 +246,7 @@ def get_top_items_html(limit: int = 8, db: Session = Depends(get_db)):
             )
         )
         .group_by(Item.id, Item.name)
-        .order_by(func.sum(ReceiptItem.price * ReceiptItem.quantity).desc())
+        .order_by(func.sum(LINE_TOTAL).desc())
         .limit(limit)
         .all()
     )
@@ -287,9 +286,7 @@ def get_top_items_html(limit: int = 8, db: Session = Depends(get_db)):
 def get_store_spend_html(db: Session = Depends(get_db)):
     """Get HTML table for store spending with graph button"""
     results = (
-        db.query(
-            Store.id, Store.name, func.sum(ReceiptItem.price * ReceiptItem.quantity).label("total")
-        )
+        db.query(Store.id, Store.name, func.sum(LINE_TOTAL).label("total"))
         .join(Receipt, Store.id == Receipt.store_id)
         .join(ReceiptItem, Receipt.id == ReceiptItem.receipt_id)
         .join(Item, ReceiptItem.item_id == Item.id)
@@ -303,7 +300,7 @@ def get_store_spend_html(db: Session = Depends(get_db)):
             )
         )
         .group_by(Store.id, Store.name)
-        .order_by(func.sum(ReceiptItem.price * ReceiptItem.quantity).desc())
+        .order_by(func.sum(LINE_TOTAL).desc())
         .all()
     )
 
@@ -462,7 +459,7 @@ def _get_category_price_data(
                 "name": name,
                 "price_per_primary": price_per_unit,
                 "secondary_value": secondary,
-                "unit_price": (price / qty) if qty and price else 0,
+                "unit_price": unit_price_of(price, qty),
                 "store": store_name,
                 "date": date,
                 "receipt_id": receipt_id,
@@ -474,7 +471,7 @@ def _get_category_price_data(
                     {
                         "price_per_primary": price_per_unit,
                         "secondary_value": secondary,
-                        "unit_price": (price / qty),
+                        "unit_price": unit_price_of(price, qty),
                         "store": store_name,
                         "date": date,
                         "receipt_id": receipt_id,
@@ -710,7 +707,7 @@ def get_basket_by_store_html(limit: int = 10, db: Session = Depends(get_db)):
     # Since we ordered by date desc, the first one seen per item_id is the latest
     for item_id, price, qty in latest_prices:
         if item_id not in global_fallback and qty > 0:
-            global_fallback[item_id] = float(price / qty)
+            global_fallback[item_id] = unit_price_of(price, qty)
 
     # 2. Get all stores and their latest prices for these items (Fixed N+1)
     stores = db.query(Store).all()
@@ -962,7 +959,7 @@ def get_category_store_drilldown(category_id: int, store_id: int, db: Session = 
         db.query(
             Receipt.id,
             Receipt.purchase_date,
-            func.sum(ReceiptItem.price * ReceiptItem.quantity).label("category_spent"),
+            func.sum(LINE_TOTAL).label("category_spent"),
             Receipt.total_amount,
         )
         .join(ReceiptItem, Receipt.id == ReceiptItem.receipt_id)

@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.models import Item, Receipt, ReceiptItem, Store
+from app.services.spend import line_total
 
 logger = logging.getLogger(__name__)
 from app.api.analytics import _get_analytics_exclusions, _is_excluded  # noqa: E402
@@ -54,7 +55,7 @@ def receipt_xray_data(db: Session = Depends(get_db)):
             if _is_excluded(exclusions, cat_name, item_name):
                 continue
             if ri.price:
-                valid_total += ri.price
+                valid_total += line_total(ri)
         valid_receipt_totals[r.id] = valid_total
 
     # ── 1. PRICE VOLATILITY RADAR ──────────────────────────────────────
@@ -107,8 +108,8 @@ def receipt_xray_data(db: Session = Depends(get_db)):
             if _is_excluded(exclusions, cat_name, item_name):
                 continue
             if ri.item and ri.price:
-                store_categories[store_name][cat_name] += ri.price
-                store_totals[store_name] += ri.price
+                store_categories[store_name][cat_name] += line_total(ri)
+                store_totals[store_name] += line_total(ri)
 
     chart_2 = []
     for store_name, cats in store_categories.items():
@@ -148,7 +149,7 @@ def receipt_xray_data(db: Session = Depends(get_db)):
             if ri.item and ri.price:
                 entry = item_frequency[ri.item.name]
                 entry["count"] += 1
-                entry["total_spend"] += ri.price
+                entry["total_spend"] += line_total(ri)
                 entry["category"] = cat_name
                 entry["stores"].add(store_name)
 

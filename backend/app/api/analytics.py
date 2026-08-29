@@ -10,6 +10,7 @@ from app.database import get_db
 from app.models import Category, Item, Receipt, ReceiptItem, Store
 from app.models.exclusion import ExclusionRule
 from app.services.nutrition_utils import calculate_receipt_item_macros, determine_macro_dominant
+from app.services.spend import LINE_TOTAL, line_total, unit_price_of
 
 router = APIRouter()
 
@@ -84,7 +85,7 @@ def spending_by_category(
     query = (
         db.query(
             Category.name,
-            func.sum(ReceiptItem.price * ReceiptItem.quantity).label("total"),
+            func.sum(LINE_TOTAL).label("total"),
         )
         .join(Item, Category.id == Item.category_id)
         .join(ReceiptItem, Item.id == ReceiptItem.item_id)
@@ -106,7 +107,7 @@ def spending_by_category(
             )
         )
         .group_by(Category.id, Category.name)
-        .order_by(func.sum(ReceiptItem.price * ReceiptItem.quantity).desc())
+        .order_by(func.sum(LINE_TOTAL).desc())
         .all()
     )
 
@@ -128,7 +129,7 @@ def monthly_spending(months: int = 6, db: Session = Depends(get_db)):
     )
 
     results = (
-        db.query(Receipt.purchase_date, func.sum(ReceiptItem.price * ReceiptItem.quantity))
+        db.query(Receipt.purchase_date, func.sum(LINE_TOTAL))
         .join(ReceiptItem, Receipt.id == ReceiptItem.receipt_id)
         .join(Item, ReceiptItem.item_id == Item.id)
         .outerjoin(Category, Item.category_id == Category.id)
@@ -171,7 +172,7 @@ def weekly_spending(weeks: int = 12, db: Session = Depends(get_db)):
     start_date = datetime.now() - timedelta(weeks=weeks)
 
     results = (
-        db.query(Receipt.purchase_date, func.sum(ReceiptItem.price * ReceiptItem.quantity))
+        db.query(Receipt.purchase_date, func.sum(LINE_TOTAL))
         .join(ReceiptItem, Receipt.id == ReceiptItem.receipt_id)
         .join(Item, ReceiptItem.item_id == Item.id)
         .outerjoin(Category, Item.category_id == Category.id)
@@ -251,7 +252,7 @@ def store_comparison(
     query = (
         db.query(
             Store.name,
-            func.sum(ReceiptItem.price * ReceiptItem.quantity).label("total"),
+            func.sum(LINE_TOTAL).label("total"),
             func.count(func.distinct(Receipt.id)).label("receipt_count"),
         )
         .join(Receipt, Store.id == Receipt.store_id)
@@ -351,7 +352,7 @@ def top_items(limit: int = 10, db: Session = Depends(get_db)):
         db.query(
             Item.name,
             Category.name.label("category_name"),
-            func.sum(ReceiptItem.price * ReceiptItem.quantity).label("total_spent"),
+            func.sum(LINE_TOTAL).label("total_spent"),
             func.count(ReceiptItem.id).label("purchase_count"),
         )
         .join(ReceiptItem, Item.id == ReceiptItem.item_id)
@@ -365,7 +366,7 @@ def top_items(limit: int = 10, db: Session = Depends(get_db)):
             )
         )
         .group_by(Item.id, Item.name, Category.name)
-        .order_by(func.sum(ReceiptItem.price * ReceiptItem.quantity).desc())
+        .order_by(func.sum(LINE_TOTAL).desc())
         .limit(limit)
         .all()
     )
@@ -387,7 +388,7 @@ def summary_stats(db: Session = Depends(get_db)):
 
     # Total spending
     total_spending = (
-        db.query(func.sum(ReceiptItem.price * ReceiptItem.quantity))
+        db.query(func.sum(LINE_TOTAL))
         .join(Item, ReceiptItem.item_id == Item.id)
         .outerjoin(Category, Item.category_id == Category.id)
         .filter(
@@ -414,7 +415,7 @@ def summary_stats(db: Session = Depends(get_db)):
     # This month spending
     start_of_month = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     this_month = (
-        db.query(func.sum(ReceiptItem.price * ReceiptItem.quantity))
+        db.query(func.sum(LINE_TOTAL))
         .join(Receipt, ReceiptItem.receipt_id == Receipt.id)
         .join(Item, ReceiptItem.item_id == Item.id)
         .outerjoin(Category, Item.category_id == Category.id)
@@ -447,7 +448,7 @@ def summary_stats(db: Session = Depends(get_db)):
 def store_spending_history(store_id: int, db: Session = Depends(get_db)):
     """Get spending history for a specific store"""
     results = (
-        db.query(Receipt.purchase_date, func.sum(ReceiptItem.price * ReceiptItem.quantity))
+        db.query(Receipt.purchase_date, func.sum(LINE_TOTAL))
         .join(ReceiptItem, Receipt.id == ReceiptItem.receipt_id)
         .join(Item, ReceiptItem.item_id == Item.id)
         .outerjoin(Category, Item.category_id == Category.id)
@@ -533,7 +534,7 @@ def basket_over_time(limit: int = 10, db: Session = Depends(get_db)):
         month = int(month)
         months_set.add((year, month))
 
-        unit_price = price / qty if qty > 0 else 0
+        unit_price = unit_price_of(price, qty)
 
         if (year, month) not in monthly_prices:
             monthly_prices[(year, month)] = {}
@@ -695,7 +696,7 @@ def get_top_combo_timeseries(db: Session = Depends(get_db)):
         history = (
             db.query(
                 Receipt.purchase_date,
-                func.sum(ReceiptItem.price * ReceiptItem.quantity).label("spent"),
+                func.sum(LINE_TOTAL).label("spent"),
             )
             .join(ReceiptItem, Receipt.id == ReceiptItem.receipt_id)
             .join(Item, ReceiptItem.item_id == Item.id)
@@ -788,8 +789,7 @@ def get_random_category_item_trends(db: Session = Depends(get_db)):
                     continue
                 date_str = date.strftime("%Y-%m-%d")
                 all_dates.add(date_str)
-                # Use unit price (price / qty)
-                unit_price = float(price / qty) if qty and qty > 0 else float(price)
+                unit_price = unit_price_of(price, qty)
                 prices_by_date[date_str] = unit_price
 
             item_histories[item_name] = prices_by_date
@@ -902,7 +902,7 @@ def get_bi_dashboard_data(db: Session = Depends(get_db)):
             if _is_excluded(exclusions, cat_name, item_name):
                 continue
 
-            item_spend = ri.price
+            item_spend = line_total(ri)
             total_spend += item_spend
 
             if cat_name not in category_metrics:

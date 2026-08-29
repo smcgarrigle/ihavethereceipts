@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Item, Receipt, ReceiptItem
+from app.services.spend import LINE_TOTAL
 
 router = APIRouter()
 
@@ -288,8 +289,8 @@ def get_nutrition_coverage(time_range: str, db: Session) -> dict:
 
     query = (
         db.query(
-            func.coalesce(func.sum(ReceiptItem.price), 0.0).label("total_spend"),
-            func.coalesce(func.sum(case((has_nutrients, ReceiptItem.price), else_=0.0)), 0.0).label(
+            func.coalesce(func.sum(LINE_TOTAL), 0.0).label("total_spend"),
+            func.coalesce(func.sum(case((has_nutrients, LINE_TOTAL), else_=0.0)), 0.0).label(
                 "covered_spend"
             ),
             func.count(func.distinct(ReceiptItem.item_id)).label("total_items"),

@@ -105,3 +105,52 @@ def test_multi_quantity_lines_are_not_double_counted(seeded):
         f"{len(wrong)} of {len(multi)} qty>1 lines store a price that is not the "
         f"per-unit price (id, qty, price, unit_price): {wrong[:5]}"
     )
+
+
+# ---------------------------------------------------------------------------
+# The onboarding seeder (app/services/onboarding.py) is a second, separate
+# seeder — the three receipts a fresh install shows on first run. The guards
+# above only ever covered scripts/seed_demo.py, and the sibling had exactly the
+# bug they were written to prevent: it stored price * qty in the per-quantity
+# price column, so every qty>1 demo line was double-counted on the dashboard.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def onboarded(db):
+    from app.services.onboarding import populate_demo_data
+
+    populate_demo_data(db)
+    return db
+
+
+def test_onboarding_line_items_sum_to_receipt_total(onboarded):
+    receipts = onboarded.query(Receipt).filter(Receipt.notes == "DEMO_DATA").all()
+    assert receipts, "onboarding produced no demo receipts"
+
+    mismatched = []
+    for receipt in receipts:
+        line_sum = sum(ri.price * ri.quantity for ri in receipt.items)
+        tolerance = max(0.02, 0.01 * len(receipt.items))
+        if abs(line_sum - (receipt.total_amount or 0.0)) > tolerance:
+            mismatched.append((receipt.id, round(line_sum, 2), receipt.total_amount))
+
+    assert not mismatched, (
+        f"{len(mismatched)} of {len(receipts)} onboarding receipts have line items "
+        f"that do not sum to their total (id, line_sum, total): {mismatched}"
+    )
+
+
+def test_onboarding_multi_quantity_lines_are_not_double_counted(onboarded):
+    multi = onboarded.query(ReceiptItem).filter(ReceiptItem.quantity > 1).all()
+    assert multi, "onboarding produced no qty>1 lines, so this guard proves nothing"
+
+    wrong = [
+        (ri.id, ri.quantity, ri.price, ri.unit_price)
+        for ri in multi
+        if ri.unit_price and abs(ri.price - ri.unit_price) > 0.02
+    ]
+    assert not wrong, (
+        f"{len(wrong)} of {len(multi)} qty>1 onboarding lines store a price that is "
+        f"not the per-unit price (id, qty, price, unit_price): {wrong}"
+    )
