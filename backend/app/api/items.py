@@ -1062,32 +1062,28 @@ def update_item_image(item_id: int, request: UpdateItemImageRequest, db: Session
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
 
-    import os
-    import urllib.request
     import uuid
+    from pathlib import Path
+
+    from app.utils.safe_fetch import UnsafeURLError, fetch_remote_image
 
     try:
-        # Generate unique filename
-        ext = request.image_url.split(".")[-1].split("?")[0]
-        if len(ext) > 4 or not ext.isalnum():
-            ext = "jpg"
+        # The extension comes from the response Content-Type, not the URL, so
+        # the caller cannot choose what the file is stored as.
+        image_bytes, ext = fetch_remote_image(request.image_url)
+    except UnsafeURLError as e:
+        logger.warning(f"Refused item image fetch for item {item_id}: {e}")
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Failed to download image: {str(e)}") from e
 
+    try:
         filename = f"item_{item_id}_{uuid.uuid4().hex[:8]}.{ext}"
-        save_dir = "static/uploads"
-        if not os.path.exists(save_dir):
-            os.makedirs(save_dir, exist_ok=True)
-
-        local_path = os.path.join(save_dir, filename)
-
-        # Download with User-Agent
-        req = urllib.request.Request(
-            request.image_url, headers={"User-Agent": "GroceryTracker/1.0"}
-        )
-        with (
-            urllib.request.urlopen(req) as response,
-            open(local_path, "wb") as out_file,
-        ):
-            out_file.write(response.read())
+        # Absolute, so the file lands in the served static dir regardless of
+        # the working directory the app was started from.
+        save_dir = Path(__file__).resolve().parents[2] / "static" / "uploads"
+        save_dir.mkdir(parents=True, exist_ok=True)
+        (save_dir / filename).write_bytes(image_bytes)
 
         # Update DB
         item.image_path = filename
@@ -1096,4 +1092,4 @@ def update_item_image(item_id: int, request: UpdateItemImageRequest, db: Session
         return {"success": True, "image_path": filename}
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to download image: {str(e)}") from e
+        raise HTTPException(status_code=500, detail=f"Failed to save image: {str(e)}") from e
