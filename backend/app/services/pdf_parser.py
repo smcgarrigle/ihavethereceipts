@@ -36,6 +36,53 @@ _FALLBACK_JUNK = [
 ]
 
 
+# Money as printed on a receipt. The thousands separator matters: the earlier
+# [0-9.]+ stopped at the comma in "$1,024.99" and yielded "1", so a four-figure
+# order was stored as $1.00. MONEY_CENTS is the anchored form, for lines that
+# are only a price.
+MONEY = r"[0-9][0-9,]*(?:\.[0-9]+)?"
+MONEY_CENTS = r"[0-9][0-9,]*\.[0-9]{2}"
+
+# A parsed total is rejected when the line items sum to more than this multiple
+# of it. Generous on purpose: the heuristic line-item loops can over-collect,
+# and every instance of the separator bug is off by a factor of ten or more.
+_TOTAL_DIVERGENCE_RATIO = 3.0
+_TOTAL_DIVERGENCE_FLOOR = 5.0
+
+
+def _money(raw: str) -> float:
+    """Parse a printed money amount, tolerating thousands separators."""
+    return float(raw.replace(",", ""))
+
+
+def _total_is_credible(result: dict[str, Any]) -> bool:
+    """Check the parsed total against the sum of the line items.
+
+    A fast-path result that claims a total far below what its own items add up
+    to has misread the total, so it is better to fall back to the model than to
+    store the wrong number. Items summing to *less* than the total is ordinary
+    (a fee or tax line that never parsed), so only the one direction rejects.
+    """
+    total = result.get("total_amount") or 0.0
+    item_sum = sum(float(i.get("final_price") or 0) for i in result.get("items", []))
+
+    if item_sum <= 0:
+        return True
+    if total <= 0:
+        logger.warning(
+            f"Fast-Path Parser: items sum to ${item_sum:.2f} but no total was parsed — "
+            "falling back to the model"
+        )
+        return False
+    if item_sum - total > _TOTAL_DIVERGENCE_FLOOR and item_sum > total * _TOTAL_DIVERGENCE_RATIO:
+        logger.warning(
+            f"Fast-Path Parser: items sum to ${item_sum:.2f} but the parsed total is "
+            f"${total:.2f} — rejecting the fast path and falling back to the model"
+        )
+        return False
+    return True
+
+
 def _load_ocr_filters() -> tuple[list[str], list[str]]:
     """Load skip_keywords and junk_filters from ocr_filters.json. ~0.1ms overhead."""
     try:
@@ -91,17 +138,17 @@ def parse_pdf_receipt(pdf_path: str) -> dict[str, Any] | None:
                 except Exception:
                     pass
 
-            if m := re.search(r"Order total\s+\$([0-9.]+)", full_text, re.IGNORECASE):
-                result["total_amount"] = float(m.group(1))
+            if m := re.search(rf"Order total\s+\$({MONEY})", full_text, re.IGNORECASE):
+                result["total_amount"] = _money(m.group(1))
 
             # Capturing Fees (Tax, Shipping)
             for m in re.finditer(
-                r"(Tax|Shipping|Handling|Shipping & Handling|S&H)\s+\$([0-9.]+)",
+                rf"(Tax|Shipping|Handling|Shipping & Handling|S&H)\s+\$({MONEY})",
                 full_text,
                 re.IGNORECASE,
             ):
                 fee_name = m.group(1)
-                fee_price = float(m.group(2))
+                fee_price = _money(m.group(2))
                 if fee_price > 0:  # Only add if it's a real fee
                     result["items"].append(
                         {
@@ -116,7 +163,7 @@ def parse_pdf_receipt(pdf_path: str) -> dict[str, Any] | None:
 
             # Line items format 1 (Browser UI)
             item_pattern = re.compile(
-                r"([\w].*?)\nUnit price: \$([0-9.]+).*?\nQuantity: (\d+)\nItem total: \$([0-9.]+)",
+                rf"([\w].*?)\nUnit price: \$({MONEY}).*?\nQuantity: (\d+)\nItem total: \$({MONEY})",
                 re.DOTALL,
             )
             for m in item_pattern.finditer(full_text):
@@ -134,10 +181,10 @@ def parse_pdf_receipt(pdf_path: str) -> dict[str, Any] | None:
                 result["items"].append(
                     {
                         "name": name.strip(" ,"),
-                        "unit_price": float(m.group(2)),
+                        "unit_price": _money(m.group(2)),
                         "quantity": int(m.group(3)),
-                        "final_price": float(m.group(4)),
-                        "base_price": float(m.group(4)),
+                        "final_price": _money(m.group(4)),
+                        "base_price": _money(m.group(4)),
                         "category": "Other",
                     }
                 )
@@ -148,15 +195,15 @@ def parse_pdf_receipt(pdf_path: str) -> dict[str, Any] | None:
                 # It anchors to the end of the line to ensure we grab the final Subtotal.
                 # Columns: $Price Qty [$Discount] $Subtotal
                 table_pattern = re.compile(
-                    r"(\$([0-9.]+)\s+(\d+)\s+(?:-?\$[0-9.]+\s+)?\$([0-9.]+))\s*$"
+                    rf"(\$({MONEY})\s+(\d+)\s+(?:-?\${MONEY}\s+)?\$({MONEY}))\s*$"
                 )
                 lines = full_text.split("\n")
                 for i, line in enumerate(lines):
                     m = table_pattern.search(line)
                     if m:
-                        price = float(m.group(2))
+                        price = _money(m.group(2))
                         qty = int(m.group(3))
-                        total = float(m.group(4))
+                        total = _money(m.group(4))
 
                         # Search backwards for a name (up to 5 lines)
                         name = "Unknown Item"
@@ -228,9 +275,9 @@ def parse_pdf_receipt(pdf_path: str) -> dict[str, Any] | None:
                     pass
 
             # Total Amount
-            m_total = re.search(r"(?:Grand|Order) Total:\s+\$([0-9.]+)", full_text, re.IGNORECASE)
+            m_total = re.search(rf"(?:Grand|Order) Total:\s+\$({MONEY})", full_text, re.IGNORECASE)
             if m_total:
-                result["total_amount"] = float(m_total.group(1))
+                result["total_amount"] = _money(m_total.group(1))
 
             lines = full_text.split("\n")
             current_name_parts: list[str] = []
@@ -250,9 +297,9 @@ def parse_pdf_receipt(pdf_path: str) -> dict[str, Any] | None:
                     continue
 
                 # Case A: Line is ONLY a price (e.g. "$4.99")
-                price_match = re.match(r"^\$([0-9]+\.[0-9]{2})$", line)
+                price_match = re.match(rf"^\$({MONEY_CENTS})$", line)
                 if price_match:
-                    price = float(price_match.group(1))
+                    price = _money(price_match.group(1))
                     name = " ".join(current_name_parts).strip()
                     # Clean up
                     name = re.sub(r"^(?:collected|collected:)\s+", "", name, flags=re.IGNORECASE)
@@ -285,10 +332,10 @@ def parse_pdf_receipt(pdf_path: str) -> dict[str, Any] | None:
                     continue
 
                 # Case B: Line is Name + Price (e.g. "Banana $2.77")
-                name_price_match = re.match(r"^(.*?)\s+\$([0-9]+\.[0-9]{2})$", line)
+                name_price_match = re.match(rf"^(.*?)\s+\$({MONEY_CENTS})$", line)
                 if name_price_match:
                     name_part = name_price_match.group(1).strip()
-                    price = float(name_price_match.group(2))
+                    price = _money(name_price_match.group(2))
 
                     name = " ".join(current_name_parts + [name_part]).strip()
                     name = re.sub(r"^(?:collected|collected:)\s+", "", name, flags=re.IGNORECASE)
@@ -324,8 +371,11 @@ def parse_pdf_receipt(pdf_path: str) -> dict[str, Any] | None:
             # Filter out garbage items with absurdly long names (recommendation sections)
             result["items"] = [item for item in raw_items if len(str(item.get("name", ""))) <= 150]
 
-        # Final check: if we found an order number, call it a win
+        # Final check: an order number means the layout was recognised, but the
+        # numbers still have to agree with each other before we trust them.
         if result["order_number"]:
+            if not _total_is_credible(result):
+                return None
             logger.info(f"Fast-Path Parser: Success for Order {result['order_number']}")
             return result
 
