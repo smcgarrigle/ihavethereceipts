@@ -45,7 +45,7 @@ STORES = [
     {"name": "LuridLurie's Gas", "address": "Exit 13, Interstate 5"},
     {"name": "Tartanula's", "address": "8 Legs Lane"},
     {"name": "L'UnOeufPun Bakery", "address": "12 Rue du Croissant"},
-    {"name": "Peptide Inferance Exchange", "address": "Online"},
+    {"name": "Peptide Inference Exchange", "address": "Online"},
     {"name": "BundtCake & More", "address": "360 Ring Road"},
 ]
 
@@ -390,7 +390,7 @@ ITEM_CATALOG: dict[str, tuple[str, float, str, float | None, str | None]] = {
     "Very Dark Chocolate 3.5oz": ("Snacks", 2.89, "ea", 3.5, "dark_chocolate"),
     "Kettle Flavored Kettle Chips 8oz": ("Snacks", 4.19, "ea", 8, "chips"),
     "Rice Cakes (Plain & Sad) 4oz": ("Snacks", 3.29, "ea", 4, "rice_cakes"),
-    # ---- Peptide Inferance Exchange ----
+    # ---- Peptide Inference Exchange ----
     "Whey Protein: Lychee Hypothesis 2lb": ("Health & Beauty", 34.99, "ea", 32, "whey"),
     "Casein Nocturne Vector Dreams 1KG": ("Health & Beauty", 39.99, "ea", 32, "casein"),
     "Creatine Monohydrate (Peer-Reviewed, Soylent-free) 10oz": (
@@ -597,7 +597,7 @@ STORE_CATALOG: dict[str, list[str]] = {
         "Pretzeled-Bread Buns (Fancy) 4pk",
         "Cage-Ish Free Eggs 12ct",
     ],
-    "Peptide Inferance Exchange": [
+    "Peptide Inference Exchange": [
         "Whey Protein: Lychee Hypothesis 2lb",
         "Casein Nocturne Vector Dreams 1KG",
         "Creatine Monohydrate (Peer-Reviewed, Soylent-free) 10oz",
@@ -676,8 +676,8 @@ def build_schedule() -> list[tuple[str, date, list[str]]]:
     # Tartanula's, BundtCake — occasional dessert emergencies
     trips("Tartanula's", [8, 2], 2, 4)
     trips("BundtCake & More", [6, 1], 1, 3)
-    # Peptide Inferance Exchange — online supplement orders
-    trips("Peptide Inferance Exchange", [12, 7, 2], 2, 4)
+    # Peptide Inference Exchange — online supplement orders
+    trips("Peptide Inference Exchange", [12, 7, 2], 2, 4)
     # B2BSaasoons — quarterly seasoning procurement
     trips("B2BSaasoons", [11, 3], 3, 6)
 
