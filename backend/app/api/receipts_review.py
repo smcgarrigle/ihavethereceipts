@@ -212,14 +212,17 @@ def save_reviewed_items(
                 if reviewed_item.fdc_match:
                     item.fdc_id = reviewed_item.fdc_match.get("fdc_id")
                     item.gtin = reviewed_item.fdc_match.get("gtin")
-                else:
-                    # Trigger FDC Enrichment in background
-                    from app.services.fdc_service import fdc_service
 
-                    background_tasks.add_task(fdc_service.enrich_db_item, db, item.id)
-
+                # Flush before scheduling: item.id is only assigned here, and
+                # the enrichment task needs it.
                 db.add(item)
                 db.flush()
+
+                if not reviewed_item.fdc_match:
+                    # Trigger FDC Enrichment in background
+                    from app.services.fdc_service import enrich_db_item_task
+
+                    background_tasks.add_task(enrich_db_item_task, item.id)
 
                 # Add to our local list for subsequent iterations
                 all_items.append(item)
