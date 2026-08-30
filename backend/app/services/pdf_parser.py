@@ -44,9 +44,15 @@ MONEY = r"[0-9][0-9,]*(?:\.[0-9]+)?"
 MONEY_CENTS = r"[0-9][0-9,]*\.[0-9]{2}"
 
 # A parsed total is rejected when the line items sum to more than this multiple
-# of it. Generous on purpose: the heuristic line-item loops can over-collect,
-# and every instance of the separator bug is off by a factor of ten or more.
-_TOTAL_DIVERGENCE_RATIO = 3.0
+# of it. Calibrated against the 205 PDF receipts in a real database rather than
+# guessed: the heuristic line-item loops routinely over-collect (subtotals,
+# per-unit prices, "you saved" lines), and on receipts whose total was parsed
+# CORRECTLY the item sum still ran as high as 8.7x that total. The separator
+# bug this guard exists for lands two orders of magnitude away -- a four-figure
+# total misread as a single digit gives a ratio above 100 -- so 20x sits in the
+# empty space between the two, and an earlier value of 3.0 threw away five
+# correct parses.
+_TOTAL_DIVERGENCE_RATIO = 20.0
 _TOTAL_DIVERGENCE_FLOOR = 5.0
 
 
@@ -58,10 +64,12 @@ def _money(raw: str) -> float:
 def _total_is_credible(result: dict[str, Any]) -> bool:
     """Check the parsed total against the sum of the line items.
 
-    A fast-path result that claims a total far below what its own items add up
-    to has misread the total, so it is better to fall back to the model than to
-    store the wrong number. Items summing to *less* than the total is ordinary
-    (a fee or tax line that never parsed), so only the one direction rejects.
+    A fast-path result that claims a total *wildly* below what its own items
+    add up to has misread the total, so it is better to fall back to the model
+    than to store the wrong number. Two things are deliberately not rejected:
+    items summing to less than the total (ordinary — a fee or tax line that
+    never parsed), and a total of zero (no total found, which the review screen
+    already handles without discarding the items).
     """
     total = result.get("total_amount") or 0.0
     item_sum = sum(float(i.get("final_price") or 0) for i in result.get("items", []))
@@ -69,11 +77,11 @@ def _total_is_credible(result: dict[str, Any]) -> bool:
     if item_sum <= 0:
         return True
     if total <= 0:
-        logger.warning(
-            f"Fast-Path Parser: items sum to ${item_sum:.2f} but no total was parsed — "
-            "falling back to the model"
-        )
-        return False
+        # No total was found, which is not the same as a total that was misread.
+        # The items are still good, and the review screen exists for exactly
+        # this — so keep them rather than spending a model call and risking the
+        # whole receipt when the configured backend is unreachable.
+        return True
     if item_sum - total > _TOTAL_DIVERGENCE_FLOOR and item_sum > total * _TOTAL_DIVERGENCE_RATIO:
         logger.warning(
             f"Fast-Path Parser: items sum to ${item_sum:.2f} but the parsed total is "
