@@ -88,8 +88,16 @@ def test_reconciliation_accepts_items_summing_below_the_total():
     assert _total_is_credible(_result(54.32, [20.05, 18.00, 12.05])) is True
 
 
-def test_reconciliation_tolerates_mild_over_collection():
-    """The heuristic loops can double-count; the guard must not be trigger-happy."""
+def test_reconciliation_tolerates_real_world_over_collection():
+    """The heuristic loops over-collect badly, and the guard must survive it.
+
+    Measured against the 205 PDF receipts in a real database: on receipts whose
+    total was parsed CORRECTLY, the item sum still ran as high as 8.7x that
+    total (subtotals, per-unit prices and "you saved" lines all get scooped up).
+    An earlier 3.0x threshold discarded five correct parses.
+    """
+    assert _total_is_credible(_result(5.63, [49.24])) is True  # the 8.7x case
+    assert _total_is_credible(_result(14.37, [71.00])) is True  # 4.9x
     assert _total_is_credible(_result(50.00, [30.00, 25.00, 20.00])) is True
 
 
@@ -98,8 +106,15 @@ def test_reconciliation_ignores_small_absolute_differences():
     assert _total_is_credible(_result(0.50, [2.00])) is True
 
 
-def test_reconciliation_rejects_items_with_no_total_at_all():
-    assert _total_is_credible(_result(0.0, [412.50, 300.00])) is False
+def test_reconciliation_keeps_items_when_no_total_was_parsed():
+    """A missing total is not a misread total.
+
+    Nine of the real PDFs parse their items fine but find no total line. The
+    review screen already handles that, so discarding the items to spend a
+    model call — which fails outright when the configured backend is
+    unreachable, the shipped default — would be strictly worse.
+    """
+    assert _total_is_credible(_result(0.0, [412.50, 300.00])) is True
 
 
 def test_reconciliation_passes_when_there_are_no_priced_items():
