@@ -212,7 +212,7 @@ def list_items(category_id: int | None = None, db: Session = Depends(get_db)):
                       @click="$dispatch('open-relevant-receipts', {{ids: '{clean_ids}'}})"
                       @keydown.enter="$dispatch('open-relevant-receipts', {{ids: '{clean_ids}'}})"
                       @keydown.space.prevent="$dispatch('open-relevant-receipts', {{ids: '{clean_ids}'}})">
-                    {store_name} ${lowest_price:.2f} {f"<span class='ml-1 text-[10px] uppercase opacity-75'>({badge_text})</span>" if badge_text else ""}
+                    {html_mod.escape(store_name)} ${lowest_price:.2f} {f"<span class='ml-1 text-[10px] uppercase opacity-75'>({badge_text})</span>" if badge_text else ""}
                 </span>
                 """
 
@@ -240,7 +240,9 @@ def list_items(category_id: int | None = None, db: Session = Depends(get_db)):
         category_options = "<option value=''>Uncategorized</option>"
         for cat in all_categories:
             selected = "selected" if item.category_id == cat.id else ""
-            category_options += f"<option value='{cat.id}' {selected}>{cat.name}</option>"
+            category_options += (
+                f"<option value='{cat.id}' {selected}>{html_mod.escape(cat.name)}</option>"
+            )
 
         escaped_item_name = html_mod.escape(item.name)
         escaped_name = escaped_item_name.replace("'", "\\'")
@@ -607,9 +609,9 @@ def search_items(q: str = "", db: Session = Depends(get_db)):
 
             <!-- Item Info -->
             <div class='flex-1'>
-                <p class='font-medium text-gray-900 dark:text-white'>{item.name}</p>
+                <p class='font-medium text-gray-900 dark:text-white'>{html_mod.escape(item.name)}</p>
                 <div class='flex flex-wrap items-center gap-x-2 text-xs text-gray-500 dark:text-gray-400'>
-                    <span class='px-1.5 py-0.5 bg-gray-100 dark:bg-gray-600 rounded'>{category_name}</span>
+                    <span class='px-1.5 py-0.5 bg-gray-100 dark:bg-gray-600 rounded'>{html_mod.escape(category_name)}</span>
                     <span>{purchase_count} purchases</span>
                     {f"<span>• {date_range}</span>" if date_range else ""}
                     {store_info}
@@ -708,7 +710,10 @@ def list_duplicates(db: Session = Depends(get_db)):
         html += "<p class='text-sm font-medium text-yellow-800 dark:text-yellow-400 mb-2'>Possible duplicates:</p>"
         html += "<ul class='space-y-1'>"
         for item in group:
-            html += f"<li class='text-sm text-gray-700 dark:text-gray-300'>• {item.name}</li>"
+            html += (
+                f"<li class='text-sm text-gray-700 dark:text-gray-300'>"
+                f"• {html_mod.escape(item.name)}</li>"
+            )
         html += "</ul>"
         html += "</div>"
     html += "</div>"
@@ -773,9 +778,9 @@ def list_ignored_suggestions(db: Session = Depends(get_db)):
         html += f"""
         <div class='flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50'>
             <div class='text-sm'>
-                <span class='font-medium text-gray-900 dark:text-white'>{item1.name}</span>
+                <span class='font-medium text-gray-900 dark:text-white'>{html_mod.escape(item1.name)}</span>
                 <span class='text-gray-400 mx-2'>≠</span>
-                <span class='font-medium text-gray-900 dark:text-white'>{item2.name}</span>
+                <span class='font-medium text-gray-900 dark:text-white'>{html_mod.escape(item2.name)}</span>
             </div>
             <button hx-delete="/api/items/ignored-suggestions/{record.id}"
                     hx-confirm="Show suggestions for this pair again?"

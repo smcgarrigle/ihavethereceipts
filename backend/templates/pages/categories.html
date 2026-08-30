@@ -108,17 +108,23 @@
         modal.setAttribute('role', 'dialog');
         modal.setAttribute('aria-modal', 'true');
         modal.setAttribute('aria-labelledby', 'price-history-modal-title');
+        // See items.html: getAttribute returns the DECODED value, so putting it
+        // back into innerHTML reverses the server's escaping. Set it as text.
         modal.innerHTML = `
         <div class="bg-bgCard rounded-lg p-6 max-w-2xl w-full mx-4">
             <div class="flex justify-between items-center mb-4">
-                <h3 id="price-history-modal-title" class="text-lg font-semibold text-textBase">${itemName} - Price History</h3>
+                <h3 id="price-history-modal-title" class="text-lg font-semibold text-textBase"></h3>
                 <button onclick="closePriceHistoryModal(this)" aria-label="Close" class="text-textMuted hover:text-textBase text-2xl">✕</button>
             </div>
             <div class="relative h-80 w-full">
-                <canvas id="priceHistoryChart" role="img" aria-label="${itemName} price history chart"></canvas>
+                <canvas id="priceHistoryChart" role="img"></canvas>
             </div>
         </div>
     `;
+        modal.querySelector('#price-history-modal-title').textContent =
+            `${itemName} - Price History`;
+        modal.querySelector('#priceHistoryChart')
+            .setAttribute('aria-label', `${itemName} price history chart`);
 
         document.body.appendChild(modal);
 
