@@ -546,11 +546,15 @@ def _render_summary_table(
         # Note: items list is already limited to 10 in the route
         visibility_class = "flex" if idx < 5 else "hidden lg:flex"
 
+        # Item and store names come from OCR of a receipt image — untrusted.
+        name_html = html_mod.escape(str(item["name"]))
+        store_html = html_mod.escape(str(item["store"]))
+
         html += f"""
             <div class="{visibility_class} flex-col lg:grid lg:grid-cols-12 gap-2 lg:gap-4 px-4 py-4 lg:py-3 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/30">
                 <!-- Item Name -->
-                <div class="col-span-6 text-sm font-medium text-gray-900 dark:text-white truncate max-w-[280px] min-[400px]:max-w-none" title="{item["name"]}">
-                    {item["name"]}
+                <div class="col-span-6 text-sm font-medium text-gray-900 dark:text-white truncate max-w-[280px] min-[400px]:max-w-none" title="{name_html}">
+                    {name_html}
                 </div>
 
                 <!-- Price and Store (Wrapped on mobile) -->
@@ -559,9 +563,9 @@ def _render_summary_table(
                         <span class="lg:hidden text-[10px] uppercase text-gray-400 mr-1">{unit_label}:</span>
                         {price_display}
                     </div>
-                    <div class="lg:col-span-3 text-sm lg:text-right text-gray-500 dark:text-gray-400 truncate lg:max-w-none max-w-[150px]" title="{item["store"]}">
+                    <div class="lg:col-span-3 text-sm lg:text-right text-gray-500 dark:text-gray-400 truncate lg:max-w-none max-w-[150px]" title="{store_html}">
                         <span class="lg:hidden text-[10px] uppercase text-gray-400 mr-1">Store:</span>
-                        {item["store"]}
+                        {store_html}
                     </div>
                 </div>
             </div>
@@ -620,12 +624,16 @@ def get_best_value_rows(
 
         date_str = item["date"].strftime("%m-%d-%y") if item["date"] else "N/A"
 
+        # Same untrusted source as the summary table above.
+        name_html = html_mod.escape(str(item["name"]))
+        store_html = html_mod.escape(str(item["store"]))
+
         # Row container: flex-col on mobile, 12-col grid on desktop
         html += f"""
         <div {trigger_attr} class="flex flex-col lg:grid lg:grid-cols-12 gap-2 lg:gap-4 px-6 py-4 lg:py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
             <!-- Item Name -->
-            <div class="lg:col-span-4 text-sm font-medium text-gray-900 dark:text-white truncate" title='{item["name"]}'>
-                {item["name"]}
+            <div class="lg:col-span-4 text-sm font-medium text-gray-900 dark:text-white truncate" title='{name_html}'>
+                {name_html}
             </div>
 
             <!-- Secondary Info (Wrapped on mobile) -->
@@ -656,14 +664,14 @@ def get_best_value_rows(
                 </div>
                 <div class="lg:col-span-2 text-sm lg:text-right text-gray-500 dark:text-gray-400 truncate max-w-[150px] lg:max-w-none">
                     <span class="lg:hidden text-[10px] uppercase text-gray-400 mr-1">Store:</span>
-                    {item["store"]}
+                    {store_html}
                 </div>
             """
         else:
             html += f"""
                 <div class="lg:col-span-2 text-sm lg:text-right text-gray-500 dark:text-gray-400 truncate max-w-[150px] lg:max-w-none">
                     <span class="lg:hidden text-[10px] uppercase text-gray-400 mr-1">Store:</span>
-                    {item["store"]}
+                    {store_html}
                 </div>
             """
 

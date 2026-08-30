@@ -1,3 +1,4 @@
+import html as html_mod
 import json
 import logging
 import uuid
@@ -221,7 +222,7 @@ def get_active_queue_items(db: Session = Depends(get_db)):
                 <div class="w-1.5 h-10 rounded-full {bar_color} shrink-0"></div>
 
                 <div class="min-w-0">
-                    <p class="text-sm font-bold text-white truncate">{filename}</p>
+                    <p class="text-sm font-bold text-white truncate">{html_mod.escape(filename)}</p>
                     <div class="flex items-center mt-0.5 space-x-2">
                         <span class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider {status_bg} {status_text}">{status_label}</span>
                         <span class="text-[10px] text-gray-600">ID: {r.id}</span>
@@ -230,7 +231,7 @@ def get_active_queue_items(db: Session = Depends(get_db)):
             </div>
 
             <div class="flex items-center space-x-4">
-                {f'<span class="text-xs text-red-500/80 max-w-xs truncate font-medium">{r.error_message}</span>' if r.status == "failed" else ""}
+                {f'<span class="text-xs text-red-500/80 max-w-xs truncate font-medium">{html_mod.escape(r.error_message or "")}</span>' if r.status == "failed" else ""}
 
                 <div class="text-right">
                     <p class="text-[10px] font-bold text-gray-500 mb-1">{r.created_at.strftime("%H:%M:%S") if r.created_at else ""}</p>
