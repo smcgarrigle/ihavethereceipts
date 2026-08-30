@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.api.templates import templates
 from app.database import get_db
+from app.services.spend import line_total
 
 logger = logging.getLogger("app.pages")
 router = APIRouter()
@@ -474,8 +475,8 @@ def review_receipt(request: Request, receipt_id: int, db: Session = Depends(get_
                 "item_id": ri.item.id if ri.item else None,
                 "name": ri.item.name if ri.item else "Unknown Item",
                 "quantity": ri.quantity,
-                "base_price": round(item_notes.get("base_price", ri.price * ri.quantity), 2),
-                "final_price": round(ri.price * ri.quantity, 2),
+                "base_price": round(item_notes.get("base_price", line_total(ri)), 2),
+                "final_price": round(line_total(ri), 2),
                 "weight": float(ri.weight) if ri.weight else None,
                 "unit_type": ri.unit_type,
                 "is_bulk": item_notes.get("is_bulk", False),

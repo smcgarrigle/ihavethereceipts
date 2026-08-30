@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Category, Item, ReceiptItem
+from app.services.spend import LINE_TOTAL
 
 router = APIRouter()
 
@@ -22,12 +23,12 @@ def list_categories(db: Session = Depends(get_db)):
             Category,
             func.count(Item.id).label("item_count"),
             func.count(ReceiptItem.id).label("purchase_count"),
-            func.sum(ReceiptItem.price * ReceiptItem.quantity).label("total_spent"),
+            func.sum(LINE_TOTAL).label("total_spent"),
         )
         .outerjoin(Item, Category.id == Item.category_id)
         .outerjoin(ReceiptItem, Item.id == ReceiptItem.item_id)
         .group_by(Category.id)
-        .order_by(func.sum(ReceiptItem.price * ReceiptItem.quantity).desc())
+        .order_by(func.sum(LINE_TOTAL).desc())
         .all()
     )
 

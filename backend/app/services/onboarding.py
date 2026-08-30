@@ -67,7 +67,7 @@ def populate_demo_data(db: Session) -> bool:
         tjs_date = today - datetime.timedelta(days=5)
         tjs_receipt = Receipt(
             store_id=tjs_store.id,
-            total_amount=45.50,
+            total_amount=0.0,  # set from the line items below
             purchase_date=datetime.datetime.combine(tjs_date, datetime.time.min),
             notes="DEMO_DATA",
             status="completed",
@@ -83,13 +83,16 @@ def populate_demo_data(db: Session) -> bool:
             ("Organic Avocados", "Produce", 4.0, 1.25, "each", None),
             ("Sourdough Bread", "Bakery", 1.0, 4.99, "each", None),
         ]
+        # price is the per-quantity price, so the receipt total is the sum of
+        # price * quantity — the same reading every analytics query uses.
+        tjs_receipt.total_amount = round(sum(qty * price for _, _, qty, price, _, _ in items_1), 2)
         for name, cat_name, qty, price, unit_type, weight in items_1:
             item = get_or_create_item(name, cat_name)
             ri = ReceiptItem(
                 receipt_id=tjs_receipt.id,
                 item_id=item.id,
                 quantity=qty,
-                price=price * qty,
+                price=price,
                 unit_price=price,
                 unit_type=unit_type,
                 weight=weight,
@@ -103,7 +106,7 @@ def populate_demo_data(db: Session) -> bool:
         safeway_date = today - datetime.timedelta(days=15)
         safeway_receipt = Receipt(
             store_id=safeway_store.id,
-            total_amount=32.40,
+            total_amount=0.0,  # set from the line items below
             purchase_date=datetime.datetime.combine(safeway_date, datetime.time.min),
             notes="DEMO_DATA",
             status="completed",
@@ -118,13 +121,18 @@ def populate_demo_data(db: Session) -> bool:
             ("Organic Bananas", "Produce", 1.2, 2.49, "lb", 1.2),
             ("Boneless Chicken Breast", "Meat", 1.0, 9.99, "each", None),
         ]
+        # price is the per-quantity price, so the receipt total is the sum of
+        # price * quantity — the same reading every analytics query uses.
+        safeway_receipt.total_amount = round(
+            sum(qty * price for _, _, qty, price, _, _ in items_2), 2
+        )
         for name, cat_name, qty, price, unit_type, weight in items_2:
             item = get_or_create_item(name, cat_name)
             ri = ReceiptItem(
                 receipt_id=safeway_receipt.id,
                 item_id=item.id,
                 quantity=qty,
-                price=price * qty,
+                price=price,
                 unit_price=price,
                 unit_type=unit_type,
                 weight=weight,
@@ -138,7 +146,7 @@ def populate_demo_data(db: Session) -> bool:
         costco_date = today - datetime.timedelta(days=25)
         costco_receipt = Receipt(
             store_id=costco_store.id,
-            total_amount=120.80,
+            total_amount=0.0,  # set from the line items below
             purchase_date=datetime.datetime.combine(costco_date, datetime.time.min),
             notes="DEMO_DATA",
             status="completed",
@@ -154,13 +162,18 @@ def populate_demo_data(db: Session) -> bool:
             ("Paper Towels", "Household", 1.0, 29.99, "each", None),
             ("Sourdough Bread", "Bakery", 1.0, 4.49, "each", None),
         ]
+        # price is the per-quantity price, so the receipt total is the sum of
+        # price * quantity — the same reading every analytics query uses.
+        costco_receipt.total_amount = round(
+            sum(qty * price for _, _, qty, price, _, _ in items_3), 2
+        )
         for name, cat_name, qty, price, unit_type, weight in items_3:
             item = get_or_create_item(name, cat_name)
             ri = ReceiptItem(
                 receipt_id=costco_receipt.id,
                 item_id=item.id,
                 quantity=qty,
-                price=price * qty,
+                price=price,
                 unit_price=price,
                 unit_type=unit_type,
                 weight=weight,

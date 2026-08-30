@@ -31,6 +31,7 @@ from app.api.receipts_fragments import get_receipt_card
 from app.database import get_db
 from app.models import Receipt, ReceiptItem, Store
 from app.services.ocr import process_receipt_task, process_text_receipt_task
+from app.services.spend import line_total
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -396,7 +397,7 @@ def update_receipt_item(
 
     # Recalculate receipt total
     receipt = db.query(Receipt).filter(Receipt.id == receipt_id).first()
-    total = sum(ri.price * ri.quantity for ri in receipt.items)
+    total = sum(line_total(ri) for ri in receipt.items)
     receipt.total_amount = total
     db.commit()
 
@@ -423,7 +424,7 @@ def delete_receipt_item(receipt_id: int, item_id: int, db: Session = Depends(get
 
     # Recalculate receipt total
     receipt = db.query(Receipt).filter(Receipt.id == receipt_id).first()
-    total = sum(ri.price * ri.quantity for ri in receipt.items)
+    total = sum(line_total(ri) for ri in receipt.items)
     receipt.total_amount = total
     db.commit()
 
