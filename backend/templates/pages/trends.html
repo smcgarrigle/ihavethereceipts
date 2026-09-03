@@ -248,14 +248,14 @@
             </div>
 
             <!-- Collapsible Detail: Product Contributor Breakdown -->
-            <div class="bg-bgCard rounded-3xl shadow-xl border border-borderDefault overflow-hidden" x-data="{ open: false }">
+            <div class="bg-bgCard rounded-3xl shadow-xl border border-borderDefault overflow-hidden" x-data="{ open: true }">
                 <button @click="open = !open" :aria-expanded="open" aria-controls="trends-product-contributors-panel" class="w-full px-6 py-4 flex justify-between items-center bg-bgSkeleton/20 hover:bg-bgSkeleton/40 transition-all">
                     <span class="font-bold text-textBase flex items-center gap-2 text-sm">
                         <span>🔍</span> Detail: Top Product Contributors
                     </span>
                     <span class="text-textSubtle text-xs" x-text="open ? 'Hide Detail ▲' : 'Show Detail ▼'"></span>
                 </button>
-                <div id="trends-product-contributors-panel" x-show="open" x-collapse class="p-6 border-t border-borderDefault" style="display: none;">
+                <div id="trends-product-contributors-panel" x-show="open" x-collapse class="p-6 border-t border-borderDefault">
                     <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8" x-data="{ nutrient: 'sugar', percent: false }">
                         <div>
                             <h4 class="text-base font-bold text-textBase">Product Contribution Breakdown</h4>

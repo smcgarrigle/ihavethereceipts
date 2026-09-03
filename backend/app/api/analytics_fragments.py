@@ -375,6 +375,13 @@ def _calculate_unit_price(price: float, qty: float, weight: float, unit: str, ca
     primary_label = None
     secondary_value = None
 
+    # Handle gallon explicitly as its own standard unit
+    if u == "gal":
+        primary_label = "$/gal"
+        if weight > 0:
+            price_per_primary = price / weight
+        return price_per_primary, primary_label, secondary_value
+
     # Determine primary unit based on category
     if category_type in ["meat", "produce"]:
         # Primary is $/lb
@@ -413,8 +420,6 @@ def _calculate_unit_price(price: float, qty: float, weight: float, unit: str, ca
             wt_oz = weight * 16
         elif u == "qt":
             wt_oz = weight * 32
-        elif u == "gal":
-            wt_oz = weight * 128
 
         if wt_oz > 0:
             price_per_primary = price / wt_oz
