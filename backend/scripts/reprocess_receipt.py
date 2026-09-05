@@ -15,6 +15,7 @@ import logging
 from app.database import SessionLocal
 from app.models import Receipt
 from app.services.ocr import process_receipt_task
+from app.services.receipt_claim import claim_receipt
 
 # Configure logging to show progress in the terminal
 logging.basicConfig(level=logging.INFO, format="Progress: %(message)s")
@@ -40,9 +41,11 @@ def main():
             print(f"Error: Image file not found at {receipt.image_path}")
             sys.exit(1)
 
-        # Trigger the same task used by the background worker
+        # Trigger the same task used by the background worker. Claim the row
+        # first, whatever state it is in, so this manual run owns it.
         print("\nStarting OCR processing...")
-        process_receipt_task(receipt.id, receipt.image_path)
+        claim_receipt(db, receipt.id, force=True)
+        process_receipt_task(receipt.id, receipt.image_path, claimed=True)
 
         # Refresh and show result
         db.refresh(receipt)
