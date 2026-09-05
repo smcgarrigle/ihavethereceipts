@@ -5,6 +5,7 @@ from pathlib import Path
 
 from app.database import SessionLocal
 from app.models import Receipt
+from app.services.receipt_claim import claim_receipt
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -59,6 +60,29 @@ class BulkProcessor:
         self.stop_requested = True
         logger.info("⏹ BulkProcessor stop requested")
 
+    def _claim_next_pending(self, db) -> Receipt | None:
+        """Return the oldest pending receipt this worker successfully claimed.
+
+        An interactive upload or the folder watcher may be processing the same
+        row: the claim is what decides, so a lost race yields None and the
+        worker leaves the receipt alone.
+        """
+        receipt: Receipt | None = (
+            db.query(Receipt)
+            .filter(Receipt.status == "pending")
+            .filter(Receipt.image_path.isnot(None))
+            .order_by(Receipt.created_at.asc())
+            .first()
+        )
+        if receipt is None:
+            return None
+
+        if not claim_receipt(db, receipt.id):
+            logger.info(f"[BulkProcessor] Receipt {receipt.id} claimed elsewhere; skipping")
+            return None
+
+        return receipt
+
     def _run_worker(self):
         """Main loop that polls for pending receipts."""
         while not self.stop_requested:
@@ -88,27 +112,17 @@ class BulkProcessor:
                 if stuck_items:
                     db.commit()
 
-                # 1. Find the oldest pending receipt (only image-based ones)
-                receipt = (
-                    db.query(Receipt)
-                    .filter(Receipt.status == "pending")
-                    .filter(Receipt.image_path.isnot(None))
-                    .order_by(Receipt.created_at.asc())
-                    .first()
-                )
+                # 1. Claim the oldest pending receipt (only image-based ones)
+                receipt = self._claim_next_pending(db)
 
                 if receipt:
                     logger.info(f"[BulkProcessor] Starting processing for receipt {receipt.id}...")
-
-                    # Mark as processing immediately
-                    receipt.status = "processing"
-                    db.commit()
 
                     # Process the receipt using the existing task logic
                     try:
                         from app.services.ocr import process_receipt_task
 
-                        process_receipt_task(receipt.id, receipt.image_path)
+                        process_receipt_task(receipt.id, receipt.image_path, claimed=True)
                     except Exception as e:
                         logger.error(
                             f"[BulkProcessor] Fatal error in task call for receipt {receipt.id}: {e}"

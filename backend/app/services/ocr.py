@@ -1035,18 +1035,30 @@ def process_pdf_receipt(pdf_path: str, prompt_extra: str = "") -> dict:
                 logger.info(f"Cleaned up temp image: {temp_image}")
 
 
-def process_receipt_task(receipt_id: int, image_path: str):
+def process_receipt_task(receipt_id: int, image_path: str, claimed: bool = False):
     """
     Background task: run OCR and update the database.
     Called from the upload endpoint via FastAPI BackgroundTasks.
+
+    Only one caller may process a given receipt: unless the caller already holds
+    the claim (claimed=True), this takes the pending -> processing transition
+    itself and returns early if another path got there first.
     """
     from app.database import SessionLocal
     from app.models import Receipt, Store
+    from app.services.receipt_claim import claim_receipt
 
     backend = get_backend()
     logger.info(f"Background OCR task started for receipt {receipt_id} (backend={backend})")
     db = SessionLocal()
+    receipt = None
     try:
+        if not claimed and not claim_receipt(db, receipt_id):
+            logger.info(
+                f"Receipt {receipt_id} is not pending (already claimed, or missing); skipping"
+            )
+            return
+
         receipt = db.query(Receipt).filter(Receipt.id == receipt_id).first()
         if not receipt:
             logger.error(f"Receipt {receipt_id} not found in background task")
