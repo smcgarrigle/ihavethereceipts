@@ -6,6 +6,13 @@ One-off migration to fix already-saved ReceiptItems so that:
      instead of the raw MSRP base_price.
   2. weight and unit_type are extracted from item names where missing (e.g. "RUSSET POT 5LB").
 
+The two price columns mean different things and this script must keep them apart:
+``price`` is the per-quantity price the whole app multiplies by quantity to get
+spend (see app/services/spend.py and DATA_DESIGN.md), while ``unit_price`` is the
+effective price per unit of weight for bulk lines. Writing the per-pound figure
+into ``price`` turns a $3.99 five-pound bag of potatoes into eighty cents of
+recorded spend.
+
 Run from the backend/ directory:
     python scripts/backfill_unit_prices.py
 
@@ -61,19 +68,26 @@ def backfill(dry_run: bool = False):
                     final_price = round(base_price - discounts + fees, 2)
                     qty = ri.quantity if ri.quantity and ri.quantity > 0 else 1
 
-                    # Determine effective unit_price
+                    # price is the per-quantity price in every query (spend is
+                    # price * quantity), so it is final_price / qty whatever the
+                    # line is. Only unit_price carries the per-weight figure.
+                    new_price = round(final_price / qty, 4)
                     if notes.get("is_bulk") and ri.weight and ri.weight > 0:
                         new_unit_price = round(final_price / (qty * ri.weight), 4)
                     else:
-                        new_unit_price = round(final_price / qty, 4)
+                        new_unit_price = new_price
 
-                    if abs((ri.unit_price or 0) - new_unit_price) > 0.0001:
+                    unit_price_changed = abs((ri.unit_price or 0) - new_unit_price) > 0.0001
+                    price_changed = abs((ri.price or 0) - new_price) > 0.0001
+
+                    if unit_price_changed or price_changed:
                         print(
-                            f"  [{ri.id}] {item_name[:40]:<40} unit_price: {ri.unit_price} → {new_unit_price}  (final={final_price}, qty={qty})"
+                            f"  [{ri.id}] {item_name[:40]:<40} price: {ri.price} → {new_price}, "
+                            f"unit_price: {ri.unit_price} → {new_unit_price}  (final={final_price}, qty={qty})"
                         )
                         if not dry_run:
                             ri.unit_price = new_unit_price
-                            ri.price = new_unit_price  # price column = unit price
+                            ri.price = new_price
                         changed = True
 
                 except (json.JSONDecodeError, TypeError, KeyError) as e:
