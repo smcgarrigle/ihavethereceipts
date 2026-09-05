@@ -864,7 +864,7 @@
                         ticks: { color: '#9ca3af' }
                     },
                     y: {
-                        title: { display: true, text: 'Price (USD$)', color: '#9ca3af' },
+                        title: { display: true, text: 'Price ({{ currency_code() }}{{ currency_symbol() }})', color: '#9ca3af' },
                         grid: { color: isDark ? '#374151' : '#e5e7eb' },
                         ticks: {
                             color: '#9ca3af',
@@ -892,7 +892,7 @@
                                 let label = context.dataset.label || '';
                                 if (label) label += ': ';
                                 if (context.parsed.y !== null) {
-                                    label += new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(context.parsed.y);
+                                    label += new Intl.NumberFormat(undefined, { style: 'currency', currency: '{{ currency_code() }}' }).format(context.parsed.y);
                                 }
                                 return label;
                             }

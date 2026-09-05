@@ -61,7 +61,7 @@ function receiptReview(config) {
                     unit_price: null,  // always recalculate from final_price below
                     original_unit_price: item.original_unit_price || null,
                     total_discount: item.total_discount || 0,
-                    is_bulk: item.is_bulk || (['lb', 'oz', 'g', 'kg'].includes(item.unit_type) && (parseFloat(item.quantity) || 1) === 1),
+                    is_bulk: item.is_bulk || (['lb', 'oz', 'g', 'kg', 'gal', 'l', 'ml', 'pt', 'qt', 'fl oz'].includes(item.unit_type) && (parseFloat(item.quantity) || 1) === 1),
                     fdc_match: item.fdc_match || null,
                     detailsExpanded: false
                 };
@@ -101,7 +101,7 @@ function receiptReview(config) {
                 const qty = processed.quantity || 1;
                 const weight = processed.weight || 1;
                 if (processed.is_bulk && processed.weight > 0) {
-                    processed.unit_price = (processed.final_price / (qty * weight)).toFixed(2);
+                    processed.unit_price = (processed.final_price / weight).toFixed(2);
                 } else {
                     processed.unit_price = (processed.final_price / qty).toFixed(2);
                 }
@@ -193,7 +193,7 @@ function receiptReview(config) {
             const unitPrice = parseFloat(item.unit_price) || 0;
 
             if (item.is_bulk) {
-                item.final_price = (unitPrice * qty * weight).toFixed(2);
+                item.final_price = (unitPrice * weight).toFixed(2);
             } else {
                 item.final_price = (unitPrice * qty).toFixed(2);
             }
@@ -207,7 +207,7 @@ function receiptReview(config) {
 
             // Derive unit_price from the final_price the user is entering
             if (item.is_bulk && weight > 0) {
-                item.unit_price = (finalPrice / (qty * weight)).toFixed(2);
+                item.unit_price = (finalPrice / weight).toFixed(2);
             } else if (qty > 0) {
                 item.unit_price = (finalPrice / qty).toFixed(2);
             }
@@ -225,7 +225,7 @@ function receiptReview(config) {
             const weight = parseFloat(item.weight) || 1;
 
             if (item.is_bulk) {
-                item.final_price = (unitPrice * qty * weight).toFixed(2);
+                item.final_price = (unitPrice * weight).toFixed(2);
             } else {
                 item.final_price = (unitPrice * qty).toFixed(2);
             }
@@ -233,7 +233,7 @@ function receiptReview(config) {
         },
 
         onUnitDropdownChange(item) {
-            if (['lb', 'oz', 'g', 'kg'].includes(item.unit_type) && item.quantity === 1) {
+            if (['lb', 'oz', 'g', 'kg', 'gal', 'l', 'ml', 'pt', 'qt', 'fl oz'].includes(item.unit_type) && item.quantity === 1) {
                 item.is_bulk = true;
             } else if (item.unit_type === 'each' || !item.unit_type) {
                 item.is_bulk = false;

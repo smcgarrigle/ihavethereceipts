@@ -177,7 +177,7 @@
                     <label for="review-ocr-total" class="block text-sm font-medium text-textMuted mb-1">Total</label>
                     <div class="relative rounded-md shadow-sm">
                         <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                            <span class="text-gray-500 text-lg font-bold">$</span>
+                            <span class="text-gray-500 text-lg font-bold">{{ currency_symbol() }}</span>
                         </div>
                         <input id="review-ocr-total" type="text" inputmode="decimal" x-model="ocrTotal"
                             @blur="ocrTotal = parseFloat(ocrTotal).toFixed(2)"
@@ -303,7 +303,7 @@
 
                             <!-- Base Price (Total Line Price) -->
                             <div>
-                                <label :for="'{{ array_name }}-final-price-' + index" class="block text-xs font-medium text-textMuted mb-1">Total Line Price ($)</label>
+                                <label :for="'{{ array_name }}-final-price-' + index" class="block text-xs font-medium text-textMuted mb-1">Total Line Price ({{ currency_symbol() }})</label>
                                 <input :id="'{{ array_name }}-final-price-' + index" type="text" inputmode="decimal" x-model="item.final_price"
                                     @input="onTotalChange(item)"
                                     @blur="fmt2(item, 'final_price')"
@@ -344,7 +344,7 @@
                             <div>
                                 <div class="flex justify-between items-center mb-1">
                                     <label :for="'{{ array_name }}-unit-price-' + index" class="block text-xs font-medium text-textMuted">
-                                        Price Per <span x-text="item.is_bulk ? (item.unit_type || 'unit') : 'Unit'"></span> ($)
+                                        Price Per <span x-text="item.is_bulk ? (item.unit_type || 'unit') : 'Unit'"></span> ({{ currency_symbol() }})
                                     </label>
                                     <button @click="togglePricingMode(item)" type="button"
                                             class="text-[10px] px-1 rounded border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
@@ -452,14 +452,14 @@
                 <!-- Final Price / Original Price Summary -->
                 <div class="mt-4 flex items-end space-x-4">
                     <div>
-                        <label :for="'{{ array_name }}-original-price-' + index" class="block text-xs font-medium text-textMuted mb-1">Original Price ($)</label>
+                        <label :for="'{{ array_name }}-original-price-' + index" class="block text-xs font-medium text-textMuted mb-1">Original Price ({{ currency_symbol() }})</label>
                         <input :id="'{{ array_name }}-original-price-' + index" type="text" readonly :value="parseFloat(item.base_price || 0).toFixed(2)"
                             class="w-32 rounded-md border-borderInput bg-bgSkeleton text-textSubtle shadow-sm text-sm font-semibold cursor-not-allowed">
                     </div>
                     <div class="pb-2 text-xs text-textMuted">
-                        Calculation: $<span x-text="parseFloat(item.final_price || 0).toFixed(2)"></span>
+                        Calculation: {{ currency_symbol() }}<span x-text="parseFloat(item.final_price || 0).toFixed(2)"></span>
                         <template x-if="calculateDiscounts(item) > 0">
-                            <span>+ $<span x-text="calculateDiscounts(item).toFixed(2)"></span></span>
+                            <span>+ {{ currency_symbol() }}<span x-text="calculateDiscounts(item).toFixed(2)"></span></span>
                         </template>
                     </div>
                 </div>
@@ -492,7 +492,7 @@
                     <h3 class="text-lg font-semibold text-textBase flex items-center gap-2">
                         <span>♻️</span> CRV Fees (<span x-text="crv_items.length"></span> items)
                     </h3>
-                    <p class="text-sm text-textMuted mt-1">Total: $<span x-text="crvTotal.toFixed(2)"></span></p>
+                    <p class="text-sm text-textMuted mt-1">Total: {{ currency_symbol() }}<span x-text="crvTotal.toFixed(2)"></span></p>
                 </div>
                 <div class="text-textSubtle">
                     <svg class="w-6 h-6 transform transition-transform" :class="crvExpanded ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">

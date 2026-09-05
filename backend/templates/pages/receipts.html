@@ -352,7 +352,7 @@
                                 (Optional)</label>
                             <div class="relative mt-1 rounded-md shadow-sm">
                                 <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                                    <span class="text-textSubtle sm:text-sm">$</span>
+                                    <span class="text-textSubtle sm:text-sm">{{ currency_symbol() }}</span>
                                 </div>
                                 <input type="number" name="total_amount" step="0.01" placeholder="0.00"
                                     class="block w-full rounded-md border-borderInput bg-bgInput text-textBase pl-7 focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
@@ -456,9 +456,9 @@
 Example:
 Thanks for shopping with Safeway!
 Order Details
-Campbells Soup Chicken & Rice $0.99
-Quantity: 1
-Regular Price $2.49
+Campbells Soup Chicken & Rice {{ currency_symbol() }}0.99
+123456789012 UPC Code
+Regular Price {{ currency_symbol() }}2.49
 ..." :disabled="submitting" class="block w-full rounded-md border-borderInput bg-bgInput text-textBase shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm font-mono text-xs leading-relaxed resize-y"
                             style="min-height: 200px;"></textarea>
                     </div>

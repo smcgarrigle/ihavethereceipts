@@ -209,9 +209,9 @@
 
                                 const meta = context.dataset.meta[context.dataIndex];
                                 if (meta) {
-                                    return `$${raw.toFixed(2)} (${meta.date})`;
+                                    return `{{ currency_symbol() }}${raw.toFixed(2)} (${meta.date})`;
                                 }
-                                return `$${raw.toFixed(2)}`;
+                                return `{{ currency_symbol() }}${raw.toFixed(2)}`;
                             }
                         }
                     },
@@ -227,7 +227,7 @@
                         beginAtZero: true,
                         title: {
                             display: true,
-                            text: 'Unit Price ($)',
+                            text: 'Unit Price ({{ currency_symbol() }})',
                             color: isDark ? '#9ca3af' : '#6b7280'
                         },
                         ticks: {
