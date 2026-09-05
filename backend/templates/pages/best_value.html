@@ -23,7 +23,7 @@
             <div class="col-span-2 text-right">{{ unit_label }}</div>
             {% if category_type == 'beverages' %}
             <div class="col-span-1 text-right">Price</div>
-            <div class="col-span-1 text-right">$/12oz</div>
+            <div class="col-span-1 text-right">{{ currency_symbol() }}/12oz</div>
             <div class="col-span-2 text-right">Store</div>
             {% else %}
             <div class="col-span-1 text-right">Price</div>

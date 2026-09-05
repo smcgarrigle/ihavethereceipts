@@ -752,7 +752,7 @@
                             label: function (context) {
                                 const raw = context.raw;
                                 if (raw === null) return null;
-                                return `${context.dataset.label}: $${raw.toFixed(2)}`;
+                                return `${context.dataset.label}: {{ currency_symbol() }}${raw.toFixed(2)}`;
                             }
                         }
                     },
@@ -765,7 +765,7 @@
                 scales: {
                     y: {
                         beginAtZero: true,
-                        title: { display: true, text: 'Unit Price ($)', color: isDark ? '#9ca3af' : '#6b7280' },
+                        title: { display: true, text: 'Unit Price ({{ currency_symbol() }})', color: isDark ? '#9ca3af' : '#6b7280' },
                         ticks: { color: isDark ? '#9ca3af' : '#6b7280' },
                         grid: { color: isDark ? '#374151' : '#e5e7eb' }
                     },

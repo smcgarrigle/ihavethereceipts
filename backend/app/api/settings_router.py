@@ -20,6 +20,11 @@ class DeleteConfirmation(BaseModel):
     confirmation: str = ""
 
 
+class CurrencyUpdate(BaseModel):
+    symbol: str
+    code: str
+
+
 from app.api.templates import templates  # noqa: E402
 from app.database import get_db  # noqa: E402
 from app.models.exclusion import ExclusionRule  # noqa: E402
@@ -133,6 +138,8 @@ def _render_settings_page(request: Request, db: Session) -> HTMLResponse:
             "ocr_backend": backend,
             "ocr_model": ocr_model_name,
             "ocr_usage": get_daily_usage(),
+            "currency_symbol": flags.get("currency_symbol", "$"),
+            "currency_code": flags.get("currency_code", "USD"),
         },
     )
 
@@ -311,6 +318,25 @@ def set_protein_roi_target(target: float) -> JSONResponse:
     _save_feature_flags(flags)
     logger.info("Protein ROI target set to $%s/g via settings.", target)
     return JSONResponse({"success": True, "protein_roi_target": target})
+
+
+@router.post("/flags/currency")
+def set_currency(body: CurrencyUpdate) -> JSONResponse:
+    """Set the global currency symbol and code."""
+    flags = _load_feature_flags()
+    flags["currency_symbol"] = body.symbol
+    flags["currency_code"] = body.code.upper()
+    _save_feature_flags(flags)
+    logger.info(
+        "Currency set to %s (%s) via settings.", flags["currency_code"], flags["currency_symbol"]
+    )
+    return JSONResponse(
+        {
+            "success": True,
+            "currency_symbol": flags["currency_symbol"],
+            "currency_code": flags["currency_code"],
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
