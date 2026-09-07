@@ -32,6 +32,12 @@ from app.database import get_db
 from app.models import Receipt, ReceiptItem, Store
 from app.services.ocr import process_receipt_task, process_text_receipt_task
 from app.services.spend import line_total
+from app.utils.upload_validation import (
+    ALLOWED_DESCRIPTION,
+    MAX_SIZE_BYTES,
+    SNIFF_BYTES,
+    sniff,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -83,24 +89,28 @@ def upload_receipt(
 ):
     """Upload a receipt image or PDF and process with OCR, then redirect to review"""
 
-    # Validate file type
-    allowed_types = ["image/jpeg", "image/jpg", "image/png", "application/pdf"]
-    if file.content_type not in allowed_types:
-        raise HTTPException(
-            status_code=400,
-            detail=f"File type {file.content_type} not allowed. Use JPG, PNG, or PDF.",
-        )
-
     # Validate file size (10MB max)
     file.file.seek(0, 2)
     file_size = file.file.tell()
     file.file.seek(0)
 
-    if file_size > 10 * 1024 * 1024:
+    if file_size > MAX_SIZE_BYTES:
         raise HTTPException(status_code=400, detail="File too large. Max 10MB.")
 
+    # The declared content_type and the filename are both client-supplied, so
+    # the extension comes from the bytes instead. Uploads are served back from
+    # this origin, and a filename of "x.html" used to be enough to get a
+    # text/html response out of it.
+    sniffed = sniff(file.file.read(SNIFF_BYTES))
+    file.file.seek(0)
+    if sniffed is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File type not allowed. Use {ALLOWED_DESCRIPTION}.",
+        )
+    file_ext, _media_type = sniffed
+
     # Generate unique filename
-    file_ext = Path(file.filename).suffix
     unique_filename = f"{uuid.uuid4()}{file_ext}"
     file_path = UPLOAD_DIR / unique_filename
 

@@ -55,7 +55,9 @@ def test_duplicate_receipt_flow(client, db, mock_ocr):
     mock_ocr.side_effect = side_effect
 
     # 2. Upload Receipt 1
-    file_content = b"fake image content"
+    # Real JPEG magic bytes: the upload endpoint takes the stored extension
+    # from the content, so a stand-in has to look like the type it claims.
+    file_content = b"\xff\xd8\xff\xe0" + b"fake image content"
     files = {"file": ("receipt1.jpg", file_content, "image/jpeg")}
 
     response = client.post("/api/receipts/upload", files=files)
