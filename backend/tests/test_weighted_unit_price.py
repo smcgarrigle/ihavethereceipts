@@ -10,7 +10,7 @@ save-reviewed-items endpoint, which fills in a weight of its own.
 
 from app.models import Item, Receipt, ReceiptItem, Store
 from app.services.ocr import _map_schema
-from app.utils.item_parsing import weighted_unit_price
+from app.utils.item_parsing import is_weight_priced, weighted_unit_price
 
 
 class TestWeightedUnitPriceHelper:
@@ -23,10 +23,10 @@ class TestWeightedUnitPriceHelper:
         assert weighted_unit_price(3.99, 1, 5.0) == 0.798
 
     def test_bulk_weight_is_the_total_bought(self):
-        # 10.756 gal of gasoline at $57.01: quantity IS the weight, so the line
-        # total is already spread across it. Dividing by qty * weight would
-        # report $0.49/gal for $5.30/gal fuel.
-        assert weighted_unit_price(57.01, 10.756, 10.756, is_bulk=True) == 5.3003
+        # 10.756 gal of gasoline at $57.01: the weight IS the amount bought, so
+        # the line total is already spread across it. Dividing by qty * weight
+        # would report $0.49/gal for $5.30/gal fuel.
+        assert weighted_unit_price(57.01, 10.756, 10.756, weight_priced=True) == 5.3003
 
     def test_no_weight_is_none(self):
         assert weighted_unit_price(3.87, 3, None) is None
@@ -220,7 +220,14 @@ class TestQuantityEqualsWeightIsWeightPriced:
     """
 
     def test_fractional_quantity_matching_weight(self):
-        assert weighted_unit_price(3.42, 0.88, 0.88) == 3.8864
+        assert is_weight_priced(0.88, 0.88) is True
+        assert weighted_unit_price(3.42, 0.88, 0.88, weight_priced=True) == 3.8864
+
+    def test_flag_wins_even_when_quantity_differs(self):
+        assert is_weight_priced(1.0, 2.5, is_bulk=True) is True
+
+    def test_ordinary_packaged_line_is_not_weight_priced(self):
+        assert is_weight_priced(3, 15.0) is False
 
     def test_quantity_one_is_unambiguous(self):
         # qty == weight == 1: both readings agree.
@@ -241,3 +248,58 @@ class TestQuantityEqualsWeightIsWeightPriced:
             }
         )
         assert data["items"][0]["unit_price"] == 3.8864
+
+
+class TestNameDerivedWeightIsNeverATotal:
+    """A size parsed out of an item name is a package label by construction.
+
+    "Tellicherry Peppercorns", 4 jars of 4 oz for $112.32, has quantity equal
+    to its name-derived weight by coincidence. Reading that as 4 oz bought
+    loose prices it at $28.08/oz instead of $7.02 — so provenance decides,
+    not the arithmetic accident.
+    """
+
+    def test_map_schema_does_not_treat_a_parsed_size_as_a_total(self):
+        data = _map_schema(
+            {
+                "items": [
+                    {
+                        "name": "Tellicherry Peppercorns 4 oz",
+                        "final_price": 112.32,
+                        "quantity": 4,
+                    }
+                ]
+            }
+        )
+        item = data["items"][0]
+        assert item["weight"] == 4.0
+        assert item["unit_price"] == 7.02
+
+    def test_review_save_does_not_treat_a_parsed_size_as_a_total(self, client, db):
+        store = Store(name="Test Store")
+        db.add(store)
+        receipt = Receipt(store_id=store.id, status="review", total_amount=112.32)
+        db.add(receipt)
+        db.commit()
+
+        payload = {
+            "items": [
+                {
+                    "name": "Tellicherry Peppercorns, 4 oz",
+                    "base_price": 112.32,
+                    "final_price": 112.32,
+                    "quantity": 4,
+                    "unit_price": 28.08,
+                    "discounts": [],
+                    "fees": [],
+                    "category": "Pantry",
+                }
+            ]
+        }
+        resp = client.post(f"/api/receipts/{receipt.id}/save-reviewed-items", json=payload)
+        assert resp.status_code == 200
+
+        db.expire_all()
+        ri = db.query(ReceiptItem).filter(ReceiptItem.receipt_id == receipt.id).one()
+        assert ri.weight == 4.0
+        assert ri.unit_price == 7.02

@@ -40,7 +40,7 @@ from typing import Any
 from pydantic import BaseModel as _SchemaBase
 
 from app.services.pdf_parser import parse_pdf_receipt
-from app.utils.item_parsing import weighted_unit_price
+from app.utils.item_parsing import is_weight_priced, weighted_unit_price
 
 logger = logging.getLogger(__name__)
 
@@ -377,10 +377,13 @@ def _map_schema(data: dict) -> dict:
 
                         # unit_price is the price of one unit of unit_type, so
                         # the line total is divided by the number of packages as
-                        # well as the size of one.
+                        # well as the size of one. A size parsed out of the name
+                        # is always a package size, never a total weight bought,
+                        # so this never takes the weight-priced branch -- 4 jars
+                        # of 4 oz would otherwise read as 4 oz bought loose.
                         effective_price = fp if fp is not None else (bp or 0)
                         recomputed = weighted_unit_price(
-                            effective_price, qty, weight_val, bool(item.get("is_bulk"))
+                            effective_price, qty, weight_val, weight_priced=False
                         )
                         if recomputed is not None:
                             item["unit_price"] = recomputed
@@ -397,7 +400,10 @@ def _map_schema(data: dict) -> dict:
                 # size can decide -- a 15 oz can is still sold by the can.
                 effective_price = fp if fp is not None else (bp or 0)
                 recomputed = weighted_unit_price(
-                    effective_price, qty, item["weight"], bool(item.get("is_bulk"))
+                    effective_price,
+                    qty,
+                    item["weight"],
+                    is_weight_priced(qty, item["weight"], bool(item.get("is_bulk"))),
                 )
                 if recomputed is not None:
                     item["unit_price"] = recomputed
