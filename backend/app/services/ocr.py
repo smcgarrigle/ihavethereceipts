@@ -40,6 +40,7 @@ from typing import Any
 from pydantic import BaseModel as _SchemaBase
 
 from app.services.pdf_parser import parse_pdf_receipt
+from app.utils.item_parsing import weighted_unit_price
 
 logger = logging.getLogger(__name__)
 
@@ -128,18 +129,19 @@ Fields:
 Rules:
 1. base_price = The line total BEFORE discounts (usually Quantity * Unit Price). If the receipt has "Price" and "You Pay" columns, use "Price" as base_price.
 2. final_price = The line total AFTER discounts and fees. If the receipt has "Price" and "You Pay" columns, use "You Pay" as final_price.
-3. unit_price = The price per single unit (e.g., $2.49/lb or $1.99 each). If multiple prices exist (original and discounted), use the DISCOUNTED unit price.
+3. unit_price = The price of ONE unit: per lb/oz when a weight or size is known, otherwise per item ($1.99 each). If multiple prices exist (original and discounted), use the DISCOUNTED unit price.
 4. If weights (lb/oz) exist ON THE RECEIPT LINE (e.g. "@ 2.49/lb"), extract weight, unit_type="lb", and set is_bulk=true.
 5. Prime/Member savings = discounts. Make sure "Member Savings", "Basket Savings", etc. that appear below an item are associated with that item's discounts.
 6. CRV/Deposits = fees (type: "crv"). If a CRV tax line appears immediately below an item, add it to that item's fees.
 7. Combine multi-line items (item + its specific discounts and fees) into ONE single item entry.
-8. PACKAGED WEIGHT ITEMS: If the item name contains a weight like "5LB", "2.5LB", "16OZ", etc., treat it as a packaged item sold by weight:
-   - Set weight = the numeric value (e.g. 5), unit_type = the unit (e.g. "lb"), is_bulk = true
-   - Set quantity = 1 (one package)
-   - Set unit_price = final_price / weight (e.g. $3.99 / 5 = $0.80/lb)
-   - Strip the weight from the name and clean it up (e.g. "RUSSET POT 5LB" → "RUSSET POTATOES")
-   - Examples: "365WFM RUSSET POT 5LB" → weight=5, unit_type="lb", unit_price=final_price/5
-9. is_bulk = true when the price is determined by weight (either from a per-lb receipt line or a packaged weight label). is_bulk = false for discrete units (cans, boxes, each).
+8. PACKAGED SIZE LABELS: If the item name contains a size like "5LB", "2.5LB", "16OZ", etc., that is the size of ONE package, not a per-weight price:
+   - Set weight = the numeric value (e.g. 5), unit_type = the unit (e.g. "lb")
+   - Leave is_bulk = false — the line is sold by the package, not by weight
+   - Set quantity = the number of packages purchased (do NOT force it to 1)
+   - Set unit_price = final_price / (quantity * weight), the price of ONE unit of unit_type (e.g. three 15OZ cans for $3.87 → 3.87 / (3 * 15) = $0.086/oz)
+   - Strip the size from the name and clean it up (e.g. "RUSSET POT 5LB" → "RUSSET POTATOES")
+   - Examples: "365WFM RUSSET POT 5LB" qty 1 → weight=5, unit_type="lb", is_bulk=false, unit_price=final_price/5
+9. is_bulk = true ONLY when the receipt itself prices the line by weight (a "@ $2.49/lb" line). It is false for discrete units — cans, boxes, bags with a printed size, each. When is_bulk = true, weight is the TOTAL weight bought and unit_price = final_price / weight.
 10. Store Assignment for Amazon/Delivery: If the receipt is from Amazon.com (e.g. Order Summary) but contains "Whole Foods", "Whole Foods Market", "Wholefoods" or a physical Whole Foods address/pickup location (e.g. "Potrero Hill", "450 RHODE ISLAND ST"), set store_name to "Whole Foods Market".
 11. CRITICAL: You MUST extract EVERY single purchased item on the receipt. Do NOT skip, consolidate, or summarize items. If there are 20 items on the receipt, your JSON array MUST contain exactly 20 items.
 12. ITEM NAMES: Do NOT include quantity/price strings like "Qty: 1 @ $3.39 each" in the item name. The item name should only be the actual product description (e.g., "Organic Garnet Sweet Potato, 1 Each"). Ensure the name is separated from the quantity line.
@@ -369,12 +371,19 @@ def _map_schema(data: dict) -> dict:
                         unit_val = match.group(2).lower()
                         item["weight"] = weight_val
                         item["unit_type"] = unit_val
-                        item["is_bulk"] = True
+                        # A size printed in the name is a package label, not a
+                        # pricing basis -- "BEANS 15OZ" is sold by the can. Leave
+                        # is_bulk as the model read it off the receipt line.
 
-                        # Recompute unit_price as final_price / weight (per-lb/oz price)
+                        # unit_price is the price of one unit of unit_type, so
+                        # the line total is divided by the number of packages as
+                        # well as the size of one.
                         effective_price = fp if fp is not None else (bp or 0)
-                        if weight_val > 0:
-                            item["unit_price"] = round(effective_price / weight_val, 4)
+                        recomputed = weighted_unit_price(
+                            effective_price, qty, weight_val, bool(item.get("is_bulk"))
+                        )
+                        if recomputed is not None:
+                            item["unit_price"] = recomputed
 
                         # Strip the extracted size from the name
                         new_name = name[: match.start()] + name[match.end() :]
@@ -383,12 +392,15 @@ def _map_schema(data: dict) -> dict:
                     except ValueError:
                         pass
             elif item.get("weight") and item.get("unit_type"):
-                # AI already found weight — ensure is_bulk is set and unit_price uses weight
-                item["is_bulk"] = True
+                # The model supplied a weight. Whether that makes the line
+                # weight-priced is its call (is_bulk), not something a parsed
+                # size can decide -- a 15 oz can is still sold by the can.
                 effective_price = fp if fp is not None else (bp or 0)
-                w = item["weight"]
-                if w and w > 0:
-                    item["unit_price"] = round(effective_price / w, 4)
+                recomputed = weighted_unit_price(
+                    effective_price, qty, item["weight"], bool(item.get("is_bulk"))
+                )
+                if recomputed is not None:
+                    item["unit_price"] = recomputed
             # --- End Size Extraction ---
 
             new_items.append(item)

@@ -19,7 +19,7 @@ from app.services.item_matcher import (
     get_store_item_ids,
 )
 from app.services.spend import line_total
-from app.utils.item_parsing import extract_weight
+from app.utils.item_parsing import extract_weight, weighted_unit_price
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -297,6 +297,21 @@ def save_reviewed_items(
                     final_weight = ext_val
                     final_unit = ext_unit
 
+            # unit_price is stored as the price of ONE unit of unit_type -- items.py
+            # and trends.py read it that way. The client sends a per-item price, so
+            # once a weight is known it has to be recomputed from the server-side
+            # line total, the same way `price` already is above. Without this a
+            # weight extracted here (extract_weight does not strip it from the name,
+            # so the OCR pass never saw it) leaves a per-package figure in a column
+            # read as per-ounce.
+            final_unit_price = reviewed_item.unit_price
+            if final_weight and final_weight > 0:
+                final_unit_price = weighted_unit_price(
+                    calculated_line_total, qty, final_weight, bool(reviewed_item.is_bulk)
+                )
+            if final_unit_price is None:
+                final_unit_price = price_per_unit
+
             receipt_item = ReceiptItem(
                 receipt_id=receipt.id,
                 item_id=item.id,
@@ -305,7 +320,7 @@ def save_reviewed_items(
                 notes=json.dumps(notes_data),
                 weight=final_weight,
                 unit_type=final_unit,
-                unit_price=reviewed_item.unit_price,
+                unit_price=final_unit_price,
                 original_unit_price=reviewed_item.original_unit_price,
                 total_discount=reviewed_item.total_discount,
             )
