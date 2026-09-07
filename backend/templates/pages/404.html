@@ -1,0 +1,52 @@
+{% extends "layouts/base.html" %}
+{% block title %}Aisle not found — The Receipts{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-16 sm:py-24 text-center">
+
+    {% include "components/crashed_cart.html" %}
+
+    <p class="mt-10 font-mono text-xs tracking-[0.2em] uppercase text-textMuted">Error 404</p>
+    <h1 class="mt-3 text-3xl sm:text-4xl font-bold text-textBase">Clean-up on aisle 404</h1>
+
+    <p class="mt-4 text-textMuted leading-relaxed">
+        We checked the shelf, we checked the back, and we checked the other back.
+        Whatever you were after isn't in this store.
+    </p>
+    {% if message %}
+    <p class="mt-2 text-sm text-textSubtle">{{ message }}</p>
+    {% endif %}
+
+    {# A receipt for the trouble. #}
+    <div class="mt-8 mx-auto max-w-xs rounded-lg border border-borderDefault bg-bgCard px-5 py-4
+                font-mono text-xs text-textMuted text-left shadow-sm">
+        <p class="text-center text-textBase font-semibold tracking-widest">THE RECEIPTS</p>
+        <p class="text-center text-[10px] mt-0.5">NOTHING TO SEE HERE</p>
+        <div class="my-2 border-t border-dashed border-borderDefault"></div>
+        <div class="flex justify-between gap-3">
+            <span class="truncate">{{ (request.url.path if request else "/") | truncate(22, true) }}</span>
+            <span class="shrink-0">NOT FOUND</span>
+        </div>
+        <div class="flex justify-between mt-1">
+            <span>SUBTOTAL</span><span>0.00</span>
+        </div>
+        <div class="my-2 border-t border-dashed border-borderDefault"></div>
+        <div class="flex justify-between font-semibold text-textBase">
+            <span>TOTAL</span><span>0.00</span>
+        </div>
+        <p class="text-center text-[10px] mt-2">NO REFUND REQUIRED</p>
+    </div>
+
+    <div class="mt-8 flex flex-wrap gap-3 justify-center">
+        <a href="/"
+           class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition">
+            Back to the dashboard
+        </a>
+        <a href="/items"
+           class="px-5 py-2.5 rounded-xl border border-borderDefault text-textBase text-sm font-medium
+                  hover:bg-bgHover transition">
+            Browse the shelves
+        </a>
+    </div>
+</div>
+{% endblock %}

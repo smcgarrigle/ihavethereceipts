@@ -5,10 +5,13 @@ from pathlib import Path
 logger = logging.getLogger("app.main")
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.responses import Response
 
+from app.utils.error_pages import error_response
 from app.utils.upload_validation import media_type_for
 
 # Load environment variables. Skipped under TESTING so .env cannot override
@@ -244,6 +247,13 @@ def serve_upload(filename: str) -> FileResponse:
         media_type=media_type,
         headers={"Content-Disposition": f'inline; filename="{path.name}"'},
     )
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> Response:
+    """Show a person an error page; keep handing scripts their JSON."""
+    detail = exc.detail if isinstance(exc.detail, str) else None
+    return error_response(request, exc.status_code, detail, headers=exc.headers)
 
 
 # Templates

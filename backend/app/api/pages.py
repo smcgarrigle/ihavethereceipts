@@ -10,7 +10,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from sqlalchemy.orm import Session
 
@@ -741,7 +741,9 @@ def item_insights_page(request: Request, item_id: int, db: Session = Depends(get
 
     item = db.query(Item).filter(Item.id == item_id).first()
     if not item:
-        return templates.TemplateResponse(request, "pages/404.html", {"message": "Item not found"})
+        # Raised rather than rendered, so the status is actually 404 and the
+        # response suits whoever asked -- see app/utils/error_pages.py.
+        raise HTTPException(status_code=404, detail="No item with that id is on the shelves.")
 
     # Load full purchase history, newest first
     purchase_history = (

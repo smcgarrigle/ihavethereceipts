@@ -63,20 +63,22 @@ class CSRFMiddleware(BaseHTTPMiddleware):
                     status_code=403, detail="CSRF form validation failed: unable to parse form data"
                 ) from e
 
-        # Validation logic
+        # Validation logic. These return rather than raise, so they never reach
+        # the app's exception handler -- error_response does the same content
+        # negotiation here, which is what gives a plain form post an error page
+        # instead of raw JSON in the browser.
+        from app.utils.error_pages import error_response
+
         if not session_token:
-            return JSONResponse(
-                status_code=403,
-                content={"detail": "CSRF session token missing. Please refresh the page."},
+            return error_response(
+                request, 403, "CSRF session token missing. Please refresh the page."
             )
 
         if not header_token and not form_token:
-            return JSONResponse(
-                status_code=403, content={"detail": "CSRF token missing from request."}
-            )
+            return error_response(request, 403, "CSRF token missing from request.")
 
         if header_token != session_token and form_token != session_token:
-            return JSONResponse(status_code=403, content={"detail": "CSRF token mismatch."})
+            return error_response(request, 403, "CSRF token mismatch.")
 
         return await call_next(request)
 
