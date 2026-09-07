@@ -5,8 +5,11 @@ from pathlib import Path
 logger = logging.getLogger("app.main")
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+
+from app.utils.upload_validation import media_type_for
 
 # Load environment variables. Skipped under TESTING so .env cannot override
 # the test environment (see app/core/config.py for the full rationale).
@@ -216,12 +219,32 @@ app.add_middleware(TrustedHostMiddleware, allowed_hosts=_trusted_hosts())
 # Mount static files
 BASE_DIR = Path(__file__).resolve().parent.parent
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
-# Uploads are saved in project_root/data/uploads, which is one level up from backend
-app.mount(
-    "/uploads",
-    StaticFiles(directory=str(BASE_DIR.parent / "data" / "uploads")),
-    name="uploads",
-)
+# Uploads are saved in project_root/data/uploads, which is one level up from
+# backend. They are NOT mounted as StaticFiles: that served each file under the
+# extension it was stored with, so anything that got past the old upload check
+# came back with a content type of its own choosing -- text/html included, on
+# this origin and under this CSP. Serving them by hand means the content type is
+# one of ours or the file is not served at all.
+UPLOADS_DIR = (BASE_DIR.parent / "data" / "uploads").resolve()
+
+
+@app.get("/uploads/{filename}", name="uploads")
+def serve_upload(filename: str) -> FileResponse:
+    media_type = media_type_for(Path(filename).suffix)
+    if media_type is None:
+        raise HTTPException(status_code=404)
+
+    # Names are UUIDs we generated, but resolve and confine anyway.
+    path = (UPLOADS_DIR / Path(filename).name).resolve()
+    if path.parent != UPLOADS_DIR or not path.is_file():
+        raise HTTPException(status_code=404)
+
+    return FileResponse(
+        path,
+        media_type=media_type,
+        headers={"Content-Disposition": f'inline; filename="{path.name}"'},
+    )
+
 
 # Templates
 

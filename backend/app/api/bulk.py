@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Receipt, Store
+from app.utils.upload_validation import MAX_SIZE_BYTES, SNIFF_BYTES, sniff
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -38,14 +39,22 @@ def bulk_upload_receipts(files: list[UploadFile] = File(...), db: Session = Depe
     results: list[dict[str, Any]] = []
 
     for file in files:
-        # Validate file type
-        allowed_types = ["image/jpeg", "image/jpg", "image/png", "application/pdf"]
-        if file.content_type not in allowed_types:
-            results.append({"filename": file.filename, "status": "error", "error": "Invalid type"})
+        # Per-file size cap; this endpoint had none, only the global request limit.
+        file.file.seek(0, 2)
+        file_size = file.file.tell()
+        file.file.seek(0)
+        if file_size > MAX_SIZE_BYTES:
+            results.append({"filename": file.filename, "status": "error", "error": "Too large"})
             continue
 
-        # Generate unique filename
-        file_ext = Path(file.filename or "").suffix
+        # Extension from the bytes, not from the client's filename or its
+        # declared content type -- see app/utils/upload_validation.py.
+        sniffed = sniff(file.file.read(SNIFF_BYTES))
+        file.file.seek(0)
+        if sniffed is None:
+            results.append({"filename": file.filename, "status": "error", "error": "Invalid type"})
+            continue
+        file_ext, _media_type = sniffed
         unique_filename = f"{uuid.uuid4()}{file_ext}"
         file_path = UPLOAD_DIR / unique_filename
 
