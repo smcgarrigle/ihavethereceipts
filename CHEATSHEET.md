@@ -222,7 +222,10 @@ uv run python scripts/fix_store_names.py [--dry-run]
 ```
 
 ### Backfill Unit Prices (Saved ReceiptItems)
-Fixes `unit_price` in the `receipt_items` table for already-saved items.
+Recomputes `unit_price` (and the per-quantity `price`) in the `receipt_items`
+table from the pricing breakdown in each line's `notes` JSON. `price` stays the
+per-quantity price that spend is read from; only `unit_price` carries the
+per-pound figure for bulk lines. Always `--dry-run` first.
 ```bash
 uv run python scripts/backfill_unit_prices.py [--dry-run]
 ```
