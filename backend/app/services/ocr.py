@@ -379,8 +379,8 @@ def _map_schema(data: dict) -> dict:
                         # the line total is divided by the number of packages as
                         # well as the size of one. A size parsed out of the name
                         # is always a package size, never a total weight bought,
-                        # so this never takes the weight-priced branch -- 4 jars
-                        # of 4 oz would otherwise read as 4 oz bought loose.
+                        # so this never takes the weight-priced branch, however
+                        # the quantity happens to compare to it.
                         effective_price = fp if fp is not None else (bp or 0)
                         recomputed = weighted_unit_price(
                             effective_price, qty, weight_val, weight_priced=False

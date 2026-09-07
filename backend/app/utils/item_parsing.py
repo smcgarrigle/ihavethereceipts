@@ -82,9 +82,11 @@ def weighted_unit_price(
       divided by both the number of packages and that size: 3 x 15 oz at $3.87
       is $0.086/oz, not $0.258.
 
-    Keeping the two apart matters because they collide: "Tellicherry
-    Peppercorns", 4 jars of 4 oz, has quantity equal to its name-derived weight
-    without being weight-priced at all.
+    The two are kept apart structurally rather than on measured evidence: no
+    row in the current corpus has a name-derived weight equal to its quantity.
+    But nothing stops one -- four 12 oz jars would do it -- and a size printed
+    in a name is never a total weight bought, so the caller says so outright
+    instead of letting the arithmetic decide.
     """
     if not weight or weight <= 0:
         return None

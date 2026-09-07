@@ -253,10 +253,10 @@ class TestQuantityEqualsWeightIsWeightPriced:
 class TestNameDerivedWeightIsNeverATotal:
     """A size parsed out of an item name is a package label by construction.
 
-    "Tellicherry Peppercorns", 4 jars of 4 oz for $112.32, has quantity equal
-    to its name-derived weight by coincidence. Reading that as 4 oz bought
-    loose prices it at $28.08/oz instead of $7.02 — so provenance decides,
-    not the arithmetic accident.
+    No row in the current corpus has a name-derived weight equal to its
+    quantity, so these are constructed cases: four 4 oz jars for $112.32 would
+    otherwise read as 4 oz bought loose, at $28.08/oz instead of $7.02.
+    Provenance decides it, not the arithmetic accident.
     """
 
     def test_map_schema_does_not_treat_a_parsed_size_as_a_total(self):
