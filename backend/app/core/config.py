@@ -70,7 +70,6 @@ class Settings:
 
     # Security
     SECRET_KEY: str = secret_key_value or "test-secret-key-for-testing"
-    ALLOWED_ORIGINS: list[str] = os.getenv("ALLOWED_ORIGINS", "*").split(",")
 
     # Database
     DATABASE_URL: str = database_url_value or "sqlite://"

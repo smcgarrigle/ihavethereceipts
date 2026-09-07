@@ -135,6 +135,7 @@ app = FastAPI(title="IHaveTheReceipts", lifespan=lifespan)
 
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.middleware import (
     ContentLengthLimitMiddleware,
@@ -143,15 +144,51 @@ from app.middleware import (
     SecurityHeadersMiddleware,
 )
 
-# CORS Configuration
-allowed_origins = os.getenv("ALLOWED_ORIGINS", "*").split(",")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+
+def _cors_origins() -> list[str]:
+    """Explicit cross-origin callers, or empty meaning: do not enable CORS.
+
+    A wildcard is deliberately read as "unset" rather than as permission.
+    Starlette does not emit a literal ``*`` when credentials are allowed -- it
+    reflects whatever Origin the request carried -- so ``ALLOWED_ORIGINS=*``
+    combined with ``allow_credentials=True`` lets any page the user happens to
+    visit read the whole purchase history back off loopback. The UI is
+    same-origin HTMX and needs no CORS at all, so the safe reading of "*" is
+    none rather than every.
+    """
+    raw = os.getenv("ALLOWED_ORIGINS", "")
+    origins = [o.strip() for o in raw.split(",") if o.strip()]
+    if "*" in origins:
+        return []
+    return origins
+
+
+def _trusted_hosts() -> list[str]:
+    """Host headers the app answers to.
+
+    There is no authentication, so start_server.sh binds loopback and documents
+    ``tailscale serve`` as the way to reach it from another device. Those are
+    the hosts it should answer on; without the check, DNS rebinding is a way
+    around the loopback bind. Widen with ALLOWED_HOSTS when binding elsewhere.
+    """
+    raw = os.getenv("ALLOWED_HOSTS", "").strip()
+    if raw:
+        return [h.strip() for h in raw.split(",") if h.strip()]
+    if os.getenv("TESTING"):
+        return ["*"]
+    return ["localhost", "127.0.0.1", "*.ts.net"]
+
+
+# CORS is off unless someone names the origins that need it.
+_origins = _cors_origins()
+if _origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 # Security Headers and CSP
 app.add_middleware(SecurityHeadersMiddleware)
@@ -171,6 +208,10 @@ app.add_middleware(
     secret_key=os.getenv("SECRET_KEY", "unsafe-default-key-change-this"),
     max_age=3600 * 24 * 7,  # 1 week
 )
+
+# Host validation, added last so it is outermost and rejects before anything
+# else runs.
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=_trusted_hosts())
 
 # Mount static files
 BASE_DIR = Path(__file__).resolve().parent.parent
