@@ -30,6 +30,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.database import SessionLocal
 from app.models.receipt import ReceiptItem
+from app.utils.item_parsing import is_weight_priced, weighted_unit_price
 
 # Same regex as ocr.py size extraction
 SIZE_RE = re.compile(r"([\d\.]+)\s*(oz|lb|g|kg|ml|l|gal|pt|qt|ct|pk)\b", re.IGNORECASE)
@@ -50,6 +51,7 @@ def backfill(dry_run: bool = False):
     db = SessionLocal()
     updated = 0
     skipped = 0
+    disputed: list[str] = []
 
     try:
         receipt_items = db.query(ReceiptItem).join(ReceiptItem.item).all()
@@ -58,7 +60,25 @@ def backfill(dry_run: bool = False):
             changed = False
             item_name = ri.item.name if ri.item else ""
 
-            # --- 1. Recalculate unit_price from notes (final_price / qty) ---
+            # --- 1. Extract weight/unit_type from the item name if missing ---
+            # This runs BEFORE the price recompute, and tracks the result in a
+            # local rather than reading it back off the row, so that a weight
+            # discovered here reaches unit_price in the same pass and --dry-run
+            # reports the same numbers a real run would write.
+            effective_weight = ri.weight
+            weight_from_name = False
+            if (not ri.weight or ri.weight == 0) and item_name:
+                w_val, w_unit = extract_size(item_name)
+                if w_val:
+                    effective_weight = w_val
+                    weight_from_name = True
+                    print(f"  [{ri.id}] {item_name[:40]:<40} weight: None → {w_val} {w_unit}")
+                    if not dry_run:
+                        ri.weight = w_val
+                        ri.unit_type = w_unit
+                    changed = True
+
+            # --- 2. Recalculate price and unit_price from notes ---
             if ri.notes:
                 try:
                     notes = json.loads(ri.notes)
@@ -72,10 +92,55 @@ def backfill(dry_run: bool = False):
                     # price * quantity), so it is final_price / qty whatever the
                     # line is. Only unit_price carries the per-weight figure.
                     new_price = round(final_price / qty, 4)
-                    if notes.get("is_bulk") and ri.weight and ri.weight > 0:
-                        new_unit_price = round(final_price / (qty * ri.weight), 4)
-                    else:
+                    # unit_price is the price of ONE unit of unit_type wherever
+                    # a weight is known -- not only on bulk lines. Gating this on
+                    # is_bulk left a per-package figure on every packaged line
+                    # (984 of 1,584 in the live database) in a column items.py
+                    # reads as $/oz.
+                    #
+                    # The stored is_bulk is deliberately NOT consulted. Rows
+                    # written before the prompt was corrected set it true for any
+                    # packaged weight label ("RUSSET POT 5LB"), so on historical
+                    # data it does not separate a line priced by weight from a
+                    # package that merely has a size on it. quantity == weight
+                    # does -- but only for a weight that came off the receipt. A
+                    # weight recovered from the name above is a package size even
+                    # when quantity happens to equal it, so it never takes the
+                    # weight-priced branch. No row in the corpus collides today;
+                    # the rule is structural, not measured.
+                    weight_priced = not weight_from_name and is_weight_priced(
+                        qty, effective_weight
+                    )
+                    new_unit_price = weighted_unit_price(
+                        final_price, qty, effective_weight, weight_priced
+                    )
+                    if new_unit_price is None:
                         new_unit_price = new_price
+
+                    # A stored unit_price on a weight-priced line can be two
+                    # different things. It may be the "@ $2.49/lb" the model read
+                    # off the page, which is better evidence than re-deriving it
+                    # from a total the same model extracted. Or it may be this
+                    # bug's own output: dividing by quantity as well as weight,
+                    # when on these lines quantity IS the weight, squares the
+                    # divisor. All 50 such rows in the live database are the
+                    # latter -- a $1.37 bunch of bananas over 1.54 lb stored as
+                    # $0.58/lb, which is 1.37 / 1.54².
+                    #
+                    # So repair the ones carrying that signature, and for anything
+                    # else report the disagreement and leave the value alone
+                    # rather than silently overwriting it.
+                    if weight_priced and ri.unit_price and ri.unit_price > 0:
+                        squared = final_price / (qty * effective_weight)
+                        over_divided = abs(ri.unit_price - squared) <= 0.01
+                        if not over_divided and abs(ri.unit_price - new_unit_price) > 0.01:
+                            disputed.append(
+                                f"  [{ri.id}] {item_name[:40]:<40} "
+                                f"stored {ri.unit_price}/{ri.unit_type}, but "
+                                f"{final_price} over {effective_weight} works out at "
+                                f"{new_unit_price} — left as-is"
+                            )
+                            new_unit_price = ri.unit_price
 
                     unit_price_changed = abs((ri.unit_price or 0) - new_unit_price) > 0.0001
                     price_changed = abs((ri.price or 0) - new_price) > 0.0001
@@ -93,20 +158,18 @@ def backfill(dry_run: bool = False):
                 except (json.JSONDecodeError, TypeError, KeyError) as e:
                     print(f"  [{ri.id}] Could not parse notes: {e}")
 
-            # --- 2. Extract weight/unit_type from item name if missing ---
-            if (not ri.weight or ri.weight == 0) and item_name:
-                w_val, w_unit = extract_size(item_name)
-                if w_val:
-                    print(f"  [{ri.id}] {item_name[:40]:<40} weight: None → {w_val} {w_unit}")
-                    if not dry_run:
-                        ri.weight = w_val
-                        ri.unit_type = w_unit
-                    changed = True
-
             if changed:
                 updated += 1
             else:
                 skipped += 1
+
+        if disputed:
+            print(
+                f"\n⚠️  {len(disputed)} weight-priced lines whose stated price per unit "
+                f"disagrees with their own total; none were changed:"
+            )
+            for line in disputed:
+                print(line)
 
         if not dry_run:
             db.commit()
