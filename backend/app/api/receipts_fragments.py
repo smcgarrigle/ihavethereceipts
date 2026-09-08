@@ -230,6 +230,40 @@ def _render_receipt_card_html(
             </a>
         """
 
+    # A failed upload used to render as an ordinary card — "Unknown Store,
+    # $0.00, 0 items" — indistinguishable from a receipt that parsed to nothing,
+    # with `status` and `error_message` both sitting unread on the object. The
+    # bulk import page already did this properly, so the vocabulary is borrowed
+    # from there (app/api/bulk.py).
+    #
+    # "completed" gets no badge on purpose: it is 412 of the 413 receipts here,
+    # and a green tick on every card is noise that would bury the one that
+    # matters. The bulk page badges every row because it is a live import queue.
+    status = (receipt.status or "pending").lower()
+    badge_styles = {
+        "failed": ("Failed", "bg-red-500/10 text-red-500 dark:text-red-400"),
+        "processing": ("Reading\u2026", "bg-orange-500/10 text-orange-500 dark:text-orange-400"),
+        "pending": ("Waiting", "bg-gray-500/10 text-gray-500 dark:text-gray-400"),
+    }
+    status_badge = ""
+    if status in badge_styles:
+        label, classes = badge_styles[status]
+        status_badge = (
+            f'<span class="ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold '
+            f'uppercase tracking-wider {classes}">{label}</span>'
+        )
+
+    # The reason, for the one status that has one. Escaped: it carries whatever
+    # the OCR backend or the model API said.
+    failure_reason = ""
+    if status == "failed" and receipt.error_message:
+        failure_reason = (
+            f'<p class="text-xs text-red-500/90 dark:text-red-400/90 mt-1 break-words">'
+            f"{html.escape(receipt.error_message)}</p>"
+        )
+
+    card_ring = " ring-1 ring-red-500/30" if status == "failed" else ""
+
     # Reconcile rather than silently overwrite: show what the total carries
     # beyond the lines, and flag the opposite case, where the parsed items add
     # up to more than the receipt says.
@@ -254,15 +288,16 @@ def _render_receipt_card_html(
         reconciliation = ""
 
     return f"""
-    <div class="p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-md transition"
+    <div class="p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-md transition{card_ring}"
          id="receipt-{receipt.id}" data-store='{store_name}'>
         <div class="flex justify-between items-start">
             <div class="flex-1">
-                <h3 class="font-semibold text-gray-900 dark:text-white">{store_name}</h3>
+                <h3 class="font-semibold text-gray-900 dark:text-white">{store_name}{status_badge}</h3>
                 <p class="text-sm text-gray-500 dark:text-gray-400 flex items-center">{date_str}{backend_badge}</p>
                 <p class="text-lg font-bold text-gray-900 dark:text-white mt-2">${display_total:.2f}</p>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{item_count} items</p>
                 {reconciliation}
+                {failure_reason}
             </div>
             <div class="flex flex-col space-y-2">
                 {view_items_btn}
