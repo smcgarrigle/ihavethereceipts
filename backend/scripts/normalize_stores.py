@@ -11,9 +11,10 @@ from app.models import Store
 from app.services.store_utils import normalize_store_name
 
 # Database connection
-DATABASE_URL = os.getenv(
-    "DATABASE_URL", "postgresql://grocery:grocery123@localhost:5433/grocery_tracker"
-)
+# Matches the rest of the project. The old default here was a Postgres
+# instance from early development (port 5433) that no longer exists, and it was
+# the only thing in the tree that needed psycopg2 installed.
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///../grocery.db")
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 db = SessionLocal()
