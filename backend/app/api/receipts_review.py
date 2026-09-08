@@ -18,7 +18,7 @@ from app.services.item_matcher import (
     get_best_match,
     get_store_item_ids,
 )
-from app.services.spend import line_total
+from app.services.spend import line_total, unaccounted
 from app.utils.item_parsing import extract_weight, is_weight_priced, weighted_unit_price
 
 router = APIRouter()
@@ -336,13 +336,24 @@ def save_reviewed_items(
 
         db.flush()
 
-        # Update receipt total to match sum of items and mark as completed.
-        # Never clobber a known-good total with $0: fall back to the client's
-        # stated total, then to whatever the receipt already had.
+        # The total the user reviewed is the receipt's total. Tax is not
+        # normally a line item, so the item sum is NOT the total: overwriting
+        # with it discarded the tax and gave the user no way to make their own
+        # correction stick. The item sum is the fallback, not the authority.
+        # Still never clobber a known-good total with $0.
         item_sum = sum(line_total(ri) for ri in receipt.items)
-        receipt.total_amount = (
-            item_sum if item_sum > 0 else (request.total_amount or receipt.total_amount)
-        )
+        if request.total_amount:
+            receipt.total_amount = request.total_amount
+        elif item_sum > 0:
+            receipt.total_amount = item_sum
+        # else: keep whatever the receipt already had
+
+        gap = unaccounted(receipt.total_amount, item_sum)
+        if gap:
+            logger.info(
+                f"Receipt {receipt.id}: total {receipt.total_amount:.2f} vs items "
+                f"{item_sum:.2f} ({gap:+.2f} unaccounted)"
+            )
         receipt.status = "completed"
 
         # Feedback loop: persist the human's fixes as few-shot signal for future OCR
