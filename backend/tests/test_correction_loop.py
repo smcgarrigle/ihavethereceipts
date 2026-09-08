@@ -104,7 +104,9 @@ def test_correction_prompt_prefers_store_scope(client, db):
 
     block = get_correction_prompt(db, store_name="Costco")
     assert "LEARNED CORRECTIONS" in block and "Costco" in block
-    assert '"ORG SPNCH" was corrected to "Organic Spinach"' in block
+    # Single quotes since finding 17: a double quote in a value could close the
+    # span it was interpolated into, so the block no longer uses them.
+    assert "'ORG SPNCH' was corrected to 'Organic Spinach'" in block
 
     # Unknown store falls back to global recents rather than returning nothing
     fallback = get_correction_prompt(db, store_name="Nonexistent Mart")
