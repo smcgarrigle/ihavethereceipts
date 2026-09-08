@@ -7,7 +7,6 @@ Also provides:
 
 import json
 import logging
-from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, Form, Request
@@ -26,6 +25,7 @@ class CurrencyUpdate(BaseModel):
 
 
 from app.api.templates import templates  # noqa: E402
+from app.core.config import settings  # noqa: E402
 from app.database import get_db  # noqa: E402
 from app.models.exclusion import ExclusionRule  # noqa: E402
 from app.services import predictions as predictions_service  # noqa: E402
@@ -33,12 +33,11 @@ from app.services import predictions as predictions_service  # noqa: E402
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-OCR_FILTERS_PATH = (
-    Path(__file__).resolve().parent.parent.parent.parent / "data" / "ocr_filters.json"
-)
-FEATURE_FLAGS_PATH = (
-    Path(__file__).resolve().parent.parent.parent.parent / "data" / "feature_flags.json"
-)
+# One definition each, from settings. There were four separate derivations of
+# the feature-flags path, which is why the test isolation fixture only ever
+# covered one of them.
+OCR_FILTERS_PATH = settings.OCR_FILTERS_PATH
+FEATURE_FLAGS_PATH = settings.FEATURE_FLAGS_PATH
 
 
 # ---------------------------------------------------------------------------
@@ -47,11 +46,19 @@ FEATURE_FLAGS_PATH = (
 
 
 def _load_ocr_filters() -> dict[str, Any]:
+    """The saved filters, or the curated defaults the PDF parser falls back to.
+
+    This used to fall back to two empty lists, so on a fresh install the
+    settings page showed no filters — and saving from that page would have
+    written the emptiness over the defaults the parser relies on.
+    """
     try:
         with open(OCR_FILTERS_PATH) as f:
             return dict(json.load(f))
     except Exception:
-        return {"skip_keywords": [], "junk_filters": []}
+        from app.services.pdf_parser import FALLBACK_JUNK, FALLBACK_SKIP
+
+        return {"skip_keywords": list(FALLBACK_SKIP), "junk_filters": list(FALLBACK_JUNK)}
 
 
 def _save_ocr_filters(data: dict) -> None:

@@ -937,16 +937,11 @@ def enrich_item_fdc(item_id: int, db: Session = Depends(get_db)):
     Respects the global USDA lookup feature flag — returns a disabled response
     when the toggle is off without erasing any existing nutritional data.
     """
-    import json
-    from pathlib import Path
+    # One loader, so the path is defined once and the test isolation fixture
+    # actually covers this call site too.
+    from app.api.settings_router import _load_feature_flags
 
-    flags_path = (
-        Path(__file__).resolve().parent.parent.parent.parent / "data" / "feature_flags.json"
-    )
-    try:
-        flags = json.loads(flags_path.read_text())
-    except Exception:
-        flags = {}
+    flags = _load_feature_flags()
 
     if not flags.get("usda_lookup_enabled", True):
         return {

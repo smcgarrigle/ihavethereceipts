@@ -1,4 +1,3 @@
-import json
 from pathlib import Path
 from typing import Any
 
@@ -17,13 +16,10 @@ def get_csrf_token(request: Request) -> str:
 
 
 def _get_flags() -> dict[str, Any]:
-    try:
-        flags_path = BASE_DIR.parent / "data" / "feature_flags.json"
-        with open(flags_path, encoding="utf-8") as f:
-            result: dict[str, Any] = json.load(f)
-            return result
-    except (OSError, json.JSONDecodeError):
-        return {}
+    """Read the flags through the one loader rather than a fourth path."""
+    from app.api.settings_router import _load_feature_flags
+
+    return _load_feature_flags()
 
 
 def get_currency_symbol() -> str:

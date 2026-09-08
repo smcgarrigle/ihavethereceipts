@@ -39,6 +39,7 @@ from typing import Any
 
 from pydantic import BaseModel as _SchemaBase
 
+from app.core.config import settings
 from app.services.pdf_parser import parse_pdf_receipt
 from app.utils.api_keys import configured_key
 from app.utils.item_parsing import is_weight_priced, weighted_unit_price
@@ -54,9 +55,11 @@ def get_backend() -> str:
     return os.getenv("OCR_BACKEND", "local").lower()
 
 
-# Usage tracker (used by both backends)
-USAGE_TRACKER_FILE = Path("data/ocr_usage.json")
-CACHE_DIR = Path("data/ocr_cache")
+# Usage tracker (used by both backends). Absolute via settings: these were
+# CWD-relative, and this module creates CACHE_DIR at import, so importing from
+# backend/ made a second data/ directory there.
+USAGE_TRACKER_FILE = settings.OCR_USAGE_PATH
+CACHE_DIR = settings.OCR_CACHE_DIR
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 
