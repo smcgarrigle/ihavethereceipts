@@ -6,7 +6,6 @@ Fragment/JSON endpoints live in their own routers under /api.
 
 import json
 import logging
-import os
 from datetime import datetime
 from pathlib import Path
 
@@ -95,7 +94,11 @@ def root(request: Request, db: Session = Depends(get_db)):
 
     # Onboarding details
     is_demo = any(r.notes == "DEMO_DATA" for r in all_receipts)
-    has_gemini_key = bool(os.getenv("GEMINI_API_KEY"))
+    # A placeholder key is not a key: the dashboard used to announce that OCR
+    # was configured to anyone who had copied .env.example verbatim.
+    from app.utils.api_keys import configured_key
+
+    has_gemini_key = bool(configured_key("GEMINI_API_KEY"))
 
     # Image OCR needs a vision model, which can be local or hosted — Gemini is one
     # option, not a requirement. Only mention it when no cloud key is configured

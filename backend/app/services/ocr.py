@@ -40,6 +40,7 @@ from typing import Any
 from pydantic import BaseModel as _SchemaBase
 
 from app.services.pdf_parser import parse_pdf_receipt
+from app.utils.api_keys import configured_key
 from app.utils.item_parsing import is_weight_priced, weighted_unit_price
 
 logger = logging.getLogger(__name__)
@@ -475,10 +476,10 @@ def _get_openrouter_client():
     if _openrouter_client is None:
         from openai import OpenAI
 
-        api_key = os.getenv("OPENROUTER_API_KEY")
+        api_key = configured_key("OPENROUTER_API_KEY")
         if not api_key:
             raise RuntimeError(
-                "OPENROUTER_API_KEY environment variable not set "
+                "OPENROUTER_API_KEY is not set to a real key "
                 "(required for OCR_BACKEND=openrouter). Get a free key at "
                 "https://openrouter.ai/keys — no payment method required."
             )
@@ -585,6 +586,47 @@ def _openrouter_error_message(exc: Exception, model: str) -> str:
             f"been retired or renamed. Current options: {OPENROUTER_MODEL_FILTER_URL}"
         )
     return f"OpenRouter error: {exc}"
+
+
+def _local_error_message(exc: Exception, url: str) -> str:
+    """Turn a local-backend failure into something a self-hoster can act on.
+
+    This is the shipped default (``OCR_BACKEND=local``), and it used to return
+    ``str(exc)`` — which for the overwhelmingly common case is the single
+    phrase "Connection error.": no URL, no mention of what is supposed to be
+    listening on it, no way forward. Its OpenRouter counterpart nine lines
+    below explains a 402 and links to the credits page; the recommended
+    default said nothing.
+
+    start_server.sh already probes this on boot with a good message. This is
+    the same information, reaching the runtime path where the upload fails.
+    """
+    import openai
+
+    logger.error(f"[OCR] Local AI error at {url}: {exc}")
+
+    # APITimeoutError subclasses APIConnectionError, so it goes first.
+    if isinstance(exc, openai.APITimeoutError):
+        return (
+            f"The model at {url} took the receipt but did not finish in time. "
+            "A large receipt on a small model can outlast the timeout — try a "
+            "smaller image, or a quicker model."
+        )
+    if isinstance(exc, openai.APIConnectionError | ConnectionError):
+        return (
+            f"Nothing answered at {url}. The default OCR backend expects a "
+            "model server running on this machine: start Ollama "
+            "(`ollama serve`, then `ollama pull llava:7b`) or LM Studio's "
+            "local server, point OCR_BACKEND_URL at wherever yours listens, "
+            "or switch to a hosted model with OCR_BACKEND=gemini or "
+            "OCR_BACKEND=openrouter."
+        )
+    if isinstance(exc, openai.NotFoundError):
+        return (
+            f"The server at {url} answered but has no such model loaded. Load "
+            "one in LM Studio, or `ollama pull` the model named in OCR_MODEL."
+        )
+    return f"The model at {url} failed: {exc}"
 
 
 def _openrouter_extra_body() -> dict[str, Any]:
@@ -772,8 +814,7 @@ def _process_local(image_paths: list[str], prompt_extra: str = "") -> dict:
     except Exception as e:
         if is_openrouter:
             return _error_result(_openrouter_error_message(e, model))
-        logger.error(f"[OCR] Local AI error: {e}")
-        return _error_result(str(e))
+        return _error_result(_local_error_message(e, url))
 
 
 # ===========================================================================
@@ -794,10 +835,14 @@ def _init_gemini():
 
     from app.services.model_manager import model_manager
 
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = configured_key("GEMINI_API_KEY")
     if not api_key:
         raise ValueError(
-            "GEMINI_API_KEY environment variable not set (required for OCR_BACKEND=gemini)"
+            "GEMINI_API_KEY is not set to a real key (required for "
+            "OCR_BACKEND=gemini). The value shipped in .env.example is a "
+            "placeholder, and sending it to Google just wastes a round trip — "
+            "get a key at https://aistudio.google.com/apikey, or set "
+            "OCR_BACKEND=local to keep everything on this machine."
         )
 
     _gemini_client = genai.Client(api_key=api_key)
@@ -860,12 +905,18 @@ def _process_gemini(image_paths: list[str], prompt_extra: str = "") -> dict:
     if not _gemini_client:
         return _error_result("Gemini client not initialized")
 
-    # Upload images
+    # Upload images. This sits inside a try because it is the first call that
+    # touches the network: an auth failure here used to propagate out of the
+    # backend instead of coming back as a result the review page can show.
     image_files = []
-    for path in image_paths:
-        img_file = _gemini_client.files.upload(file=path)
-        logger.info(f"Uploaded to Gemini: {img_file.name}")
-        image_files.append(img_file)
+    try:
+        for path in image_paths:
+            img_file = _gemini_client.files.upload(file=path)
+            logger.info(f"Uploaded to Gemini: {img_file.name}")
+            image_files.append(img_file)
+    except Exception as e:
+        logger.error(f"[OCR] Gemini upload failed: {e}")
+        return _error_result(f"Could not send the receipt to Gemini: {e}")
 
     # Build model list: primary + fallbacks, deduped
     models_to_try = list(
