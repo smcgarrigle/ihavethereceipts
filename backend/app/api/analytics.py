@@ -870,8 +870,10 @@ def get_ocr_accuracy(db: Session = Depends(get_db)):
 @router.get("/bi-dashboard")
 def get_bi_dashboard_data(db: Session = Depends(get_db)):
     """Aggregate live calculations for the Tufte BI Dashboard."""
-    # Time window: Last 30 days
-    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    # Time window: last 30 days. Local, not UTC: purchase_date is written with a
+    # naive local datetime.now(), so a UTC cutoff would shift the window by this
+    # machine's offset — the mirror of the sweeper bug in bulk_processor.py.
+    thirty_days_ago = datetime.now() - timedelta(days=30)
 
     receipts = (
         db.query(Receipt)
