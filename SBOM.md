@@ -2,8 +2,10 @@
 
 **Project:** IHaveTheReceipts
 **Version:** 0.1.0
-**Generated:** 2026-08-05
-**Format:** Markdown (manual, based on `uv pip list`)
+**Generated:** 2026-09-08
+**Format:** Markdown. Versions are derived from `backend/uv.lock` by
+`backend/scripts/refresh_sbom.py`; licence and purpose are maintained by hand.
+`tests/test_sbom_current.py` fails when the versions drift.
 
 ---
 

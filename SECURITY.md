@@ -47,7 +47,7 @@ fixation, and similar) generally don't apply — see section 7.
 | **Personal receipts / images** | `data/uploads/`, `data/processed/`, `data/GroceryReceiptsPDFs/` are all gitignored. Verify with `git status` before committing. |
 | **SQLite database** | `*.db`, `*.db-shm`, `*.db-wal` are gitignored. Never commit `grocery.db` — it contains your full purchase history. |
 | **Internal planning docs** | `scratch/`, `PROJECT_REVIEW.md`, `reclassification_analysis.md` etc. are gitignored. Review the Internal Documentation block in `.gitignore` before a public release. |
-| **Stack traces in logs** | `uvicorn_log.txt` is gitignored. Never commit log files. |
+| **Stack traces in logs** | `data/*.log` is gitignored. Never commit log files. |
 
 **Quick pre-push audit:**
 ```bash
