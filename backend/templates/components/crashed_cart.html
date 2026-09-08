@@ -1,0 +1,63 @@
+{# A shopping trolley that has come off worse. Used by the error pages.
+
+   Colours are currentColor plus plain SVG opacity attributes on purpose: the
+   theme palette is defined as bare `var(--text-muted)` with no <alpha-value>,
+   so Tailwind cannot generate `fill-textMuted/20` and such a class silently
+   renders as black. #}
+<svg viewBox="0 0 340 170" role="img" aria-labelledby="crashed-cart-title"
+     class="w-full max-w-md mx-auto h-auto">
+    <title id="crashed-cart-title">An overturned shopping trolley with its wheels off and its shopping spilled across the floor</title>
+
+    <g class="text-textMuted">
+        {# floor #}
+        <line x1="16" y1="142" x2="324" y2="142" stroke="currentColor" stroke-opacity=".35"
+              stroke-width="3" stroke-linecap="round" />
+        {# skid marks it came in on #}
+        <path d="M18 133 q40 -9 74 -4" fill="none" stroke="currentColor" stroke-opacity=".3"
+              stroke-width="2.5" stroke-linecap="round" stroke-dasharray="6 10" />
+        <path d="M24 123 q34 -8 60 -3" fill="none" stroke="currentColor" stroke-opacity=".18"
+              stroke-width="2" stroke-linecap="round" stroke-dasharray="4 11" />
+        {# shadow, so it is on the floor rather than above it #}
+        <ellipse cx="108" cy="140" rx="54" ry="5.5" fill="currentColor" fill-opacity=".16" />
+    </g>
+
+    {# the trolley, tipped onto its face with its legs in the air. Drawn upright
+       and then rotated, so the basket still reads as a basket. #}
+    <g transform="translate(106 106) rotate(145)" class="text-orange-500"
+       fill="none" stroke="currentColor" stroke-width="5"
+       stroke-linecap="round" stroke-linejoin="round">
+        <path d="M-34 -30 H30 L20 14 H-24 Z" />
+        <path d="M-21 -30 -14 14 M-8 -30 -3 14 M5 -30 8 14 M18 -30 19 14"
+              stroke-width="3" stroke-opacity=".5" />
+        {# the rim of the opening #}
+        <path d="M-36 -30 H32" stroke-width="5.5" />
+        {# handle #}
+        <path d="M-34 -30 -48 -43 M-48 -43 -60 -43" />
+        {# legs, now with nothing on the end of them #}
+        <path d="M-20 14 -24 32 M16 14 19 32" stroke-width="4" />
+    </g>
+
+    <g class="text-textMuted" stroke="currentColor" fill="none">
+        {# the wheel that stayed put #}
+        <circle cx="228" cy="132" r="10" stroke-width="4" />
+        <circle cx="228" cy="132" r="2.5" fill="currentColor" stroke="none" />
+        {# the wheel that did not #}
+        <circle cx="304" cy="124" r="14" stroke-width="4" />
+        <circle cx="304" cy="124" r="3" fill="currentColor" stroke="none" />
+        <path d="M282 116 h-13 M280 124 h-17 M282 132 h-13" stroke-width="2.5"
+              stroke-linecap="round" stroke-opacity=".5" />
+    </g>
+
+    {# the shopping, spilling out of the open end #}
+    <g>
+        {# a banana, having a worse day than anyone #}
+        <path d="M162 142 q13 -15 28 -10 q-10 3 -14 10 z" fill="#facc15" />
+        {# apple #}
+        <circle cx="196" cy="130" r="10" fill="#ef4444" />
+        <path d="M196 120 q3 -6 8 -7" fill="none" stroke="#16a34a"
+              stroke-width="2.5" stroke-linecap="round" />
+        {# a tin, rolled onto its side #}
+        <rect x="256" y="126" width="26" height="16" rx="4" fill="#3b82f6" />
+        <path d="M264 126 v16 M274 126 v16" stroke="#bfdbfe" stroke-width="1.5" opacity=".8" />
+    </g>
+</svg>
