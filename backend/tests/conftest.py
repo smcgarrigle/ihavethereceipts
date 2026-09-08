@@ -31,6 +31,19 @@ def do_begin(conn):
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
+@pytest.fixture(autouse=True)
+def _isolate_feature_flags(tmp_path, monkeypatch):
+    """Keep tests out of the repository's tracked data/feature_flags.json.
+
+    It is runtime-mutable state that happens to be committed, so a test that
+    flips a flag would otherwise dirty the working tree. A missing file loads
+    the same defaults, so this changes nothing a test can observe.
+    """
+    from app.api import settings_router
+
+    monkeypatch.setattr(settings_router, "FEATURE_FLAGS_PATH", tmp_path / "feature_flags.json")
+
+
 @pytest.fixture(scope="function")
 def db():
     Base.metadata.create_all(bind=engine)
