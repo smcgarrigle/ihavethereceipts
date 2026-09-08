@@ -12,8 +12,8 @@ Thank you for your interest in contributing! This is a self-hosted, single-user 
 - **[uv](https://docs.astral.sh/uv/)** (package manager)
 - A **Google Gemini API key** OR a local model server ([LM Studio](https://lmstudio.ai/) / [Ollama](https://ollama.com/))
 - **System dependencies** (for PDF parsing):
-  - Linux: `sudo apt install poppler-utils libmagic1`
-  - macOS: `brew install poppler libmagic`
+  - Linux: `sudo apt install poppler-utils`
+  - macOS: `brew install poppler`
 
 ### Setup
 
