@@ -17,4 +17,9 @@ if [ ! -x "$CLI" ]; then
 fi
 
 "$CLI" -c tailwind.config.js -i static/css/tailwind.input.css -o static/css/tailwind.css --minify "$@"
+
+# The minifier omits the trailing newline, which the repo's own end-of-file-fixer
+# pre-commit hook then adds back — aborting the first commit after every rebuild.
+[ -n "$(tail -c1 static/css/tailwind.css)" ] && echo >> static/css/tailwind.css
+
 echo "Built static/css/tailwind.css"
