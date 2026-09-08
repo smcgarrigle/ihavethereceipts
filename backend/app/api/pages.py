@@ -35,9 +35,13 @@ def root(request: Request, db: Session = Depends(get_db)):
 
     from app.models import Receipt, Store
 
-    # Check if empty, and trigger onboarding demo data
+    # Show the demo on a genuinely fresh install, but only until the user has
+    # cleared it. Without the second half, clearing the demo lasted exactly one
+    # request and an empty dashboard was unreachable.
+    from app.services.onboarding import onboarding_is_complete
+
     receipt_count = db.query(Receipt).count()
-    if receipt_count == 0:
+    if receipt_count == 0 and not onboarding_is_complete():
         from app.services.onboarding import populate_demo_data
 
         populate_demo_data(db)

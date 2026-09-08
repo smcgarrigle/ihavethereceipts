@@ -191,6 +191,30 @@ def populate_demo_data(db: Session) -> bool:
         return False
 
 
+ONBOARDING_FLAG = "onboarding_complete"
+
+
+def onboarding_is_complete() -> bool:
+    """Whether the demo has already been shown and dismissed.
+
+    Seeding was gated on an empty receipts table alone, so clearing the demo
+    did not stick: the next request to / put the three fictional receipts
+    straight back. It also made the genuinely-empty dashboard unreachable.
+    """
+    from app.api.settings_router import _load_feature_flags
+
+    return bool(_load_feature_flags().get(ONBOARDING_FLAG, False))
+
+
+def mark_onboarding_complete() -> None:
+    """Record that the user has taken the wheel, so the demo stays gone."""
+    from app.api.settings_router import _load_feature_flags, _save_feature_flags
+
+    flags = _load_feature_flags()
+    flags[ONBOARDING_FLAG] = True
+    _save_feature_flags(flags)
+
+
 def clear_demo_data(db: Session) -> bool:
     """
     Clears all receipts containing notes="DEMO_DATA" and associated items.
@@ -208,6 +232,9 @@ def clear_demo_data(db: Session) -> bool:
         db.query(Item).filter(~Item.receipt_items.any()).delete(synchronize_session=False)
 
         db.commit()
+        # Only once the delete has committed: a flag set beside a failed clear
+        # would leave the dashboard empty with no way to get the demo back.
+        mark_onboarding_complete()
         logger.info("Successfully cleared all demonstration data and orphaned items.")
         return True
     except Exception as e:
