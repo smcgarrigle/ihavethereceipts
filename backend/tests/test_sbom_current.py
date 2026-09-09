@@ -5,9 +5,10 @@ fastapi said 0.128.0 against 0.141.1 installed, google-genai 1.60.0 against
 2.17.0. A bill of materials nobody can trust is worse than none, because it
 gets quoted.
 
-Versions are now derived by scripts/refresh_sbom.py and this fails when they
-drift. Licence and purpose stay editorial: neither can be read off the lock
-file, and the purpose column is the part of the document with any value in it.
+Versions are now derived from backend/uv.lock by scripts/refresh_sbom.py and
+this fails when they drift. Licence and purpose stay editorial: neither is in
+the lock file, and the purpose column is the part of the document with any
+value in it.
 """
 
 from __future__ import annotations
@@ -35,11 +36,11 @@ def test_sbom_exists():
     assert SBOM.is_file()
 
 
-def test_versions_match_what_is_installed(refresher):
+def test_versions_match_the_lock_file(refresher):
     """The drift guard. Fix with: uv run python scripts/refresh_sbom.py"""
     _updated, changes = refresher.refresh(SBOM.read_text(encoding="utf-8"))
     assert not changes, (
-        "SBOM.md versions have drifted from the installed packages:\n  "
+        "SBOM.md versions have drifted from backend/uv.lock:\n  "
         + "\n  ".join(changes)
         + "\n\nRun: uv run python scripts/refresh_sbom.py"
     )
@@ -57,7 +58,7 @@ def test_the_refresher_only_touches_the_version_column(refresher):
 
 
 def test_an_uninstalled_package_is_left_alone(refresher):
-    """Rows for things we no longer install are not the version guard's business."""
+    """Rows for things no longer in the lock are not the version guard's business."""
     row = "| [some-removed-thing](https://example.invalid/) | 1.2.3 | MIT | gone |\n"
     updated, changes = refresher.refresh(row)
     assert changes == []
