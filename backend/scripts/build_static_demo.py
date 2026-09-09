@@ -60,6 +60,14 @@ os.environ.setdefault("SECRET_KEY", "static-demo-build-key")
 sys.path.insert(0, str(BACKEND_DIR))
 
 # Page routes that exist regardless of data (entity pages are added from the DB).
+# The app validates the Host header (main.py:_trusted_hosts), and TestClient
+# defaults to http://testserver -- not a host the app answers to. Every request
+# the crawl made came back 400 "Invalid host header" and the snapshot came out
+# empty, for eighteen consecutive Pages deploys. The test suite never saw it
+# because conftest sets TESTING, which widens the allowlist to "*"; this build
+# does not. Kept as a constant so a test can assert it stays a trusted host.
+CLIENT_BASE_URL = "http://localhost"
+
 SEED_URLS = [
     "/",
     "/receipts",
@@ -789,7 +797,7 @@ def crawl(out: Path) -> tuple[int, list[str], set[str], int, int]:
     queue: deque[str] = deque(SEED_URLS)
     visited: set[str] = set(SEED_URLS)
 
-    with TestClient(app) as client:
+    with TestClient(app, base_url=CLIENT_BASE_URL) as client:
         seed_database()
         for url in entity_urls():
             if url not in visited:
@@ -962,6 +970,18 @@ def main() -> int:
             print(f"  ⚠️  {len(broken)} internal references have no snapshot file:")
             for ref in broken[:20]:
                 print(f"      {ref}")
+
+    # A snapshot with nothing in it is a failure, not a success. Reporting one
+    # as complete is how eighteen consecutive Pages deploys went red at the
+    # verify step instead of here, where the cause is visible.
+    if saved == 0:
+        print(
+            "\n❌ Snapshot is empty: no response was captured. The crawl reached "
+            "the app but saved nothing — check the warnings above for the status "
+            "codes it got back.",
+            file=sys.stderr,
+        )
+        return 1
 
     if final_out.exists():
         shutil.rmtree(final_out)
