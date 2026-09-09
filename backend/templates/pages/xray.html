@@ -313,23 +313,35 @@
                     <div class="hbar" style="margin-bottom: 0.5rem;">
                         <div class="hbar-label" x-text="item.name" :title="item.name"></div>
                         <div class="hbar-track" style="position:relative">
-                            <!-- Range bar showing min→max spread, scaled to the
-                                 dearest item in the whole chart so every row sits
-                                 on one comparable axis. -->
+                            <!-- Range bar showing min→max spread as a ratio to
+                                 this item's OWN average, not in dollars. Rows are
+                                 in different units — per lb, per oz, each — so a
+                                 shared dollar axis made bar length track absolute
+                                 price instead of volatility, which is what this
+                                 card ranks by. On a relative axis the longest bar
+                                 is the most volatile item. -->
                             <div class="range-bar-inner"
-                                 :style="`left: ${volPct(item.min)}%;
-                                          width: ${Math.max(volPct(item.spread), 1.5)}%;
+                                 :style="`left: ${volRel(item.min / item.avg)}%;
+                                          width: ${Math.max(volRel(item.spread / item.avg), 1.5)}%;
                                           background: ${getVolatilityColor(item.spread_pct)};`">
                             </div>
-                            <!-- Average price dot -->
+                            <!-- The average sits at 1.0 on that axis, so the dots
+                                 line up and the bar shows how far each item swings
+                                 either side of its own norm. -->
                             <div class="range-bar-dot"
-                                 :style="`left: ${volPct(item.avg)}%`"
-                                 :title="'Avg: $' + item.avg">
+                                 :style="`left: ${volRel(1)}%`"
+                                 :title="`Avg $${item.avg.toFixed(2)} — low $${item.min.toFixed(2)}, high $${item.max.toFixed(2)}`">
                             </div>
                         </div>
                         <div class="hbar-val">
                             <span :style="`color: ${getVolatilityColor(item.spread_pct)}`"
                                   x-text="'±' + item.spread_pct + '%'"></span>
+                            <!-- The price and the unit it is in. Without the unit
+                                 a reader cannot tell $0.94 an ounce from $21.69 a
+                                 pound, which is the confusion this card had. -->
+                            <span class="text-textSubtle"
+                                  style="font-size:0.6rem; display:block; line-height:1.2"
+                                  x-text="'$' + item.avg.toFixed(2) + (item.basis === 'each' ? ' each' : '/' + item.basis)"></span>
                         </div>
                     </div>
                 </template>
@@ -549,11 +561,16 @@ function xrayDashboard() {
             return count + ' ' + (count === 1 ? singular : (pluralForm || singular + 's'));
         },
 
-        volPct(value) {
+        // Position on an axis of "ratio to this item's own average", shared by
+        // every row so bar LENGTH is comparable between items in different units.
+        volRel(ratio) {
+            if (!isFinite(ratio) || ratio < 0) return 0;
             const rows = this.data?.price_volatility || [];
-            const ceiling = Math.max(...rows.map(r => r.max || 0), 0);
-            if (!ceiling) return 0;
-            return Math.min((value / ceiling) * 100, 100);
+            const ceiling = Math.max(
+                ...rows.map(r => (r.avg > 0 ? r.max / r.avg : 0)),
+                1.2  // keep a stable axis when every item is nearly flat
+            );
+            return Math.min((ratio / ceiling) * 100, 100);
         },
 
         // Category color palette (Tufte-approved muted tones)

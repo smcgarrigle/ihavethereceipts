@@ -94,3 +94,33 @@ def weighted_unit_price(
     if weight_priced:
         return round(line_total / weight, 4)
     return round(line_total / (qty * weight), 4)
+
+
+# Spellings of the same unit that reach us from OCR and from the review form.
+# "Regular Gasoline" alone arrives as gal, gallon and gallons — one purchase
+# each — which is enough to leave it with no comparable series at all.
+UNIT_ALIASES = {
+    "gallon": "gal",
+    "gallons": "gal",
+    "lbs": "lb",
+    "pound": "lb",
+    "pounds": "lb",
+    "ounce": "oz",
+    "ounces": "oz",
+    "fl_oz": "fl oz",
+    "floz": "fl oz",
+    "litre": "l",
+    "liter": "l",
+    "litres": "l",
+    "liters": "l",
+    "ea": "each",
+    "": "each",
+}
+
+
+def normalise_unit(unit: str | None) -> str:
+    """One spelling per unit, so two purchases of the same thing can be compared."""
+    if not unit:
+        return "each"
+    cleaned = unit.strip().lower()
+    return UNIT_ALIASES.get(cleaned, cleaned)
