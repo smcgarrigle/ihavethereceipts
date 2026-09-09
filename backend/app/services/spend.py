@@ -12,9 +12,15 @@ The column's meaning is correct and documented. What it needed was one place to
 say it, so import from here rather than writing the multiplication again.
 """
 
+import json
 from typing import Any
 
 from app.models import ReceiptItem
+from app.utils.item_parsing import (
+    is_weight_priced,
+    normalise_unit,
+    weighted_unit_price,
+)
 
 # SQL-side line total, for use inside func.sum(...), order_by(...) and friends.
 # SQLAlchemy expressions are reusable, so this one constant serves every query.
@@ -61,3 +67,47 @@ def unaccounted(total: float | None, item_sum: float) -> float:
         return 0.0
     diff = round(float(total) - item_sum, 2)
     return diff if abs(diff) >= 0.01 else 0.0
+
+
+def comparable_unit_price(receipt_item: Any) -> tuple[float, str]:
+    """A price that can be compared across purchases, and the basis it is in.
+
+    ``price`` is the per-quantity price, and for the same item that can mean two
+    different things: on a weight-priced line the quantity IS the weight, so
+    ``price`` is already per pound, while on a packaged line the quantity is a
+    count and ``price`` is per package. Comparing those to each other measures
+    how much was bought, not what it cost.
+
+    RED INSTANT YEAST is the case that showed it. Five purchases of the same
+    bulk yeast at $10.06-$11.00 a pound, but ``price`` reads 10.06, 1.41, 1.31,
+    1.76, 2.24 — an apparent swing of 260% where the real one is 9%.
+
+    Returns (price, basis). The basis is a normalised unit when the line has a
+    weight, and "each" otherwise; callers must only compare prices that share
+    a basis.
+    """
+    price = float(receipt_item.price or 0.0)
+    weight = receipt_item.weight
+    if not weight or weight <= 0:
+        return price, "each"
+
+    unit = normalise_unit(receipt_item.unit_type)
+    if unit == "each":
+        return price, "each"
+
+    is_bulk = False
+    if receipt_item.notes:
+        try:
+            is_bulk = bool(json.loads(receipt_item.notes).get("is_bulk"))
+        except (json.JSONDecodeError, TypeError, AttributeError):
+            is_bulk = False
+
+    per_unit = weighted_unit_price(
+        line_total(receipt_item),
+        receipt_item.quantity,
+        weight,
+        is_weight_priced(receipt_item.quantity, weight, is_bulk),
+    )
+    if per_unit is None or per_unit <= 0:
+        return price, "each"
+    return per_unit, unit
