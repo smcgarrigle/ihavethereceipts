@@ -121,8 +121,8 @@ The OCR receipt upload endpoint (`POST /api/receipts/upload`) accepts images and
 ## 5. Dependency Security
 
 - Run `uv pip list --outdated` periodically to identify stale packages.
-- Two runtime dependencies carry **GPL-2.0** licenses (`fuzzywuzzy`, `python-levenshtein`). These are slated for removal — `rapidfuzz` (MIT) is already the preferred replacement in all new code. See [SBOM.md](SBOM.md).
-- The `psycopg2-binary` and `asyncpg` PostgreSQL drivers are declared in `pyproject.toml` as legacy artifacts — the app uses SQLite exclusively. They are safe to prune in a future cleanup.
+- No dependency carries a copyleft license. The two **GPL-2.0** packages (`fuzzywuzzy`, `python-levenshtein`) and the **LGPL-3.0** PostgreSQL driver (`psycopg2-binary`) were removed once a check confirmed none of them had an import site anywhere; fuzzy matching is `rapidfuzz` (MIT) throughout. See [SBOM.md](SBOM.md).
+- `tests/test_declared_dependencies.py` fails if anything is imported without being declared, or declared without being imported — which is how those five were found.
 
 ---
 
