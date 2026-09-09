@@ -37,6 +37,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+import httpx
 from pydantic import BaseModel as _SchemaBase
 
 from app.core.config import settings
@@ -50,6 +51,12 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Backend selection
 # ---------------------------------------------------------------------------
+# Seconds to wait for a local model to answer. 3 minutes: long enough for a
+# normal model on a normal receipt, short enough that a wrong address fails
+# while you are still looking at the screen. Override with OCR_TIMEOUT_SECONDS.
+DEFAULT_LOCAL_READ_TIMEOUT = 180.0
+
+
 def get_backend() -> str:
     """Dynamically lookup the OCR backend from environment."""
     return os.getenv("OCR_BACKEND", "local").lower()
@@ -499,6 +506,21 @@ def _get_openrouter_client():
     return _openrouter_client
 
 
+def _local_read_timeout() -> float:
+    """How long to wait for the local model to answer, in seconds.
+
+    Configurable because the right value depends on the model: 180s covers a
+    normal vision model on a normal receipt, while a reasoning model emitting
+    chain-of-thought can need considerably longer.
+    """
+    raw = os.getenv("OCR_TIMEOUT_SECONDS", "").strip()
+    try:
+        value = float(raw)
+    except ValueError:
+        return DEFAULT_LOCAL_READ_TIMEOUT
+    return value if value > 0 else DEFAULT_LOCAL_READ_TIMEOUT
+
+
 def _get_local_client():
     if get_backend() == "openrouter":
         return _get_openrouter_client()
@@ -508,9 +530,24 @@ def _get_local_client():
         from openai import OpenAI
 
         url = _local_backend_url()
-        # Increase timeout to 30 minutes (1800s) to prevent the client from dropping the connection
-        # if a local "reasoning" model takes longer than the default 10 minutes to generate CoT tokens.
-        _local_client = OpenAI(base_url=url, api_key="ollama", timeout=1800.0)
+        # Separate connect and read budgets. A single flat timeout covered both,
+        # so an OCR_BACKEND_URL pointing at a host that drops packets rather than
+        # refusing them — a firewalled box, a stale Tailscale address, a container
+        # that has gone — hung an upload for the whole budget times the retries
+        # instead of failing fast with the message _local_error_message gives.
+        #
+        # Connect is 5s because a local server either answers immediately or is
+        # not there. Read is OCR_TIMEOUT_SECONDS (default 180) — long enough for
+        # a reasonable local model on a reasonable receipt, and the ceiling is
+        # real because max_retries is 0: retrying a hung connection only
+        # multiplies the wait. Raise OCR_TIMEOUT_SECONDS if you run a slow
+        # reasoning model that needs longer to generate its tokens.
+        _local_client = OpenAI(
+            base_url=url,
+            api_key="ollama",
+            timeout=httpx.Timeout(_local_read_timeout(), connect=5.0),
+            max_retries=0,
+        )
         logger.info(f"✓ Local OCR client initialized → {url}")
     return _local_client
 
@@ -608,12 +645,26 @@ def _local_error_message(exc: Exception, url: str) -> str:
 
     logger.error(f"[OCR] Local AI error at {url}: {exc}")
 
-    # APITimeoutError subclasses APIConnectionError, so it goes first.
+    # APITimeoutError subclasses APIConnectionError, so it goes first. But it
+    # covers two different failures, and now that the connect budget is separate
+    # from the read budget the connect one is the common case: a host that drops
+    # packets rather than refusing them times out on connect, and telling the
+    # user their model "did not finish in time" when nothing ever answered sends
+    # them looking at the wrong thing. httpx leaves the specific timeout on
+    # __cause__, so the two can be told apart.
     if isinstance(exc, openai.APITimeoutError):
+        if isinstance(exc.__cause__, httpx.ConnectTimeout):
+            return (
+                f"Nothing answered at {url}. The address took too long even to "
+                "connect, which usually means it is wrong or the host is "
+                "unreachable rather than busy — check OCR_BACKEND_URL, or start "
+                "Ollama (`ollama serve`) or LM Studio's local server."
+            )
         return (
-            f"The model at {url} took the receipt but did not finish in time. "
-            "A large receipt on a small model can outlast the timeout — try a "
-            "smaller image, or a quicker model."
+            f"The model at {url} took the receipt but did not finish in "
+            f"{_local_read_timeout():.0f}s. A large receipt on a small model can "
+            "outlast that — try a smaller image or a quicker model, or raise "
+            "OCR_TIMEOUT_SECONDS."
         )
     if isinstance(exc, openai.APIConnectionError | ConnectionError):
         return (

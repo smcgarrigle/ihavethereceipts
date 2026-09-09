@@ -109,7 +109,9 @@ class TestTheLocalBackendExplainsItself:
         )
         error = ocr._process_local([local_backend])["error"]
 
-        assert "did not finish in time" in error
+        # A timeout with no __cause__ cannot be attributed to connecting, so it
+        # reads as the model being slow — and now names the budget it exceeded.
+        assert "did not finish" in error
         assert "Nothing answered" not in error, "a timeout was reported as a refusal"
         assert URL in error
 
@@ -151,3 +153,75 @@ class TestGeminiUploadFailureIsAResult:
         result = ocr._process_gemini([str(img)])
         assert "error" in result, "the exception propagated instead of returning a result"
         assert "API key not valid" in result["error"]
+
+
+class TestTheTimeoutBudgets:
+    """A flat 30-minute timeout covered connecting as well as reading.
+
+    An OCR_BACKEND_URL pointing at a host that drops packets rather than
+    refusing them — a firewalled box, a stale Tailscale address, a container
+    that has gone — hung an upload for that budget times the SDK's retries,
+    which is up to 90 minutes, instead of failing fast with the message above.
+    Measured against 127.0.0.1:1, which drops on this machine: 11 seconds.
+    """
+
+    def test_connecting_is_capped_short(self):
+        from app.services import ocr
+
+        ocr._local_client = None
+        client = ocr._get_local_client()
+        assert client.timeout.connect == 5.0
+
+    def test_reading_gets_the_configured_budget(self, monkeypatch):
+        from app.services import ocr
+
+        monkeypatch.setenv("OCR_TIMEOUT_SECONDS", "240")
+        ocr._local_client = None
+        try:
+            assert ocr._get_local_client().timeout.read == 240.0
+        finally:
+            ocr._local_client = None
+
+    def test_the_default_read_budget_is_three_minutes(self, monkeypatch):
+        from app.services import ocr
+
+        monkeypatch.delenv("OCR_TIMEOUT_SECONDS", raising=False)
+        assert ocr._local_read_timeout() == 180.0
+
+    @pytest.mark.parametrize("bad", ["", "   ", "not-a-number", "0", "-30"])
+    def test_a_nonsense_setting_falls_back_to_the_default(self, bad, monkeypatch):
+        from app.services import ocr
+
+        monkeypatch.setenv("OCR_TIMEOUT_SECONDS", bad)
+        assert ocr._local_read_timeout() == ocr.DEFAULT_LOCAL_READ_TIMEOUT
+
+    def test_retries_do_not_multiply_the_ceiling(self):
+        """3 minutes must mean 3 minutes, not 3 attempts of 3 minutes."""
+        from app.services import ocr
+
+        ocr._local_client = None
+        assert ocr._get_local_client().max_retries == 0
+
+    def test_a_connect_timeout_is_not_reported_as_a_slow_model(self, local_backend, monkeypatch):
+        """Both are APITimeoutError; only __cause__ tells them apart."""
+        request = httpx.Request("POST", URL)
+        timed_out = openai.APITimeoutError(request=request)
+        timed_out.__cause__ = httpx.ConnectTimeout("too slow", request=request)
+
+        monkeypatch.setattr(ocr, "_get_local_client", lambda: _dead_client(timed_out))
+        error = ocr._process_local([local_backend])["error"]
+
+        assert "Nothing answered" in error
+        assert "did not finish" not in error, "a dead address blamed the model"
+        assert "OCR_BACKEND_URL" in error
+
+    def test_a_real_read_timeout_still_blames_the_model(self, local_backend, monkeypatch):
+        request = httpx.Request("POST", URL)
+        timed_out = openai.APITimeoutError(request=request)
+        timed_out.__cause__ = httpx.ReadTimeout("too slow", request=request)
+
+        monkeypatch.setattr(ocr, "_get_local_client", lambda: _dead_client(timed_out))
+        error = ocr._process_local([local_backend])["error"]
+
+        assert "did not finish" in error
+        assert "OCR_TIMEOUT_SECONDS" in error, "no way to raise the limit offered"
