@@ -13,6 +13,8 @@ say it, so import from here rather than writing the multiplication again.
 """
 
 import json
+from collections import Counter
+from collections.abc import Iterable
 from typing import Any
 
 from app.models import ReceiptItem
@@ -111,3 +113,49 @@ def comparable_unit_price(receipt_item: Any) -> tuple[float, str]:
     if per_unit is None or per_unit <= 0:
         return price, "each"
     return per_unit, unit
+
+
+def comparable_price_series(receipt_items: Iterable[Any]) -> tuple[str, list[tuple[Any, float]]]:
+    """One item's purchases reduced to a series that can honestly be compared.
+
+    :func:`comparable_unit_price` says what a single line cost per unit and on
+    what basis; this picks the basis to read the item on and drops the lines
+    that are not on it. A chart or a spread that mixes $/lb points with $/each
+    points is measuring the shopping, not the price, which is the bug both
+    callers exist to avoid.
+
+    The basis chosen is the one the item was bought on most often, ties broken
+    on the basis name so the answer does not depend on row order. Returns
+    ``(basis, [(line, price), ...])`` with the lines in the order given, or
+    ``("", [])`` when nothing on the list carries a price.
+
+    Lines left out are the caller's to account for: the X-Ray radar simply has
+    a shorter series, while the item insights page says how many purchases are
+    not on the chart, since that page is showing them all a few pixels above.
+    """
+    priced: list[tuple[Any, float, str]] = []
+    for line in receipt_items:
+        if not line.price or line.price <= 0:
+            continue
+        price, basis = comparable_unit_price(line)
+        if price > 0:
+            priced.append((line, price, basis))
+
+    if not priced:
+        return "", []
+
+    counts = Counter(basis for _, _, basis in priced)
+    basis = min(counts, key=lambda b: (-counts[b], b))
+    return basis, [(line, price) for line, price, b in priced if b == basis]
+
+
+def price_basis_label(basis: str) -> str:
+    """How to say a basis next to a dollar figure: "$2.49 per lb", "$8.30 each".
+
+    One phrasing for every place a comparable price is shown, because $0.94 an
+    ounce and $21.69 a pound are not otherwise distinguishable on a page that
+    charts whichever basis the item happened to be bought on.
+    """
+    if not basis or basis == "each":
+        return "each"
+    return f"per {basis}"
