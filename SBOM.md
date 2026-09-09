@@ -31,7 +31,6 @@ These are the packages explicitly declared in `backend/pyproject.toml`.
 | [jinja2](https://jinja.palletsprojects.com/) | 3.1.6 | BSD-3-Clause | HTML templating engine |
 | [python-multipart](https://github.com/andrew-d/python-multipart) | 0.0.21 | Apache-2.0 | Form/file upload parsing |
 | [itsdangerous](https://itsdangerous.palletsprojects.com/) | 2.2.0 | BSD-3-Clause | CSRF token signing |
-| [aiofiles](https://github.com/Tinche/aiofiles) | 25.1.0 | Apache-2.0 | Async file I/O |
 
 ### Database & ORM
 
@@ -39,10 +38,8 @@ These are the packages explicitly declared in `backend/pyproject.toml`.
 | :--- | :--- | :--- | :--- |
 | [sqlalchemy](https://www.sqlalchemy.org/) | 2.0.46 | MIT | ORM and query builder |
 | [alembic](https://alembic.sqlalchemy.org/) | 1.18.1 | MIT | Database schema migrations |
-| [psycopg2-binary](https://www.psycopg.org/) | 2.9.11 | LGPL-3.0 | PostgreSQL driver (sync) — legacy, unused |
-| [asyncpg](https://github.com/MagicStack/asyncpg) | 0.31.0 | Apache-2.0 | PostgreSQL driver (async) — legacy, unused |
 
-> **Primary database:** SQLite (zero-config, file-based). The PostgreSQL drivers (`psycopg2-binary`, `asyncpg`) are legacy artifacts from early development and are not required for normal operation. They are candidates for removal in a future cleanup.
+> **Primary database:** SQLite (zero-config, file-based). The PostgreSQL drivers that used to be declared here were removed once a check confirmed they had no import sites anywhere.
 
 ### AI / OCR
 
@@ -59,8 +56,6 @@ These are the packages explicitly declared in `backend/pyproject.toml`.
 | Package | Installed Version | License | Purpose |
 | :--- | :--- | :--- | :--- |
 | [rapidfuzz](https://github.com/maxbachmann/RapidFuzz) | 3.14.3 | MIT | Fast fuzzy string matching (item deduplication) — **preferred** |
-| [fuzzywuzzy](https://github.com/seatgeek/fuzzywuzzy) | 0.18.0 | GPL-2.0 | Legacy fuzzy match — **superseded by rapidfuzz, pending removal** |
-| [python-levenshtein](https://github.com/maxbachmann/python-Levenshtein) | 0.27.3 | GPL-2.0 | Edit-distance computations — **pending removal** |
 | [json-repair](https://github.com/mangiucugna/json_repair) | 0.58.6 | MIT | Repairs malformed JSON from LLM output |
 
 ### Data Processing & Export
@@ -145,15 +140,13 @@ All frontend libraries are downloaded and served locally. No external CDN reques
 | License | Count | Key Packages |
 | :--- | :--- | :--- |
 | MIT | ~20 | fastapi, sqlalchemy, alembic, rapidfuzz, json-repair, ruff, pytest, openpyxl |
-| Apache-2.0 | ~10 | google-genai, openai, asyncpg, aiofiles, playwright, requests |
+| Apache-2.0 | ~10 | google-genai, openai, playwright, requests, tenacity |
 | BSD-3-Clause | ~8 | uvicorn, starlette, jinja2, python-dotenv, pandas, numpy, httpx |
-| GPL-2.0 | 2 | fuzzywuzzy, python-levenshtein (**pending removal**) |
-| LGPL-3.0 | 1 | psycopg2-binary (legacy, unused) |
 | MPL-2.0 | 1 | axe-core-python (dev only) |
 | HPND | 1 | pillow |
 | OFL-1.1 | 1 | Inter font (vendored) |
 
-> ⚠️ **GPL-2.0 note:** `fuzzywuzzy` and `python-levenshtein` are GPL-2.0. They are used internally only (not redistributed as a library). `rapidfuzz` (MIT) is the established replacement — all new matching code uses it. These two packages should be removed from `pyproject.toml` once any remaining call sites are audited and migrated.
+> **No copyleft dependencies.** The two GPL-2.0 packages (`fuzzywuzzy`, `python-levenshtein`) and the LGPL-3.0 one (`psycopg2-binary`) were removed once a check confirmed none of them had an import site anywhere. Fuzzy matching is `rapidfuzz` (MIT) throughout.
 
 ---
 
