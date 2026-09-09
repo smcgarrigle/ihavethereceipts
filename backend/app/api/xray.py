@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.models import Item, Receipt, ReceiptItem, Store
-from app.services.spend import comparable_unit_price, line_total
+from app.services.spend import comparable_price_series, line_total
 
 logger = logging.getLogger(__name__)
 from app.api.analytics import _get_analytics_exclusions, _is_excluded  # noqa: E402
@@ -68,28 +68,23 @@ def receipt_xray_data(db: Session = Depends(get_db)):
     # is the case that exposed it: five purchases of the same bulk yeast between
     # $10.06 and $11.00 a pound read as a 260% swing, when the real one is 9%.
     # Regular Gasoline was worse, at 226% against a true 3.8% a gallon.
-    item_prices: dict[tuple[str, str], list[float]] = defaultdict(list)
+    item_lines: dict[str, list[ReceiptItem]] = defaultdict(list)
     for r in receipts:
         for ri in r.items:
             cat_name = ri.item.category.name if ri.item and ri.item.category else "Uncategorized"
             item_name = ri.item.name if ri.item else ""
             if _is_excluded(exclusions, cat_name, item_name):
                 continue
-            if ri.item and ri.price and ri.price > 0:
-                price, basis = comparable_unit_price(ri)
-                if price > 0:
-                    item_prices[(ri.item.name, basis)].append(price)
+            if ri.item:
+                item_lines[ri.item.name].append(ri)
 
-    # One series per item: the basis it was bought on most often. Ties break on
-    # the basis name so the chart does not reshuffle between requests.
-    best_series: dict[str, tuple[str, list[float]]] = {}
-    for (name, basis), prices in sorted(item_prices.items()):
-        current = best_series.get(name)
-        if current is None or len(prices) > len(current[1]):
-            best_series[name] = (basis, prices)
-
+    # One series per item, on the basis it was bought on most often, which is
+    # what comparable_price_series picks. The item insights page reads the same
+    # helper, so a price charted there and a spread reported here agree.
     volatility_data = []
-    for name, (basis, prices) in best_series.items():
+    for name, lines in item_lines.items():
+        basis, series = comparable_price_series(lines)
+        prices = [price for _, price in series]
         if len(prices) >= 3:  # Need at least 3 data points
             avg = sum(prices) / len(prices)
             min_p = min(prices)

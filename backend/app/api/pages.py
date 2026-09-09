@@ -15,7 +15,12 @@ from sqlalchemy.orm import Session
 
 from app.api.templates import templates
 from app.database import get_db
-from app.services.spend import line_total
+from app.services.spend import (
+    comparable_price_series,
+    comparable_unit_price,
+    line_total,
+    price_basis_label,
+)
 
 logger = logging.getLogger("app.pages")
 router = APIRouter()
@@ -738,6 +743,20 @@ def restock_page(request: Request):
     return templates.TemplateResponse(request, "pages/restock.html")
 
 
+def _purchase_day(receipt_item) -> str:
+    """The purchase date of a line, as the sparkline axis says it.
+
+    Dates come back as datetimes, but the template has long defended against a
+    string here, so this does too rather than 500 the page over a stray one.
+    """
+    date = receipt_item.receipt.purchase_date if receipt_item.receipt else None
+    if not date:
+        return ""
+    if isinstance(date, str):
+        return date[:10]
+    return date.strftime("%b %d, %Y")
+
+
 @router.get("/items/{item_id}/insights", response_class=HTMLResponse)
 def item_insights_page(request: Request, item_id: int, db: Session = Depends(get_db)):
     from sqlalchemy.orm import joinedload
@@ -761,6 +780,47 @@ def item_insights_page(request: Request, item_id: int, db: Session = Depends(get
         .options(joinedload(ReceiptItem.receipt).joinedload(Receipt.store))
         .order_by(Receipt.purchase_date.desc())
         .all()
+    )
+
+    # The price panel reads per-unit prices rather than the `price` column.
+    # `price` is per-quantity, and for one item that means two things: on a
+    # weight-priced line the quantity IS the weight so `price` is already per
+    # pound, while on a packaged line it is the price of one package. Charting
+    # the column plots how much was bought. 00 PIZZA FLOUR is the case that
+    # showed it here — a 1.75 lb bag at $3.06 and two 1.42 lb bags at $2.49 and
+    # $2.10 drew a 52% collapse, where the price per pound went $1.75, $1.75,
+    # $1.48. The X-Ray volatility radar reads the same helpers, so a spread
+    # reported there and a price charted here are the same number.
+    line_prices = {}
+    for ri in purchase_history:
+        unit_price, line_basis = comparable_unit_price(ri)
+        line_prices[ri.id] = {
+            "total": line_total(ri),
+            "unit": unit_price,
+            "basis": line_basis,
+            "label": price_basis_label(line_basis),
+        }
+
+    price_basis, comparable = comparable_price_series(purchase_history)
+    # Oldest first, the direction the sparkline is read in.
+    price_trend = [
+        {"label": _purchase_day(ri), "price": round(price, 4)} for ri, price in reversed(comparable)
+    ]
+    charted = [point["price"] for point in price_trend]
+    price_summary = (
+        {
+            "basis": price_basis,
+            "label": price_basis_label(price_basis),
+            "min": min(charted),
+            "max": max(charted),
+            "avg": sum(charted) / len(charted),
+            "charted": len(charted),
+            # Purchases on another basis: shown in the timeline above, but a
+            # $/each point on a $/lb line would be a different kind of number.
+            "omitted": len(purchase_history) - len(charted),
+        }
+        if charted
+        else None
     )
 
     # Determine Nutrition Data and Source
@@ -902,6 +962,9 @@ def item_insights_page(request: Request, item_id: int, db: Session = Depends(get
             "source": nutrition_source,
             "custom": item.custom_nutrients or {},
             "purchase_history": purchase_history,
+            "line_prices": line_prices,
+            "price_trend": price_trend,
+            "price_summary": price_summary,
             "categories": db.query(Category).order_by(Category.name).all(),
         },
     )
