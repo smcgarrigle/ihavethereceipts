@@ -3,11 +3,12 @@ import datetime
 import json
 import logging
 import os
-from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
 from google import genai
+
+from app.core.config import settings
 
 # Ensure env vars are loaded
 load_dotenv()
@@ -21,7 +22,10 @@ class ModelManager:
     Ensures the application always uses available models.
     """
 
-    CACHE_FILE = Path("data/known_models.json")
+    # Absolute via settings: this was CWD-relative, so the model cache split
+    # between data/known_models.json and backend/data/known_models.json
+    # depending on where the app was started. Both files exist on this machine.
+    CACHE_FILE = settings.KNOWN_MODELS_PATH
     CACHE_DURATION_DAYS = 7
 
     # Preferred aliases/keywords in order of priority

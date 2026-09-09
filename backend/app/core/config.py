@@ -80,18 +80,22 @@ class Settings:
     OCR_BACKEND_URL: str = os.getenv("OCR_BACKEND_URL", "http://localhost:11434/v1")
     GEMINI_MODEL_NAME: str = os.getenv("GEMINI_MODEL_NAME", "gemini-flash")
 
-    # Feature Flags
-    # Enable by setting ENABLE_FEATURE_NAME=true in .env
-    FEATURES = {
-        "OPEN_PRODUCE": os.getenv("ENABLE_OPEN_PRODUCE", "false").lower() == "true",
-        "INGREDIENT_ANALYTICS": os.getenv("ENABLE_INGREDIENT_ANALYTICS", "true").lower() == "true",
-        "BULK_AUTO_PROCESS": os.getenv("ENABLE_BULK_AUTO_PROCESS", "true").lower() == "true",
-        "EXPERIMENTAL_OCR": os.getenv("ENABLE_EXPERIMENTAL_OCR", "false").lower() == "true",
-    }
+    # Runtime state and caches. These live in one place because two of them
+    # used to be CWD-relative (`Path("data/...")`), and both `make run` and
+    # start_server.sh run from backend/ — so the daily usage counter, the OCR
+    # cache and the model cache all resolved to a second `backend/data/`
+    # directory, quietly splitting from the real one at the repository root.
+    FEATURE_FLAGS_PATH: Path = DATA_DIR / "feature_flags.json"
+    OCR_FILTERS_PATH: Path = DATA_DIR / "ocr_filters.json"
+    OCR_USAGE_PATH: Path = DATA_DIR / "ocr_usage.json"
+    OCR_CACHE_DIR: Path = DATA_DIR / "ocr_cache"
+    KNOWN_MODELS_PATH: Path = DATA_DIR / "known_models.json"
 
-    @classmethod
-    def is_enabled(cls, feature_name: str) -> bool:
-        return cls.FEATURES.get(feature_name.upper(), False)
+    # There was a FEATURES dict and an is_enabled() classmethod here, reading
+    # four ENABLE_* variables that .env.example documented as live. Nothing
+    # anywhere called either of them, so setting ENABLE_BULK_AUTO_PROCESS=false
+    # did nothing and said nothing. Deleted rather than wired up: none of the
+    # four describes behaviour the app actually has a switch for.
 
 
 settings = Settings()

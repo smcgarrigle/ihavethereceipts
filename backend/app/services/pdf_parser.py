@@ -2,18 +2,21 @@ import json
 import logging
 import re
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
 import pdfplumber
 
+from app.core.config import settings
+
 logger = logging.getLogger(__name__)
 
-_OCR_FILTERS_PATH = (
-    Path(__file__).resolve().parent.parent.parent.parent / "data" / "ocr_filters.json"
-)
+_OCR_FILTERS_PATH = settings.OCR_FILTERS_PATH
 
-_FALLBACK_SKIP = [
+# Public because the settings page needs the same defaults: `data/ocr_filters.json`
+# is runtime state and is no longer tracked in git, so a fresh clone has only
+# these. They were previously the parser's private fallback while the settings
+# loader fell back to nothing.
+FALLBACK_SKIP = [
     "Purchased at",
     "Order Summary",
     "Order Details",
@@ -28,7 +31,7 @@ _FALLBACK_SKIP = [
     "PICKUP AT",
     "Payment method",
 ]
-_FALLBACK_JUNK = [
+FALLBACK_JUNK = [
     r", Non-GMO",
     r", Gluten-Free",
     r", with Immune Support",
@@ -96,9 +99,9 @@ def _load_ocr_filters() -> tuple[list[str], list[str]]:
     try:
         with open(_OCR_FILTERS_PATH) as f:
             data = json.load(f)
-        return data.get("skip_keywords", _FALLBACK_SKIP), data.get("junk_filters", _FALLBACK_JUNK)
+        return data.get("skip_keywords", FALLBACK_SKIP), data.get("junk_filters", FALLBACK_JUNK)
     except Exception:
-        return _FALLBACK_SKIP, _FALLBACK_JUNK
+        return FALLBACK_SKIP, FALLBACK_JUNK
 
 
 def parse_pdf_receipt(pdf_path: str) -> dict[str, Any] | None:
