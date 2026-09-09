@@ -132,7 +132,7 @@ sudo dphys-swapfile setup && sudo dphys-swapfile swapon
 
 ```bash
 # Install system dependencies
-sudo apt update && sudo apt install -y python3 python3-pip pipx poppler-utils libmagic1
+sudo apt update && sudo apt install -y python3 python3-pip pipx poppler-utils
 
 # Install uv
 pipx install uv

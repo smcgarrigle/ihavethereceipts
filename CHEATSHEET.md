@@ -29,13 +29,14 @@ uvicorn app.main:app --reload --port 8000
 ## 📋 Log Tracing
 
 ### Local Mode (Python/Uvicorn)
-If you started the app using `./start_server.sh`, logs are written to a file:
-```bash
-# Follow logs in real-time
-tail -f backend/uvicorn_log.txt
-```
+`./start_server.sh` runs uvicorn in the foreground, so request logs appear in
+that terminal window. There is no `uvicorn_log.txt` — nothing writes one.
 
-If you ran `uvicorn` directly in the terminal, logs appear in that terminal window.
+The background bulk worker is the one component that does log to a file:
+```bash
+# Follow the OCR queue in real-time
+tail -f data/bulk.log
+```
 ---
 
 ## 🛠️ Troubleshooting
@@ -150,8 +151,8 @@ uv run python scripts/ocr_eval.py --live --limit 5 # re-run OCR with current pro
 ### Inspect What the OCR Has Learned
 The feedback loop stores your review corrections and feeds them into future prompts:
 ```bash
-sqlite3 backend/grocery.db "SELECT field, ai_value, approved_value FROM ocr_corrections ORDER BY id DESC LIMIT 20;"
-# or from backend/: sqlite3 grocery.db "..."
+sqlite3 grocery.db "SELECT field, ai_value, approved_value FROM ocr_corrections ORDER BY id DESC LIMIT 20;"
+# the database lives at the repository root, so from backend/: sqlite3 ../grocery.db "..."
 ```
 
 ### Monitor GPU Usage
@@ -189,38 +190,6 @@ If `ollama ps` shows 100% CPU despite having a GPU:
 
 All scripts live in `backend/scripts/` and use `grocery.db` directly. Run from `backend/`.
 
-### Fix Unit Prices & Extract Sizes from Item Names
-Patches `ocr_data` JSON to extract weight/unit from names like `"5LB"`, `"8 Oz"`, `"6PK"` and recalculate `unit_price = final_price / weight`. Zero API calls.
-```bash
-# Single receipt
-uv run python scripts/patch_receipt_ocr.py --receipt-id 452
-# All receipts
-uv run python scripts/patch_receipt_ocr.py --all
-# Preview without writing
-uv run python scripts/patch_receipt_ocr.py --all --dry-run
-```
-
-### Back-fill Missing Dates from PDF Files
-Recovers `purchase_date` from PDF filenames and content (reads `"Order placed..."` from PDF text).
-```bash
-uv run python scripts/fix_batch_dates.py [--dry-run]
-```
-
-### Remove Junk Item Names (PDF Parser Boilerplate)
-Flags items whose names contain address strings, "Buy again", payment details, etc.
-```bash
-# Report only
-uv run python scripts/fix_dirty_names.py
-# Delete the flagged items
-uv run python scripts/fix_dirty_names.py --delete
-```
-
-### Normalize Store Names
-Merges variants like `Iherb`/`IHerb` → `iHerb`, `Amazon` → `Amazon.com`.
-```bash
-uv run python scripts/fix_store_names.py [--dry-run]
-```
-
 ### Backfill Unit Prices (Saved ReceiptItems)
 Recomputes `unit_price` (and the per-quantity `price`) in the `receipt_items`
 table from the pricing breakdown in each line's `notes` JSON. `price` stays the
@@ -230,4 +199,13 @@ per-pound figure for bulk lines. Always `--dry-run` first.
 uv run python scripts/backfill_unit_prices.py [--dry-run]
 ```
 
-> See `DATA_CLEANUP_2026_05_02.md` for the full audit log from the May 2026 batch import cleanup.
+### One-off cleanup scripts (archived)
+
+Four scripts that used to be listed here — `patch_receipt_ocr.py`,
+`fix_batch_dates.py`, `fix_dirty_names.py` and `fix_store_names.py` — were
+written for the May 2026 batch import cleanup and have moved to
+`backend/scripts/archive/`. They still run, but they are historical one-offs
+rather than maintenance you should reach for, and they are not covered by the
+test suite. Read one before running it.
+
+Current store-name normalisation lives in `scripts/normalize_stores.py`.

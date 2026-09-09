@@ -243,7 +243,7 @@ Install system dependencies before running `uv sync`:
 
 ```bash
 # PDF processing + file-type detection
-sudo apt install -y poppler-utils libmagic1
+sudo apt install -y poppler-utils
 
 # Optional: local AI via Ollama
 curl -fsSL https://ollama.com/install.sh | sh
@@ -264,7 +264,6 @@ make lint    # ruff check + format
 | Issue | Resolution |
 |---|---|
 | `pdfplumber` fails to open PDFs | Run `sudo apt install poppler-utils` |
-| `python-magic` import error | Run `sudo apt install libmagic1` |
 | Port 8000 already in use | Change with `--port 8001` in `make run` |
 | Ollama slow on first run | First inference downloads model weights — normal |
 | SQLite `database is locked` | WAL mode is on by default; this is rare under normal use |
@@ -281,7 +280,7 @@ The app runs natively on Apple Silicon. After cloning, install system dependenci
 # Homebrew (if not installed)
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
-brew install uv poppler libmagic   # uv + PDF + file-type detection
+brew install uv poppler   # uv + PDF + file-type detection
 
 # Optional: local AI via Ollama
 brew install ollama
@@ -302,7 +301,6 @@ make lint    # ruff check + format
 | Issue | Resolution |
 |---|---|
 | `pdfplumber` fails to open PDFs | Run `brew install poppler` |
-| `python-magic` import error | Run `brew install libmagic` |
 | Port 8000 already in use | Change with `--port 8001` in `make run` |
 | LM Studio / Ollama slow on first run | First inference downloads model weights — normal |
 | SQLite `database is locked` | WAL mode is on by default; this is rare under normal use |
