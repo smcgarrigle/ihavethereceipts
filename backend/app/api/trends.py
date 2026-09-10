@@ -14,7 +14,7 @@ from app.api.trends_nutrition import (
 )
 from app.database import get_db
 from app.models import Item, Receipt, ReceiptItem
-from app.services.spend import LINE_TOTAL
+from app.services.spend import LINE_TOTAL, comparable_price_series, price_basis_label
 
 router = APIRouter()
 
@@ -341,57 +341,76 @@ def get_frequency_data(db: Session = Depends(get_db)):
     }
 
 
+def _week_key(purchase_date, fmt: str) -> str | None:
+    """The week a purchase falls in, or None if the date cannot be read.
+
+    Dates arrive as datetimes, but a stray string has always been guarded
+    against here, so keep guarding.
+    """
+    from datetime import datetime
+
+    if isinstance(purchase_date, str):
+        try:
+            clean = purchase_date.replace("T", " ").split(" ")[0]
+            purchase_date = datetime.strptime(clean, "%Y-%m-%d")
+        except ValueError:
+            return None
+    try:
+        return purchase_date.strftime(fmt)
+    except AttributeError:
+        return None
+
+
 @router.get("/inflation")
 def get_inflation_data(db: Session = Depends(get_db)):
     """
     Calculate the week-over-week price change (inflation index).
     Returns a list of weeks with their average price change percentage.
+
+    Each purchase is compared to the previous purchase of the same item on the
+    same basis. `ReceiptItem.price` is the per-quantity price, so reading the
+    column directly compares $/lb on a weight-priced line against $/package on
+    a packaged one and reports the change in bag size as inflation: three
+    purchases of 00 PIZZA FLOUR at a steady $1.75/lb read as a 43% drop.
+    `comparable_price_series` picks one basis per item, as it does for the
+    X-Ray radar and the item insights sparkline.
+
+    Read `count` alongside `change`. This is a plain mean over whatever
+    comparisons landed in a week, and a week holding one of them is common —
+    2026-W19 in the live database is a single purchase of one cracker brand.
     """
     from collections import defaultdict
-    from datetime import datetime
 
-    # 1. Get all receipt items ordered by date
-    from sqlalchemy import text
+    from sqlalchemy.orm import joinedload
 
-    query = text("""
-    SELECT
-        i.id,
-        ri.price,
-        r.purchase_date
-    FROM receipt_items ri
-    JOIN receipts r ON ri.receipt_id = r.id
-    JOIN items i ON ri.item_id = i.id
-    LEFT JOIN categories c ON i.category_id = c.id
-    WHERE c.name IS NULL OR c.name NOT IN ('Excluded', 'Other')
-    ORDER BY r.purchase_date ASC
-    """)
-    rows = db.execute(query).fetchall()
+    from app.models import Category
 
-    # 2. Process changes
-    last_prices = {}
+    lines = (
+        db.query(ReceiptItem)
+        .join(Receipt, ReceiptItem.receipt_id == Receipt.id)
+        .join(Item, ReceiptItem.item_id == Item.id)
+        .outerjoin(Category, Item.category_id == Category.id)
+        .filter(Receipt.purchase_date.isnot(None))
+        .filter(or_(Category.name.is_(None), Category.name.notin_(["Excluded", "Other"])))
+        .options(joinedload(ReceiptItem.receipt))
+        .order_by(Receipt.purchase_date.asc())
+        .all()
+    )
+
+    by_item: dict[int, list[ReceiptItem]] = defaultdict(list)
+    for line in lines:
+        by_item[line.item_id].append(line)
+
     weekly_changes = defaultdict(list)
-
-    for item_id, price, purchase_date in rows:
-        try:
-            # Handle string vs datetime object
-            if isinstance(purchase_date, str):
-                # Handle T or space separator
-                clean_date = purchase_date.replace("T", " ").split(" ")[0]
-                dt = datetime.strptime(clean_date, "%Y-%m-%d")
-            else:
-                dt = purchase_date
-
-            week_str = dt.strftime("%Y-W%W")
-        except (ValueError, TypeError, AttributeError):
-            continue
-
-        if item_id in last_prices:
-            old_price = last_prices[item_id]
-            if old_price > 0:
-                change_pct = (price - old_price) / old_price
-                weekly_changes[week_str].append(change_pct)
-
-        last_prices[item_id] = price
+    for item_lines in by_item.values():
+        # Ascending by date, and the series keeps the order it was given.
+        _, series = comparable_price_series(item_lines)
+        previous = None
+        for line, price in series:
+            week_str = _week_key(line.receipt.purchase_date if line.receipt else None, "%Y-W%W")
+            if week_str and previous is not None and previous > 0:
+                weekly_changes[week_str].append((price - previous) / previous)
+            previous = price
 
     # 3. Format response
     sorted_weeks = sorted(weekly_changes.keys())
@@ -498,46 +517,61 @@ def get_store_top_items(
     item_names = {t.id: t.name for t in top_items}
 
     # 3. Get history for these items
+    #
+    # Averaged in Python rather than in SQL, because the figure being averaged
+    # is not a column. `price` is per-quantity, which for one item means $/lb on
+    # a weight-priced line and $/package on a packaged one, so `avg(price)` over
+    # a week mixed the two and moved with how much was bought. Each item is read
+    # on the basis it was bought on most at this store, and says so in its label.
+    from collections import defaultdict
+
+    from sqlalchemy.orm import joinedload
+
     history_query = (
-        db.query(
-            ReceiptItem.item_id,
-            func.strftime("%Y-%W", Receipt.purchase_date).label("week"),
-            func.avg(ReceiptItem.price).label("avg_price"),
-        )
+        db.query(ReceiptItem)
         .join(Receipt, ReceiptItem.receipt_id == Receipt.id)
         .filter(Receipt.store_id == store_obj.id)
         .filter(ReceiptItem.item_id.in_(top_item_ids))
         .filter(Receipt.purchase_date.is_not(None))
+        .options(joinedload(ReceiptItem.receipt))
     )
 
     if start_date:
         history_query = history_query.filter(Receipt.purchase_date >= start_date)
 
-    history = history_query.group_by(ReceiptItem.item_id, "week").order_by("week").all()
+    lines_by_item: dict[int, list[ReceiptItem]] = defaultdict(list)
+    for line in history_query.all():
+        lines_by_item[line.item_id].append(line)
+
+    # item id -> (basis, {week: mean comparable price})
+    history: dict[int, tuple[str, dict[str, float]]] = {}
+    for item_id, item_lines in lines_by_item.items():
+        basis, series = comparable_price_series(item_lines)
+        weekly: dict[str, list[float]] = defaultdict(list)
+        for line, price in series:
+            week = _week_key(line.receipt.purchase_date if line.receipt else None, "%Y-%W")
+            if week:
+                weekly[week].append(price)
+        history[item_id] = (basis, {w: sum(p) / len(p) for w, p in weekly.items()})
 
     # 4. Extract unique weeks for X-axis
-    weeks = sorted({r.week for r in history if r.week})
+    weeks = sorted({w for _, by_week in history.values() for w in by_week})
 
     # 5. Format datasets
     colors = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"]
     datasets = []
 
     for i, item_id in enumerate(top_item_ids):
-        # Find which weeks this item was purchased
-        data_points = []
-        for w in weeks:
-            # Find price for this week
-            match = next(
-                (r.avg_price for r in history if r.item_id == item_id and r.week == w), None
-            )
-            data_points.append(
-                round(match, 2) if match else None
-            )  # Null connects the line across gaps in Chart.js
+        basis, by_week = history.get(item_id, ("", {}))
+        # Null connects the line across gaps in Chart.js
+        data_points = [round(by_week[w], 2) if by_week.get(w) else None for w in weeks]
+        name = item_names[item_id]
+        label = name[:30] + ("..." if len(name) > 30 else "")
 
         datasets.append(
             {
-                "label": item_names[item_id][:30]
-                + ("..." if len(item_names[item_id]) > 30 else ""),
+                "label": f"{label} ({price_basis_label(basis)})" if basis else label,
+                "basis": basis,
                 "data": data_points,
                 "borderColor": colors[i % len(colors)],
                 "backgroundColor": colors[i % len(colors)],
@@ -666,22 +700,46 @@ def get_store_diff(db: Session = Depends(get_db)):
     item_ids = [ti.id for ti in top_items]
     item_names = [ti.name for ti in top_items]
 
-    # Get avg price per store for these items
-    # Also need store names
-    prices_query = (
-        db.query(
-            ReceiptItem.item_id,
-            Store.name,
-            func.avg(ReceiptItem.unit_price).label("avg_unit_price"),
-        )
+    # Price per store, one basis per item.
+    #
+    # This read `avg(unit_price)`, and that column is not a price per unit on
+    # every row: weight-priced lines were written with the package-size divisor,
+    # so it stores 1.75 / 1.23 / 1.04 for 00 PIZZA FLOUR where the truth is
+    # 1.75 / 1.75 / 1.48. On a chart whose entire job is ranking stores it
+    # reversed the answer — Russet Potatoes read cheapest at Safeway ($1.76
+    # against $2.14 and $2.79) when per pound Safeway is the dearest of the
+    # three at $1.76/lb against $0.60 and $0.74. Derived from the line instead,
+    # by the same helper the rest of the app compares prices with.
+    from collections import defaultdict
+
+    from sqlalchemy.orm import joinedload
+
+    lines = (
+        db.query(ReceiptItem)
         .join(Receipt, ReceiptItem.receipt_id == Receipt.id)
         .join(Store, Receipt.store_id == Store.id)
         .filter(ReceiptItem.item_id.in_(item_ids))
-        .group_by(ReceiptItem.item_id, Store.name)
+        .options(joinedload(ReceiptItem.receipt).joinedload(Receipt.store))
         .all()
     )
 
-    store_names = sorted({r.name for r in prices_query})
+    lines_by_item: dict[int, list[ReceiptItem]] = defaultdict(list)
+    for line in lines:
+        lines_by_item[line.item_id].append(line)
+
+    bases: dict[int, str] = {}
+    prices: dict[int, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
+    for item_id, item_lines in lines_by_item.items():
+        basis, series = comparable_price_series(item_lines)
+        bases[item_id] = basis
+        for line, price in series:
+            store_name = line.receipt.store.name if line.receipt and line.receipt.store else None
+            if store_name:
+                prices[item_id][store_name].append(price)
+
+    # A store with no purchase of an item on that item's basis gets no bar for
+    # it, rather than a bar in some other unit standing next to the others.
+    store_names = sorted({s for by_store in prices.values() for s in by_store})
 
     datasets = []
     colors = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"]
@@ -689,16 +747,8 @@ def get_store_diff(db: Session = Depends(get_db)):
     for i, s_name in enumerate(store_names):
         data = []
         for item_id in item_ids:
-            # find price
-            price = next(
-                (
-                    (float(r.avg_unit_price) if r.avg_unit_price is not None else 0.0)
-                    for r in prices_query
-                    if r.item_id == item_id and r.name == s_name
-                ),
-                0,
-            )
-            data.append(round(price, 2) if price else 0)
+            paid = prices.get(item_id, {}).get(s_name, [])
+            data.append(round(sum(paid) / len(paid), 2) if paid else 0)
 
         # Only add dataset if store actually sells one of these top 5
         if any(d > 0 for d in data):
@@ -706,10 +756,13 @@ def get_store_diff(db: Session = Depends(get_db)):
                 {"label": s_name, "data": data, "backgroundColor": colors[i % len(colors)]}
             )
 
-    return {
-        "labels": [name[:20] + ("..." if len(name) > 20 else "") for name in item_names],
-        "datasets": datasets,
-    }
+    labels = []
+    for item_id, name in zip(item_ids, item_names, strict=True):
+        short = name[:20] + ("..." if len(name) > 20 else "")
+        basis = bases.get(item_id, "")
+        labels.append(f"{short} ({price_basis_label(basis)})" if basis else short)
+
+    return {"labels": labels, "datasets": datasets}
 
 
 @router.get("/weekly-trajectory")
