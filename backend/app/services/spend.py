@@ -19,6 +19,7 @@ from typing import Any
 
 from app.models import ReceiptItem
 from app.utils.item_parsing import (
+    COUNT_UNITS,
     is_weight_priced,
     normalise_unit,
     weighted_unit_price,
@@ -155,7 +156,15 @@ def price_basis_label(basis: str) -> str:
     One phrasing for every place a comparable price is shown, because $0.94 an
     ounce and $21.69 a pound are not otherwise distinguishable on a page that
     charts whichever basis the item happened to be bought on.
+
+    A count unit is said as "per unit", not "per pk". The figure derived from a
+    pack size is the price of one of the things in the pack, so SIERRA NEVADA
+    Golden 6pk read "$1.83 per pk" when a six-pack costs about $11. "each" is
+    not available for it either: that already means one whole thing as bought,
+    which is what the same item's un-counted lines are measured in.
     """
     if not basis or basis == "each":
         return "each"
+    if basis in COUNT_UNITS:
+        return "per unit"
     return f"per {basis}"
