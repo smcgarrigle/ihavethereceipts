@@ -118,6 +118,16 @@ UNIT_ALIASES = {
 }
 
 
+# Units that count things rather than measure them. The stored weight is the
+# number IN the package, so a price derived from it is the price of ONE of them
+# — a can out of a six-pack, an egg out of a carton. "per pk" would read as the
+# price of the whole pack, which is six times the figure.
+#
+# pk (242 rows) and ct (34) are the two present in the corpus; the other
+# spellings cost nothing and save a re-run if one ever arrives.
+COUNT_UNITS = frozenset({"pk", "pack", "packs", "ct", "cnt", "count"})
+
+
 def normalise_unit(unit: str | None) -> str:
     """One spelling per unit, so two purchases of the same thing can be compared."""
     if not unit:
