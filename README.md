@@ -247,7 +247,7 @@ sudo apt install -y poppler-utils
 
 # Optional: local AI via Ollama
 curl -fsSL https://ollama.com/install.sh | sh
-ollama pull granite3.3-vision:2b   # or qwen2-vl
+ollama pull granite3.3-vision:2b   # or qwen2.5-vl
 ```
 
 Then follow the standard [Setup](#setup) steps. The `Makefile` in the project root wraps common commands:
@@ -256,7 +256,7 @@ Then follow the standard [Setup](#setup) steps. The `Makefile` in the project ro
 make setup   # uv sync + pre-commit install
 make run     # start the dev server
 make test    # run pytest suite
-make lint    # ruff check + format
+make lint    # ruff check + format check
 ```
 
 **Common Linux issues:**
@@ -264,7 +264,7 @@ make lint    # ruff check + format
 | Issue | Resolution |
 |---|---|
 | `pdfplumber` fails to open PDFs | Run `sudo apt install poppler-utils` |
-| Port 8000 already in use | Change with `--port 8001` in `make run` |
+| Port 8000 already in use | `make run PORT=8001` |
 | Ollama slow on first run | First inference downloads model weights — normal |
 | SQLite `database is locked` | WAL mode is on by default; this is rare under normal use |
 
@@ -284,7 +284,7 @@ brew install uv poppler   # uv + PDF + file-type detection
 
 # Optional: local AI via Ollama
 brew install ollama
-ollama pull granite3.3-vision:2b   # or qwen2-vl
+ollama pull granite3.3-vision:2b   # or qwen2.5-vl
 ```
 
 Then follow the standard [Setup](#setup) steps above. A `Makefile` in the project root also wraps common commands:
@@ -293,7 +293,7 @@ Then follow the standard [Setup](#setup) steps above. A `Makefile` in the projec
 make setup   # uv sync + pre-commit install
 make run     # start the dev server
 make test    # run pytest suite
-make lint    # ruff check + format
+make lint    # ruff check + format check
 ```
 
 **Common Mac issues:**
@@ -301,7 +301,7 @@ make lint    # ruff check + format
 | Issue | Resolution |
 |---|---|
 | `pdfplumber` fails to open PDFs | Run `brew install poppler` |
-| Port 8000 already in use | Change with `--port 8001` in `make run` |
+| Port 8000 already in use | `make run PORT=8001` |
 | LM Studio / Ollama slow on first run | First inference downloads model weights — normal |
 | SQLite `database is locked` | WAL mode is on by default; this is rare under normal use |
 

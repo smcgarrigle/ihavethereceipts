@@ -92,7 +92,7 @@ uv run pytest            # test suite
 Or use the Makefile shortcuts:
 
 ```bash
-make lint    # ruff check + format
+make lint    # ruff check + format check
 make test    # pytest
 make run     # start dev server
 ```
