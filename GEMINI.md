@@ -21,7 +21,7 @@ This document serves as the primary blueprint for all AI agents working on this 
 - [TESTING.md](TESTING.md): Test suite layout, how to run it, and the e2e marker.
 
 ## 1. Core Technology Stack
-- **Backend**: Python 3.11, FastAPI
+- **Backend**: Python 3.11+, FastAPI
 - **Database**: SQLite (Single-User, file-based, zero-config)
 - **ORM**: SQLAlchemy with Alembic for migrations
 - **Frontend**:
@@ -63,7 +63,7 @@ This document serves as the primary blueprint for all AI agents working on this 
 - **Alpine.js Inline Limitations**: Do **NOT** use `const` or `let` inside Alpine.js inline attributes (e.g., `@click`). It breaks in many environments. Move complex logic to the `x-data` object methods.
 - **Jinja2 in JS**: When passing data from Jinja2 to JavaScript, use a hidden `<script type="application/json">` tag and parse it in JS. Avoid direct interpolation like `var data = {{ variable }}` which often breaks due to auto-formatting or escaping issues.
 - **HTMX Return Types**: Ensure HTMX endpoints return HTML fragments, not JSON, unless the frontend is specifically designed to handle a JSON response. Returning raw JSON to an HTMX target will display the JSON string in the UI.
-- **Database**: The project uses SQLite exclusively in development. The `DATABASE_URL` in `.env` should always point to `sqlite:///./grocery.db`.
+- **Database**: The project uses SQLite exclusively in development. The `DATABASE_URL` in `.env` must be an **absolute** path — `sqlite:////absolute/path/to/grocery.db`, four slashes. A relative sqlite URL resolves against the caller's working directory, so a script run from `backend/` silently creates an empty stray database instead of opening the real one. `app/core/config.py` writes an absolute path when the variable is missing.
 - **Unit Price Math**: For bulk/weight tracking, always use `(Price * Qty) / TotalWeight`. Using `Price / (Weight * Qty)` leads to precision errors and $0.00 rounding issues in analytics.
 - **Blocking the Event Loop**: Do **NOT** use `async def` for endpoints performing heavy synchronous I/O (Database, AI). This freezes the entire application. Use standard `def` instead; FastAPI runs these in a thread pool.
 - **N+1 Database Queries**: Avoid querying within loops. Use SQLAlchemy `joinedload()` or batch fetch logic instead of fetching related items one-by-one in a list.

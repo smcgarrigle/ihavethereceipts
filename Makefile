@@ -9,6 +9,9 @@ BACKEND_DIR = backend
 # Override deliberately with `make run-lan` (or `make run HOST=0.0.0.0`).
 HOST ?= 127.0.0.1
 
+# Override for a second instance or when 8000 is taken: `make run PORT=8001`.
+PORT ?= 8000
+
 .PHONY: setup run run-lan test lint format demo help
 
 help:
@@ -29,7 +32,7 @@ setup:
 	@echo "✅ Setup complete. Run 'make run' to start the server."
 
 run:
-	cd $(BACKEND_DIR) && uv run uvicorn app.main:app --reload --host $(HOST) --port 8000
+	cd $(BACKEND_DIR) && uv run uvicorn app.main:app --reload --host $(HOST) --port $(PORT)
 
 run-lan:
 	$(MAKE) run HOST=0.0.0.0
