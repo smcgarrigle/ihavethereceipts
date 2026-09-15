@@ -177,7 +177,7 @@ INPUT_TYPES = ("image", "pdf", "paste")
 
 # How each input type is named inside the prompt block.
 _INPUT_TYPE_LABELS = {
-    "image": "photographed receipts",
+    "image": "image receipts",
     "pdf": "PDF receipts",
     "paste": "pasted receipt text",
 }
@@ -208,7 +208,7 @@ def get_correction_prompt(
 
     ``input_type`` (``image``, ``pdf`` or ``paste``) keeps corrections to the
     same kind of ingestion, and the store fallback stays inside it. A pasted
-    table and a photographed receipt fail in different ways: 123 of the first
+    table and an image of a receipt fail in different ways: 123 of the first
     433 corrections came from pasted text, and their price lines taught image
     prompts to double prices. ``None`` keeps every input type.
 

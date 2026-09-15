@@ -210,8 +210,8 @@ def test_json_payload_records_what_was_run(harness):
 
 
 def test_live_prompt_uses_the_receipts_input_type(harness, client, db, tmp_path):
-    """A photographed receipt is scored with photo corrections only, as in production."""
-    photo = _receipt_with_review(
+    """An image receipt is scored with image corrections only, as in production."""
+    image = _receipt_with_review(
         db, client, tmp_path, "Costco", "ORG SPNCH", "Organic Spinach", 3.99
     )
     _receipt_with_review(
@@ -232,7 +232,7 @@ def test_live_prompt_uses_the_receipts_input_type(harness, client, db, tmp_path)
     )
     db.commit()
 
-    block = harness.build_prompt_extra(db, photo, "global")
+    block = harness.build_prompt_extra(db, image, "global")
 
     assert "KS ALMND BTR" in block
-    assert "PASTED LINE" not in block, "a pasted-text correction reached a photo receipt's prompt"
+    assert "PASTED LINE" not in block, "a pasted-text correction reached an image receipt's prompt"

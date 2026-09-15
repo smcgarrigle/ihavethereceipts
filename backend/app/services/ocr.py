@@ -1191,7 +1191,7 @@ def process_receipt_task(receipt_id: int, image_path: str, claimed: bool = False
         start_time = time.time()
 
         # Few-shot feedback: recent human corrections from the same kind of
-        # input (photo or PDF), scoped to this receipt's store when known
+        # input (image or PDF), scoped to this receipt's store when known
         # (reprocess), all stores otherwise (first pass)
         prompt_extra = ""
         try:
@@ -1597,7 +1597,7 @@ def process_text_receipt_task(receipt_id: int, raw_text: str) -> None:
         start_time = time.time()
 
         # Few-shot feedback: recent human corrections from pasted receipts only.
-        # A pasted table fails differently from a photo, so image lessons stay out.
+        # A pasted table fails differently from an image, so image lessons stay out.
         prompt_extra = ""
         try:
             from app.services.correction_service import get_correction_prompt
