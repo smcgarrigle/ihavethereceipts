@@ -125,19 +125,30 @@ def record_corrections(db: Session, receipt, reviewed_items: list) -> int:
         return 0
 
     try:
+        from app.services.correction_keys import content_key
+
         db.query(OcrCorrection).filter(OcrCorrection.receipt_id == receipt.id).delete()
 
+        kind = input_type_of(receipt.image_path)
         corrections: list[OcrCorrection] = []
 
         def add(field, ai_value, approved_value, item_context=None):
+            # The key is computed from the bounded values actually stored, so a
+            # backfill reading the stored row produces the same key.
+            ai_stored = _bounded(ai_value, MAX_STORED_VALUE)
+            approved_stored = _bounded(approved_value, MAX_STORED_VALUE)
             corrections.append(
                 OcrCorrection(
                     receipt_id=receipt.id,
                     store_id=receipt.store_id,
                     field=field,
+                    input_type=kind,
+                    content_key=content_key(
+                        receipt.store_id, kind, field, ai_stored, approved_stored
+                    ),
                     item_context=_bounded(item_context, MAX_STORED_VALUE),
-                    ai_value=_bounded(ai_value, MAX_STORED_VALUE),
-                    approved_value=_bounded(approved_value, MAX_STORED_VALUE),
+                    ai_value=ai_stored,
+                    approved_value=approved_stored,
                 )
             )
 
