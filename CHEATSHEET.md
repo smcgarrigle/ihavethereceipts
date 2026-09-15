@@ -145,7 +145,8 @@ Scores extraction accuracy against your own human-reviewed receipts:
 ```bash
 cd backend
 uv run python scripts/ocr_eval.py                  # free baseline from stored extractions
-uv run python scripts/ocr_eval.py --live --limit 5 # re-run OCR with current prompt/model
+uv run python scripts/ocr_eval.py --live --receipt-ids 459 458 --json out.json  # re-run OCR with the production prompt
+uv run python scripts/ocr_eval.py --live --corrections none --limit 5            # base prompt only, no corrections block
 ```
 
 ### Inspect What the OCR Has Learned
