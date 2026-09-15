@@ -8,6 +8,7 @@ guidance — per store when the store is known, global otherwise.
 
 import json
 import logging
+from collections.abc import Iterable
 
 from rapidfuzz import fuzz
 from sqlalchemy.orm import Session
@@ -171,17 +172,29 @@ def record_corrections(db: Session, receipt, reviewed_items: list) -> int:
         return 0
 
 
-def get_correction_prompt(db: Session, store_name: str | None = None, limit: int = 10) -> str:
+def get_correction_prompt(
+    db: Session,
+    store_name: str | None = None,
+    limit: int = 10,
+    exclude_receipt_ids: Iterable[int] | None = None,
+) -> str:
     """Build a few-shot prompt block from recent corrections, or "" when none.
 
     Prefers corrections from the given store; falls back to the most recent
     corrections across all stores so first-pass OCR (store unknown) still
     benefits from global patterns.
+
+    ``exclude_receipt_ids`` leaves out corrections recorded from those receipts.
+    The eval harness needs it: scoring a receipt with its own corrections in the
+    prompt hands the model the answers it is being scored on.
     """
     try:
         from app.models import Store
 
         query = db.query(OcrCorrection).order_by(OcrCorrection.created_at.desc())
+        excluded = list(exclude_receipt_ids or [])
+        if excluded:
+            query = query.filter(OcrCorrection.receipt_id.notin_(excluded))
         scope = "all stores"
         if store_name:
             store = db.query(Store).filter(Store.name == store_name).first()
