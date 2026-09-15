@@ -1190,16 +1190,21 @@ def process_receipt_task(receipt_id: int, image_path: str, claimed: bool = False
         file_ext = Path(image_path).suffix.lower()
         start_time = time.time()
 
-        # Few-shot feedback: recent human corrections, scoped to this receipt's
-        # store when known (reprocess), global otherwise (first pass)
+        # Few-shot feedback: recent human corrections from the same kind of
+        # input (photo or PDF), scoped to this receipt's store when known
+        # (reprocess), all stores otherwise (first pass)
         prompt_extra = ""
         try:
             from app.services.correction_service import get_correction_prompt
 
             store_hint = receipt.store.name if receipt.store else None
-            prompt_extra = get_correction_prompt(db, store_hint)
+            input_type = "pdf" if file_ext == ".pdf" else "image"
+            prompt_extra = get_correction_prompt(db, store_hint, input_type=input_type)
             if prompt_extra:
-                logger.info(f"Injecting learned corrections into OCR prompt (store={store_hint})")
+                logger.info(
+                    f"Injecting learned corrections into OCR prompt "
+                    f"(store={store_hint}, input={input_type})"
+                )
         except Exception as e:
             logger.warning(f"Could not build correction prompt: {e}")
 
@@ -1591,16 +1596,18 @@ def process_text_receipt_task(receipt_id: int, raw_text: str) -> None:
 
         start_time = time.time()
 
-        # Few-shot feedback: recent human corrections
+        # Few-shot feedback: recent human corrections from pasted receipts only.
+        # A pasted table fails differently from a photo, so image lessons stay out.
         prompt_extra = ""
         try:
             from app.services.correction_service import get_correction_prompt
 
             store_hint = receipt.store.name if receipt.store else None
-            prompt_extra = get_correction_prompt(db, store_hint)
+            prompt_extra = get_correction_prompt(db, store_hint, input_type="paste")
             if prompt_extra:
                 logger.info(
-                    f"Injecting learned corrections into text-parse prompt (store={store_hint})"
+                    f"Injecting learned corrections into text-parse prompt "
+                    f"(store={store_hint}, input=paste)"
                 )
         except Exception as e:
             logger.warning(f"Could not build correction prompt: {e}")
