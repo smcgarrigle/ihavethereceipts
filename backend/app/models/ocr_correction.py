@@ -26,6 +26,12 @@ class OcrCorrection(Base):
         Integer, ForeignKey("stores.id"), nullable=True, index=True
     )
     field: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    # 'image' | 'pdf' | 'paste' — how the receipt came in. Nullable only so rows
+    # written before the column existed can be backfilled by the migration.
+    input_type: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    # Durable identity of the lesson (app.services.correction_keys.content_key).
+    # Rows are re-created on every re-save; this key is not.
+    content_key: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)
     item_context: Mapped[str | None] = mapped_column(
         Text, nullable=True
     )  # item name, for field-level fixes

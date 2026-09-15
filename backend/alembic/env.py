@@ -21,6 +21,8 @@ if config.config_file_name is not None:
 
 # Import all models so their tables are registered in Base.metadata
 import app.models.category  # noqa: F401
+import app.models.correction_override  # noqa: F401
+import app.models.correction_usage  # noqa: F401
 import app.models.exclusion  # noqa: F401
 import app.models.item  # noqa: F401
 import app.models.merge_log  # noqa: F401
