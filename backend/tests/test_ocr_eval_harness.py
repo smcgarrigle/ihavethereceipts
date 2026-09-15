@@ -15,7 +15,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.models import Receipt, Store
+from app.models import OcrCorrection, Receipt, Store
 from app.services.correction_service import get_correction_prompt
 
 HARNESS = Path(__file__).resolve().parent.parent / "scripts" / "ocr_eval.py"
@@ -207,3 +207,32 @@ def test_json_payload_records_what_was_run(harness):
     assert payload["mean"]["name_score"] == 90.0
     assert payload["ocr_errors"][0]["receipt_id"] == 2
     json.dumps(payload)
+
+
+def test_live_prompt_uses_the_receipts_input_type(harness, client, db, tmp_path):
+    """A photographed receipt is scored with photo corrections only, as in production."""
+    photo = _receipt_with_review(
+        db, client, tmp_path, "Costco", "ORG SPNCH", "Organic Spinach", 3.99
+    )
+    _receipt_with_review(
+        db, client, tmp_path, "Costco", "KS ALMND BTR", "Kirkland Almond Butter", 11.49
+    )
+    store = db.query(Store).filter_by(name="Costco").first()
+    pasted = Receipt(store_id=store.id, status="completed", image_path=None)
+    db.add(pasted)
+    db.commit()
+    db.add(
+        OcrCorrection(
+            receipt_id=pasted.id,
+            store_id=store.id,
+            field="name",
+            ai_value="PASTED LINE",
+            approved_value="Pasted Line",
+        )
+    )
+    db.commit()
+
+    block = harness.build_prompt_extra(db, photo, "global")
+
+    assert "KS ALMND BTR" in block
+    assert "PASTED LINE" not in block, "a pasted-text correction reached a photo receipt's prompt"

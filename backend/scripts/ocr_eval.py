@@ -138,15 +138,21 @@ def build_prompt_extra(db, receipt, corrections: str) -> str:
     """The corrections block production would send for this receipt.
 
     ``global`` matches a first-pass upload, ``store`` matches reprocessing, and
-    ``none`` sends the base prompt alone. The receipt's own corrections are
-    always excluded.
+    ``none`` sends the base prompt alone. Corrections come from the same input
+    type as the receipt (photo, PDF or paste), as in production, and the
+    receipt's own corrections are always excluded.
     """
     if corrections == "none":
         return ""
-    from app.services.correction_service import get_correction_prompt
+    from app.services.correction_service import get_correction_prompt, input_type_of
 
     store_name = receipt.store.name if (corrections == "store" and receipt.store) else None
-    return get_correction_prompt(db, store_name, exclude_receipt_ids=[receipt.id])
+    return get_correction_prompt(
+        db,
+        store_name,
+        exclude_receipt_ids=[receipt.id],
+        input_type=input_type_of(receipt.image_path),
+    )
 
 
 def _production_extract(path: str, prompt_extra: str) -> dict:
