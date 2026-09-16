@@ -149,6 +149,30 @@ def suppressed_keys(db: Session) -> set[str]:
         return set()
 
 
+def _naive(moment: datetime | None) -> datetime | None:
+    """UTC without a timezone, to compare against naive DateTime columns.
+
+    ``ocr_corrections.created_at`` is written timezone-aware by the app but
+    stored naive, and ``correction_usage.used_at`` is a naive column, so a
+    direct comparison of the two raises.
+    """
+    if moment is None:
+        return None
+    return moment.replace(tzinfo=None) if moment.tzinfo else moment
+
+
+def _recurrences_after(recorded_at: list[datetime], first_used: datetime | None) -> int:
+    """How many of these corrections were recorded after the lesson was sent.
+
+    Zero when the lesson has never been sent: a correction cannot have
+    recurred against advice the model was never given.
+    """
+    cutoff = _naive(first_used)
+    if cutoff is None:
+        return 0
+    return sum(1 for when in recorded_at if (stamp := _naive(when)) and stamp > cutoff)
+
+
 def list_corrections(
     db: Session,
     store_name: str | None = None,
@@ -163,6 +187,11 @@ def list_corrections(
     ``seen`` counts stored correction rows. ``used_this_week`` and ``last_used``
     come from the usage log, which starts from the day logging shipped (CM-07),
     so an old lesson can read zero uses and still have been sent many times.
+
+    ``recurred`` counts corrections recorded *after* the lesson was first sent
+    in a prompt. Usage measures exposure, not value: a lesson the model was
+    already given and still got wrong is one worth removing rather than
+    keeping. It reads zero until the usage log has some history behind it.
     """
     from app.models import CorrectionUsage, Receipt, Store
 
@@ -207,13 +236,16 @@ def list_corrections(
                 "quantity": correction.quantity,
                 "seen": 1,
                 "last_recorded": correction.created_at,
+                "recorded_at": [correction.created_at],
                 "used_this_week": 0,
                 "last_used": None,
+                "recurred": 0,
                 "suppressed": bool(correction.content_key) and correction.content_key in suppressed,
                 "pinned": bool(correction.content_key) and correction.content_key in pinned,
             }
         else:
             row["seen"] += 1
+            row["recorded_at"].append(correction.created_at)
 
     keys = [row["content_key"] for row in grouped.values() if row["content_key"]]
     if keys:
@@ -236,20 +268,29 @@ def list_corrections(
             .group_by(CorrectionUsage.content_key)
             .all()
         )
+        first_used = (
+            db.query(CorrectionUsage.content_key, func.min(CorrectionUsage.used_at))
+            .filter(CorrectionUsage.content_key.in_(keys))
+            .group_by(CorrectionUsage.content_key)
+            .all()
+        )
         totals = {key: (count, last) for key, count, last in usage}
         # Indexed rather than unpacked: SQLAlchemy returns Row objects, which
         # dict() will not take, and a key/value comprehension is flagged as a
         # needless dict(). This form satisfies both.
         this_week: dict[str, int] = {row[0]: row[1] for row in recent}
+        earliest: dict[str, datetime] = {row[0]: row[1] for row in first_used}
         for row in grouped.values():
             key = row["content_key"]
             if not key:
                 continue
             row["used_total"], row["last_used"] = totals.get(key, (0, None))
             row["used_this_week"] = this_week.get(key, 0)
+            row["recurred"] = _recurrences_after(row["recorded_at"], earliest.get(key))
 
     for row in grouped.values():
         row.setdefault("used_total", 0)
+        row.pop("recorded_at", None)
 
     return list(grouped.values())
 

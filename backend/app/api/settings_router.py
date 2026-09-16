@@ -99,22 +99,38 @@ def exclusions_page_redirect(_request: Request) -> RedirectResponse:
     return RedirectResponse(url="/settings", status_code=301)
 
 
-def _corrections_context(db: Session, store: str, input_type: str) -> dict[str, Any]:
+CORRECTION_SORTS = ("used", "recurred")
+
+
+def _corrections_context(
+    db: Session,
+    store: str,
+    input_type: str,
+    sort: str = "",
+) -> dict[str, Any]:
     """Shared context for the corrections page and its action fragments."""
     from app.models import Store
     from app.services.correction_service import INPUT_TYPES, list_corrections
 
     chosen_type = input_type if input_type in INPUT_TYPES else ""
     chosen_store = store.strip()
+    chosen_sort = sort if sort in CORRECTION_SORTS else "used"
 
     rows = list_corrections(
         db,
         store_name=chosen_store or None,
         input_type=chosen_type or None,
     )
-    rows.sort(
-        key=lambda r: (-r["used_this_week"], -r["seen"], (r["store"] or "").lower()),
-    )
+    if chosen_sort == "recurred":
+        # Deletion candidates first: a lesson that keeps being re-recorded
+        # after it was sent is the one worth removing.
+        rows.sort(
+            key=lambda r: (-r["recurred"], -r["used_total"], -r["seen"]),
+        )
+    else:
+        rows.sort(
+            key=lambda r: (-r["used_this_week"], -r["seen"], (r["store"] or "").lower()),
+        )
 
     return {
         "rows": rows,
@@ -122,7 +138,10 @@ def _corrections_context(db: Session, store: str, input_type: str) -> dict[str, 
         "input_types": INPUT_TYPES,
         "chosen_store": chosen_store,
         "chosen_type": chosen_type,
+        "chosen_sort": chosen_sort,
+        "sorts": CORRECTION_SORTS,
         "total_seen": sum(r["seen"] for r in rows),
+        "total_recurred": sum(1 for r in rows if r["recurred"] >= 2),
     }
 
 
@@ -132,17 +151,18 @@ def corrections_page(
     db: Session = Depends(get_db),
     store: str = "",
     input_type: str = "",
+    sort: str = "",
 ):
     """Every lesson the OCR prompt can draw on, one row per distinct correction.
 
-    An unknown input type is treated as no filter rather than an error: the
-    value arrives in a query string, so a stale bookmark should show the
+    An unknown input type or sort is treated as no filter rather than an error:
+    the value arrives in a query string, so a stale bookmark should show the
     unfiltered page instead of a 422.
     """
     return templates.TemplateResponse(
         request,
         "pages/corrections.html",
-        _corrections_context(db, store, input_type),
+        _corrections_context(db, store, input_type, sort),
     )
 
 
@@ -166,6 +186,7 @@ def correction_action(
     db: Session = Depends(get_db),
     store: str = "",
     input_type: str = "",
+    sort: str = "",
 ):
     """Remove, restore, pin or unpin one lesson, then re-render the panel.
 
@@ -194,7 +215,7 @@ def correction_action(
 
     logger.info("Correction %s: %s", action, content_key)
 
-    context = _corrections_context(db, store, input_type)
+    context = _corrections_context(db, store, input_type, sort)
     # The undo bar is only offered straight after a removal. A restore says so
     # instead, so the two never appear together.
     summary = _correction_summary(correction)
