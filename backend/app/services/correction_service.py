@@ -107,6 +107,24 @@ def _pair_items(ai_items: list[dict], reviewed_items: list) -> tuple[list, list,
     return pairs, unmatched_ai, [reviewed_items[i] for i in remaining]
 
 
+# A per-unit price is stored rounded to the cent, so a line of N units can be a
+# cent away from N times it: receipt #461 holds 3.695 a unit, which prints as
+# 3.69 and totals 7.39, not 7.38. The tolerance is therefore one cent per unit.
+_UNIT_PRICE_ROUNDING = 0.01
+
+
+def _is_quantity_mixup(model_value: float, saved_value: float, quantity: float | None) -> bool:
+    """True when a price "correction" is a column mix-up, not a misreading.
+
+    The model read the per-unit column where the line total was wanted, so the
+    saved value is the model's value times the quantity. Recorded as a lesson it
+    reads "4.34 was corrected to 8.68", which teaches the model to double prices.
+    """
+    if not quantity or quantity <= 1:
+        return False
+    return abs(model_value * quantity - saved_value) <= _UNIT_PRICE_ROUNDING * quantity + 1e-9
+
+
 def record_corrections(db: Session, receipt, reviewed_items: list) -> int:
     """Diff the AI extraction against the human-approved items and persist fixes.
 
@@ -132,7 +150,7 @@ def record_corrections(db: Session, receipt, reviewed_items: list) -> int:
         kind = input_type_of(receipt.image_path)
         corrections: list[OcrCorrection] = []
 
-        def add(field, ai_value, approved_value, item_context=None):
+        def add(field, ai_value, approved_value, item_context=None, quantity=None):
             # The key is computed from the bounded values actually stored, so a
             # backfill reading the stored row produces the same key.
             ai_stored = _bounded(ai_value, MAX_STORED_VALUE)
@@ -147,6 +165,7 @@ def record_corrections(db: Session, receipt, reviewed_items: list) -> int:
                         receipt.store_id, kind, field, ai_stored, approved_stored
                     ),
                     item_context=_bounded(item_context, MAX_STORED_VALUE),
+                    quantity=quantity,
                     ai_value=ai_stored,
                     approved_value=approved_stored,
                 )
@@ -162,11 +181,26 @@ def record_corrections(db: Session, receipt, reviewed_items: list) -> int:
 
             ai_price = ai.get("final_price")
             if ai_price is not None and abs(ai_price - human.final_price) >= 0.01:
-                add("price", f"{ai_price:.2f}", f"{human.final_price:.2f}", human.name)
+                if _is_quantity_mixup(ai_price, human.final_price, human.quantity):
+                    logger.debug(
+                        "Skipping column mix-up on receipt %s: %.2f x %s = %.2f",
+                        receipt.id,
+                        ai_price,
+                        human.quantity,
+                        human.final_price,
+                    )
+                else:
+                    add(
+                        "price",
+                        f"{ai_price:.2f}",
+                        f"{human.final_price:.2f}",
+                        human.name,
+                        quantity=human.quantity,
+                    )
 
             ai_qty = ai.get("quantity")
             if ai_qty is not None and human.quantity and abs(ai_qty - human.quantity) >= 0.01:
-                add("quantity", ai_qty, human.quantity, human.name)
+                add("quantity", ai_qty, human.quantity, human.name, quantity=human.quantity)
 
         for ai in unmatched_ai:
             ai_name = (ai.get("original_ocr_name") or ai.get("name") or "").strip()
@@ -331,8 +365,14 @@ def get_correction_prompt(
                     "do not invent lines."
                 )
             elif c.field in ("price", "quantity"):
+                # The quantity matters on a price line: without it, a line total
+                # for several units reads as the price of one.
+                count = ""
+                if c.field == "price" and c.quantity and c.quantity > 1:
+                    count = f" (a line of {c.quantity:g})"
                 lines.append(
-                    f"- {c.field} for '{context}' was corrected from '{ai_value}' to '{approved}'."
+                    f"- {c.field} for '{context}'{count} was corrected "
+                    f"from '{ai_value}' to '{approved}'."
                 )
         lines.append("END CORRECTION DATA>>>")
         return "\n".join(lines) + "\n"
