@@ -175,7 +175,10 @@ def test_upload_task_asks_for_its_own_input_type(db, image_path, ocr_function, e
 
     with (
         patch("app.database.SessionLocal", TestingSessionLocal),
-        patch("app.services.correction_service.get_correction_prompt", return_value="") as build,
+        patch(
+            "app.services.correction_service.select_corrections",
+            return_value=([], "all stores"),
+        ) as build,
         patch(f"app.services.ocr.{ocr_function}", return_value={"error": "stopped in test"}),
     ):
         process_receipt_task(receipt_id, image_path)
@@ -192,7 +195,10 @@ def test_paste_task_asks_for_pasted_corrections(db):
 
     with (
         patch("app.database.SessionLocal", TestingSessionLocal),
-        patch("app.services.correction_service.get_correction_prompt", return_value="") as build,
+        patch(
+            "app.services.correction_service.select_corrections",
+            return_value=([], "all stores"),
+        ) as build,
         patch("app.services.ocr.process_text_receipt", return_value={"error": "stopped in test"}),
     ):
         process_text_receipt_task(receipt_id, "Milk 4.29")

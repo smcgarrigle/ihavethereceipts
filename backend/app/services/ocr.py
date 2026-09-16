@@ -1195,16 +1195,25 @@ def process_receipt_task(receipt_id: int, image_path: str, claimed: bool = False
         # (reprocess), all stores otherwise (first pass)
         prompt_extra = ""
         try:
-            from app.services.correction_service import get_correction_prompt
+            from app.services.correction_service import (
+                log_correction_usage,
+                render_correction_block,
+                select_corrections,
+            )
 
             store_hint = receipt.store.name if receipt.store else None
             input_type = "pdf" if file_ext == ".pdf" else "image"
-            prompt_extra = get_correction_prompt(db, store_hint, input_type=input_type)
+            rows, scope = select_corrections(db, store_hint, input_type=input_type)
+            prompt_extra = render_correction_block(rows, scope, input_type)
             if prompt_extra:
                 logger.info(
                     f"Injecting learned corrections into OCR prompt "
                     f"(store={store_hint}, input={input_type})"
                 )
+                # Logged before the call, not after: the model can fail or take
+                # minutes, and what a receipt was prompted with is still the
+                # answer either way.
+                log_correction_usage(db, receipt.id, rows)
         except Exception as e:
             logger.warning(f"Could not build correction prompt: {e}")
 
@@ -1600,15 +1609,21 @@ def process_text_receipt_task(receipt_id: int, raw_text: str) -> None:
         # A pasted table fails differently from an image, so image lessons stay out.
         prompt_extra = ""
         try:
-            from app.services.correction_service import get_correction_prompt
+            from app.services.correction_service import (
+                log_correction_usage,
+                render_correction_block,
+                select_corrections,
+            )
 
             store_hint = receipt.store.name if receipt.store else None
-            prompt_extra = get_correction_prompt(db, store_hint, input_type="paste")
+            rows, scope = select_corrections(db, store_hint, input_type="paste")
+            prompt_extra = render_correction_block(rows, scope, "paste")
             if prompt_extra:
                 logger.info(
                     f"Injecting learned corrections into text-parse prompt "
                     f"(store={store_hint}, input=paste)"
                 )
+                log_correction_usage(db, receipt.id, rows)
         except Exception as e:
             logger.warning(f"Could not build correction prompt: {e}")
 
