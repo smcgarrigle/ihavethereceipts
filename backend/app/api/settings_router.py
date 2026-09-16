@@ -98,6 +98,52 @@ def exclusions_page_redirect(_request: Request) -> RedirectResponse:
     return RedirectResponse(url="/settings", status_code=301)
 
 
+@router.get("/corrections", response_class=HTMLResponse)
+def corrections_page(
+    request: Request,
+    db: Session = Depends(get_db),
+    store: str = "",
+    input_type: str = "",
+):
+    """Every lesson the OCR prompt can draw on, one row per distinct correction.
+
+    Read-only. Removing, pinning and editing arrive with CM-11.
+
+    An unknown input type is treated as no filter rather than an error: the
+    value arrives in a query string, so a stale bookmark should show the
+    unfiltered page instead of a 422.
+    """
+    from app.models import Store
+    from app.services.correction_service import INPUT_TYPES, list_corrections
+
+    chosen_type = input_type if input_type in INPUT_TYPES else ""
+    chosen_store = store.strip()
+
+    rows = list_corrections(
+        db,
+        store_name=chosen_store or None,
+        input_type=chosen_type or None,
+    )
+    rows.sort(
+        key=lambda r: (-r["used_this_week"], -r["seen"], (r["store"] or "").lower()),
+    )
+
+    stores = [name for (name,) in db.query(Store.name).order_by(Store.name).all()]
+
+    return templates.TemplateResponse(
+        request,
+        "pages/corrections.html",
+        {
+            "rows": rows,
+            "stores": stores,
+            "input_types": INPUT_TYPES,
+            "chosen_store": chosen_store,
+            "chosen_type": chosen_type,
+            "total_seen": sum(r["seen"] for r in rows),
+        },
+    )
+
+
 def _render_settings_page(request: Request, db: Session) -> HTMLResponse:
     """Shared render logic for the settings page."""
     analytics_rules = (

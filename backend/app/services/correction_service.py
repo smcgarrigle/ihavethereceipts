@@ -10,6 +10,7 @@ import json
 import logging
 import os
 from collections.abc import Iterable
+from datetime import UTC, datetime, timedelta
 
 from rapidfuzz import fuzz
 from sqlalchemy import func, or_
@@ -146,6 +147,111 @@ def suppressed_keys(db: Session) -> set[str]:
         # undoes; failing closed would lose the correction entirely.
         logger.exception("Failed to read suppressed corrections")
         return set()
+
+
+def list_corrections(
+    db: Session,
+    store_name: str | None = None,
+    input_type: str | None = None,
+) -> list[dict]:
+    """Every distinct lesson, with how often it was recorded and last sent.
+
+    One row per ``content_key``, not per stored correction row: the same lesson
+    recorded on several receipts is one thing a person decides about. Rows
+    predating the key column have none and are grouped by their values instead.
+
+    ``seen`` counts stored correction rows. ``used_this_week`` and ``last_used``
+    come from the usage log, which starts from the day logging shipped (CM-07),
+    so an old lesson can read zero uses and still have been sent many times.
+    """
+    from app.models import CorrectionUsage, Receipt, Store
+
+    if input_type is not None and input_type not in INPUT_TYPES:
+        raise ValueError(f"input_type must be one of {INPUT_TYPES}, not {input_type!r}")
+
+    query = (
+        db.query(OcrCorrection, Store.name)
+        .outerjoin(Store, Store.id == OcrCorrection.store_id)
+        .order_by(OcrCorrection.created_at.desc())
+    )
+    if input_type is not None:
+        query = query.join(Receipt, Receipt.id == OcrCorrection.receipt_id)
+        no_file = or_(Receipt.image_path.is_(None), Receipt.image_path == "")
+        is_pdf = func.lower(Receipt.image_path).like("%.pdf")
+        if input_type == "paste":
+            query = query.filter(no_file)
+        elif input_type == "pdf":
+            query = query.filter(is_pdf)
+        else:
+            query = query.filter(~no_file, ~is_pdf)
+    if store_name:
+        query = query.filter(Store.name == store_name)
+
+    week_ago = datetime.now(UTC) - timedelta(days=7)
+    suppressed = suppressed_keys(db)
+    pinned = pinned_keys(db)
+
+    grouped: dict[object, dict] = {}
+    for correction, store in query.all():
+        identity = _lesson_identity(correction)
+        row = grouped.get(identity)
+        if row is None:
+            grouped[identity] = {
+                "content_key": correction.content_key,
+                "store": store,
+                "input_type": correction.input_type,
+                "field": correction.field,
+                "ai_value": correction.ai_value,
+                "approved_value": correction.approved_value,
+                "item_context": correction.item_context,
+                "quantity": correction.quantity,
+                "seen": 1,
+                "last_recorded": correction.created_at,
+                "used_this_week": 0,
+                "last_used": None,
+                "suppressed": bool(correction.content_key) and correction.content_key in suppressed,
+                "pinned": bool(correction.content_key) and correction.content_key in pinned,
+            }
+        else:
+            row["seen"] += 1
+
+    keys = [row["content_key"] for row in grouped.values() if row["content_key"]]
+    if keys:
+        usage = (
+            db.query(
+                CorrectionUsage.content_key,
+                func.count(CorrectionUsage.id),
+                func.max(CorrectionUsage.used_at),
+            )
+            .filter(CorrectionUsage.content_key.in_(keys))
+            .group_by(CorrectionUsage.content_key)
+            .all()
+        )
+        recent = (
+            db.query(CorrectionUsage.content_key, func.count(CorrectionUsage.id))
+            .filter(
+                CorrectionUsage.content_key.in_(keys),
+                CorrectionUsage.used_at >= week_ago.replace(tzinfo=None),
+            )
+            .group_by(CorrectionUsage.content_key)
+            .all()
+        )
+        totals = {key: (count, last) for key, count, last in usage}
+        # Indexed rather than unpacked: SQLAlchemy returns Row objects, which
+        # dict() will not take, and a key/value comprehension is flagged as a
+        # needless dict(). This form satisfies both.
+        this_week: dict[str, int] = {row[0]: row[1] for row in recent}
+        for row in grouped.values():
+            key = row["content_key"]
+            if not key:
+                continue
+            row["used_total"], row["last_used"] = totals.get(key, (0, None))
+            row["used_this_week"] = this_week.get(key, 0)
+
+    for row in grouped.values():
+        row.setdefault("used_total", 0)
+
+    return list(grouped.values())
 
 
 def pinned_keys(db: Session) -> set[str]:

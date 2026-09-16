@@ -96,6 +96,22 @@ def test_receipt_review_integrity(client, dummy_receipt):
         assert soup.find(id=element_id) is not None, f"Missing {element_id} on Review page"
 
 
+def test_corrections_page_integrity(client):
+    """Verify critical IDs on the Learned Corrections page."""
+    response = client.get("/settings/corrections")
+    assert response.status_code == 200
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    expected_ids = [
+        "corrections-table",
+        "corrections-tally",
+        "filter-store",
+        "filter-input-type",
+    ]
+    for element_id in expected_ids:
+        assert soup.find(id=element_id) is not None, f"Missing {element_id} on Corrections page"
+
+
 def test_produce_mode_integrity(client):
     """Verify critical IDs on the Produce Mode page."""
     response = client.get("/produce")
