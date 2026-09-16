@@ -139,7 +139,7 @@ def build_prompt_extra(db, receipt, corrections: str) -> str:
 
     ``global`` matches a first-pass upload, ``store`` matches reprocessing, and
     ``none`` sends the base prompt alone. Corrections come from the same input
-    type as the receipt (photo, PDF or paste), as in production, and the
+    type as the receipt (image, PDF or paste), as in production, and the
     receipt's own corrections are always excluded.
     """
     if corrections == "none":
@@ -269,12 +269,18 @@ def build_payload(result: dict[str, Any], args: argparse.Namespace) -> dict[str,
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--receipt-ids", type=int, nargs="*", default=None)
-    parser.add_argument("--live", action="store_true", help="Re-run OCR instead of scoring stored ocr_data")
+    parser.add_argument(
+        "--live", action="store_true", help="Re-run OCR instead of scoring stored ocr_data"
+    )
     parser.add_argument("--corrections", choices=CORRECTION_MODES, default="global")
-    parser.add_argument("--json", dest="json_path", default=None, help="Also write results to this file")
+    parser.add_argument(
+        "--json", dest="json_path", default=None, help="Also write results to this file"
+    )
     return parser.parse_args(argv)
 
 
@@ -302,9 +308,15 @@ def main(argv: list[str] | None = None) -> None:
         db.close()
 
     if not result["rows"]:
-        print("No scoreable receipts found (need completed receipts with ocr_data and saved items).")
+        print(
+            "No scoreable receipts found (need completed receipts with ocr_data and saved items)."
+        )
     else:
-        mode = f"LIVE re-extraction, corrections={args.corrections}" if args.live else "stored ocr_data (baseline)"
+        mode = (
+            f"LIVE re-extraction, corrections={args.corrections}"
+            if args.live
+            else "stored ocr_data (baseline)"
+        )
         print_table(result, mode)
 
     if args.json_path:

@@ -1,7 +1,7 @@
 """CM-02: corrections are scoped to the input type they came from.
 
 The block was filtered by store only, so lessons from pasted receipt text went
-into prompts for photographed receipts and the reverse. On the live database
+into prompts for image receipts and the reverse. On the live database
 123 of the first 433 corrections came from pasted text, including price lines
 from an iHerb table (Price column read instead of Subtotal) that taught image
 prompts to double prices.
@@ -50,13 +50,13 @@ def _name_fix(db, receipt, ai_value, approved_value):
 def mixed(db):
     """One correction from each input type, all at the same store."""
     costco = _store(db, "Costco")
-    photo = _receipt(db, costco, "/data/uploads/a.jpg")
+    image = _receipt(db, costco, "/data/uploads/a.jpg")
     pdf = _receipt(db, costco, "/data/uploads/b.PDF")
     paste = _receipt(db, costco, None)
-    _name_fix(db, photo, "PHOTO LINE", "Photo Line")
+    _name_fix(db, image, "IMAGE LINE", "Image Line")
     _name_fix(db, pdf, "PDF LINE", "Pdf Line")
     _name_fix(db, paste, "PASTE LINE", "Paste Line")
-    return {"image": photo, "pdf": pdf, "paste": paste}
+    return {"image": image, "pdf": pdf, "paste": paste}
 
 
 @pytest.mark.parametrize(
@@ -77,9 +77,9 @@ def test_input_type_of(path, expected):
 @pytest.mark.parametrize(
     ("input_type", "kept", "left_out"),
     [
-        ("image", "PHOTO LINE", ("PDF LINE", "PASTE LINE")),
-        ("pdf", "PDF LINE", ("PHOTO LINE", "PASTE LINE")),
-        ("paste", "PASTE LINE", ("PHOTO LINE", "PDF LINE")),
+        ("image", "IMAGE LINE", ("PDF LINE", "PASTE LINE")),
+        ("pdf", "PDF LINE", ("IMAGE LINE", "PASTE LINE")),
+        ("paste", "PASTE LINE", ("IMAGE LINE", "PDF LINE")),
     ],
 )
 @pytest.mark.usefixtures("mixed")
@@ -94,44 +94,44 @@ def test_each_input_type_gets_only_its_own_corrections(db, input_type, kept, lef
 
 @pytest.mark.usefixtures("mixed")
 def test_store_fallback_stays_within_the_input_type(db):
-    """A store with no photo corrections falls back to all stores' photos, not its own pastes."""
+    """A store with no image corrections falls back to all stores' images, not its own pastes."""
     iherb = _store(db, "Iherb")
     _name_fix(db, _receipt(db, iherb, None), "IHERB PASTE", "iHerb Paste")
 
     block = get_correction_prompt(db, store_name="Iherb", input_type="image")
 
     assert "all stores" in block
-    assert "PHOTO LINE" in block
+    assert "IMAGE LINE" in block
     assert "IHERB PASTE" not in block and "PASTE LINE" not in block
 
 
 @pytest.mark.usefixtures("mixed")
 def test_store_scope_applies_inside_the_input_type(db):
     safeway = _store(db, "Safeway")
-    _name_fix(db, _receipt(db, safeway, "/data/uploads/s.jpg"), "SFWY PHOTO", "Safeway Photo")
+    _name_fix(db, _receipt(db, safeway, "/data/uploads/s.jpg"), "SFWY IMAGE", "Safeway Image")
 
     block = get_correction_prompt(db, store_name="Safeway", input_type="image")
 
-    assert "Safeway" in block and "SFWY PHOTO" in block
-    assert "PHOTO LINE" not in block, "store scope should drop other stores' photo corrections"
+    assert "Safeway" in block and "SFWY IMAGE" in block
+    assert "IMAGE LINE" not in block, "store scope should drop other stores' image corrections"
 
 
 @pytest.mark.usefixtures("mixed")
 def test_the_block_names_its_source(db):
     assert "of pasted receipt text at all stores" in get_correction_prompt(db, input_type="paste")
-    assert "of photographed receipts" in get_correction_prompt(db, input_type="image")
+    assert "of image receipts" in get_correction_prompt(db, input_type="image")
 
 
 @pytest.mark.usefixtures("mixed")
 def test_no_input_type_keeps_every_correction_and_the_old_wording(db):
     block = get_correction_prompt(db)
-    assert all(line in block for line in ("PHOTO LINE", "PDF LINE", "PASTE LINE"))
+    assert all(line in block for line in ("IMAGE LINE", "PDF LINE", "PASTE LINE"))
     assert "past human reviews at all stores" in block
 
 
 def test_exclusion_still_applies_with_an_input_type(db, mixed):
     block = get_correction_prompt(db, input_type="image", exclude_receipt_ids=[mixed["image"].id])
-    assert block == "", "the only photo correction was excluded, so no block should be built"
+    assert block == "", "the only image correction was excluded, so no block should be built"
 
 
 def test_unknown_input_type_is_rejected(db):
@@ -163,7 +163,7 @@ def _pending(db, image_path):
 @pytest.mark.parametrize(
     ("image_path", "ocr_function", "expected"),
     [
-        ("/tmp/cm02-photo.jpg", "process_receipt_image", "image"),
+        ("/tmp/cm02-image.jpg", "process_receipt_image", "image"),
         ("/tmp/cm02-order.pdf", "process_pdf_receipt", "pdf"),
     ],
 )
