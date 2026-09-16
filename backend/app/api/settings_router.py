@@ -29,6 +29,7 @@ from app.core.config import settings  # noqa: E402
 from app.database import get_db  # noqa: E402
 from app.models.exclusion import ExclusionRule  # noqa: E402
 from app.services import predictions as predictions_service  # noqa: E402
+from app.utils.error_pages import error_response  # noqa: E402
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -98,21 +99,8 @@ def exclusions_page_redirect(_request: Request) -> RedirectResponse:
     return RedirectResponse(url="/settings", status_code=301)
 
 
-@router.get("/corrections", response_class=HTMLResponse)
-def corrections_page(
-    request: Request,
-    db: Session = Depends(get_db),
-    store: str = "",
-    input_type: str = "",
-):
-    """Every lesson the OCR prompt can draw on, one row per distinct correction.
-
-    Read-only. Removing, pinning and editing arrive with CM-11.
-
-    An unknown input type is treated as no filter rather than an error: the
-    value arrives in a query string, so a stale bookmark should show the
-    unfiltered page instead of a 422.
-    """
+def _corrections_context(db: Session, store: str, input_type: str) -> dict[str, Any]:
+    """Shared context for the corrections page and its action fragments."""
     from app.models import Store
     from app.services.correction_service import INPUT_TYPES, list_corrections
 
@@ -128,20 +116,102 @@ def corrections_page(
         key=lambda r: (-r["used_this_week"], -r["seen"], (r["store"] or "").lower()),
     )
 
-    stores = [name for (name,) in db.query(Store.name).order_by(Store.name).all()]
+    return {
+        "rows": rows,
+        "stores": [name for (name,) in db.query(Store.name).order_by(Store.name).all()],
+        "input_types": INPUT_TYPES,
+        "chosen_store": chosen_store,
+        "chosen_type": chosen_type,
+        "total_seen": sum(r["seen"] for r in rows),
+    }
 
+
+@router.get("/corrections", response_class=HTMLResponse)
+def corrections_page(
+    request: Request,
+    db: Session = Depends(get_db),
+    store: str = "",
+    input_type: str = "",
+):
+    """Every lesson the OCR prompt can draw on, one row per distinct correction.
+
+    An unknown input type is treated as no filter rather than an error: the
+    value arrives in a query string, so a stale bookmark should show the
+    unfiltered page instead of a 422.
+    """
     return templates.TemplateResponse(
         request,
         "pages/corrections.html",
-        {
-            "rows": rows,
-            "stores": stores,
-            "input_types": INPUT_TYPES,
-            "chosen_store": chosen_store,
-            "chosen_type": chosen_type,
-            "total_seen": sum(r["seen"] for r in rows),
-        },
+        _corrections_context(db, store, input_type),
     )
+
+
+# ---------------------------------------------------------------------------
+# Corrections page actions
+#
+# Removing is suppression, not deletion: the lesson keeps its history and the
+# decision survives re-saving the receipt it came from (CM-08), which is what
+# makes undo a second call rather than a resurrection. CSRF rides on the
+# htmx:configRequest listener in layouts/base.html.
+# ---------------------------------------------------------------------------
+
+_CORRECTION_ACTIONS = ("remove", "restore", "pin", "unpin")
+
+
+@router.post("/corrections/{content_key}/{action}", response_class=HTMLResponse)
+def correction_action(
+    content_key: str,
+    action: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    store: str = "",
+    input_type: str = "",
+):
+    """Remove, restore, pin or unpin one lesson, then re-render the panel.
+
+    The lesson is addressed by content key, so the decision outlives the
+    correction row it was made about. A key with no stored row left is a 404:
+    the page only offers actions on rows it rendered.
+    """
+    from app.models import OcrCorrection
+    from app.services.correction_service import set_pinned, set_suppressed
+
+    if action not in _CORRECTION_ACTIONS:
+        return error_response(request, 404, f"Unknown correction action: {action}")
+
+    correction = db.query(OcrCorrection).filter(OcrCorrection.content_key == content_key).first()
+    if correction is None:
+        return error_response(request, 404, "That correction no longer exists.")
+
+    if action == "remove":
+        set_suppressed(db, correction, True)
+    elif action == "restore":
+        set_suppressed(db, correction, False)
+    elif action == "pin":
+        set_pinned(db, correction, True)
+    else:
+        set_pinned(db, correction, False)
+
+    logger.info("Correction %s: %s", action, content_key)
+
+    context = _corrections_context(db, store, input_type)
+    # The undo bar is only offered straight after a removal. A restore says so
+    # instead, so the two never appear together.
+    summary = _correction_summary(correction)
+    if action == "remove":
+        context["removed"] = summary
+        context["removed_key"] = content_key
+    elif action == "restore":
+        context["undone"] = summary
+
+    return templates.TemplateResponse(request, "fragments/corrections_table.html", context)
+
+
+def _correction_summary(correction: Any) -> str:
+    """A short label for the undo bar. Escaped by the template, not here."""
+    before = (correction.ai_value or "(missing)").strip()
+    after = (correction.approved_value or "(removed)").strip()
+    return f"{before} → {after}"
 
 
 def _render_settings_page(request: Request, db: Session) -> HTMLResponse:
