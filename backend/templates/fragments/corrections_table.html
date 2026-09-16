@@ -30,6 +30,7 @@
                 <th scope="col" class="px-4 py-3 text-right">Seen</th>
                 <th scope="col" class="px-4 py-3 text-right">Used this week</th>
                 <th scope="col" class="px-4 py-3">Last used</th>
+                <th scope="col" class="px-4 py-3 text-right">Recurred</th>
                 <th scope="col" class="px-4 py-3 text-right">Actions</th>
             </tr>
         </thead>
@@ -66,6 +67,20 @@
                 <td class="px-4 py-3 text-right text-textBase font-mono tabular-nums">{{ row.used_this_week }}</td>
                 <td class="px-4 py-3 text-textMuted whitespace-nowrap font-mono text-xs">
                     {{ row.last_used.strftime('%Y-%m-%d') if row.last_used else 'never' }}
+                </td>
+                <td class="px-4 py-3 text-right whitespace-nowrap">
+                    {# Usage is exposure, not value. A lesson recorded again after
+                       it was already sent is one that is not working. #}
+                    {% if row.recurred >= 2 %}
+                    <span class="text-xs px-1.5 py-0.5 rounded bg-red-500/15 text-red-400"
+                          title="Recorded again after this lesson had already been sent in a prompt">
+                        recurred {{ row.recurred }} times after use
+                    </span>
+                    {% elif row.recurred == 1 %}
+                    <span class="font-mono text-xs tabular-nums text-textMuted">1</span>
+                    {% else %}
+                    <span class="font-mono text-xs tabular-nums text-textSubtle">—</span>
+                    {% endif %}
                 </td>
                 <td class="px-4 py-3 text-right whitespace-nowrap">
                     {% if row.content_key %}
@@ -113,7 +128,7 @@
             </tr>
             {% else %}
             <tr>
-                <td colspan="7" class="px-4 py-8 text-center text-sm text-textMuted italic">
+                <td colspan="8" class="px-4 py-8 text-center text-sm text-textMuted italic">
                     {% if chosen_store or chosen_type %}
                     No corrections match this filter.
                     {% else %}

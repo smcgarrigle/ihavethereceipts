@@ -42,12 +42,21 @@
             </select>
         </div>
 
+        <div class="flex flex-col gap-1">
+            <label for="filter-sort" class="text-xs font-medium text-textMuted">Sort by</label>
+            <select id="filter-sort" name="sort"
+                    class="rounded-lg bg-bgInput border border-borderInput text-sm text-textBase px-3 py-2">
+                <option value="used" {% if chosen_sort == 'used' %}selected{% endif %}>Used this week</option>
+                <option value="recurred" {% if chosen_sort == 'recurred' %}selected{% endif %}>Recurred after use</option>
+            </select>
+        </div>
+
         <button type="submit"
                 class="rounded-lg bg-indigo-500/15 text-indigo-400 hover:bg-indigo-500/25 text-sm font-medium px-4 py-2 transition-colors">
             Apply
         </button>
 
-        {% if chosen_store or chosen_type %}
+        {% if chosen_store or chosen_type or chosen_sort != 'used' %}
         <a href="/settings/corrections"
            class="text-sm text-textMuted hover:text-textBase transition-colors">Clear</a>
         {% endif %}
@@ -55,6 +64,9 @@
         <p id="corrections-tally" class="ml-auto text-xs text-textMuted font-mono">
             {{ rows | length }} lesson{{ '' if rows | length == 1 else 's' }} &middot;
             {{ total_seen }} recorded correction{{ '' if total_seen == 1 else 's' }}
+            {% if total_recurred %}
+            &middot; <span class="text-red-400">{{ total_recurred }} recurring</span>
+            {% endif %}
         </p>
     </form>
 
