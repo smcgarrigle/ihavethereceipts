@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -35,6 +35,9 @@ class OcrCorrection(Base):
     item_context: Mapped[str | None] = mapped_column(
         Text, nullable=True
     )  # item name, for field-level fixes
+    # How many of the item the line held, for price and quantity fixes. Null on
+    # rows written before the column existed; there is no way to recover it.
+    quantity: Mapped[float | None] = mapped_column(Float, nullable=True)
     ai_value: Mapped[str | None] = mapped_column(Text, nullable=True)
     approved_value: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
