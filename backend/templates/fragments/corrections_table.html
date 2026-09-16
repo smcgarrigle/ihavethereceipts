@@ -1,0 +1,127 @@
+{# One source for the table, so an action swap and a full page load agree.
+   CSRF rides on the global htmx:configRequest listener in layouts/base.html. #}
+{% if undone %}
+<div class="px-4 py-2.5 bg-emerald-500/10 border-b border-emerald-500/30 text-sm text-textBase">
+    Restored <span class="font-mono text-xs">{{ undone }}</span>.
+</div>
+{% endif %}
+
+{% if removed %}
+<div class="px-4 py-2.5 bg-amber-500/10 border-b border-amber-500/30 flex flex-wrap items-center gap-3">
+    <span class="text-sm text-textBase">
+        Removed <span class="font-mono text-xs">{{ removed }}</span> — it will not be sent in future prompts.
+    </span>
+    <button hx-post="/settings/corrections/{{ removed_key }}/restore"
+            hx-target="#corrections-panel"
+            hx-swap="innerHTML"
+            class="text-sm font-medium text-amber-400 hover:text-amber-300 underline underline-offset-2 transition-colors">
+        Undo
+    </button>
+</div>
+{% endif %}
+
+<div class="overflow-x-auto">
+    <table id="corrections-table" class="min-w-full text-sm">
+        <thead class="bg-bgMain border-b border-borderDefault">
+            <tr class="text-left text-xs font-semibold text-textMuted uppercase tracking-wide">
+                <th scope="col" class="px-4 py-3">Store</th>
+                <th scope="col" class="px-4 py-3">Input</th>
+                <th scope="col" class="px-4 py-3">Correction</th>
+                <th scope="col" class="px-4 py-3 text-right">Seen</th>
+                <th scope="col" class="px-4 py-3 text-right">Used this week</th>
+                <th scope="col" class="px-4 py-3">Last used</th>
+                <th scope="col" class="px-4 py-3 text-right">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-borderLight">
+            {% for row in rows %}
+            <tr class="hover:bg-bgHover transition-colors {{ 'opacity-60' if row.suppressed else '' }}">
+                <td class="px-4 py-3 text-textBase whitespace-nowrap">
+                    {{ row.store or 'Unknown Store' }}
+                </td>
+                <td class="px-4 py-3 text-textMuted whitespace-nowrap">
+                    {{ row.input_type or '—' }}
+                </td>
+                <td class="px-4 py-3 text-textBase">
+                    <span class="text-xs font-medium text-textMuted uppercase tracking-wide">{{ row.field }}</span>
+                    {% if row.item_context %}
+                    <span class="text-xs text-textSubtle">&middot; {{ row.item_context }}</span>
+                    {% endif %}
+                    <div class="mt-1 font-mono text-xs">
+                        <span class="text-textSubtle line-through">{{ row.ai_value if row.ai_value is not none else '(missing)' }}</span>
+                        <span class="text-textMuted mx-1">&rarr;</span>
+                        <span class="text-textBase">{{ row.approved_value if row.approved_value is not none else '(removed)' }}</span>
+                    </div>
+                    {% if row.field == 'price' and row.quantity and row.quantity > 1 %}
+                    <p class="text-xs text-textSubtle mt-0.5">a line of {{ '%g' % row.quantity }}</p>
+                    {% endif %}
+                    {% if row.suppressed %}
+                    <span class="inline-block mt-1 text-xs px-1.5 py-0.5 rounded bg-red-500/15 text-red-400">removed</span>
+                    {% endif %}
+                    {% if row.pinned %}
+                    <span class="inline-block mt-1 text-xs px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400">pinned</span>
+                    {% endif %}
+                </td>
+                <td class="px-4 py-3 text-right text-textBase font-mono tabular-nums">{{ row.seen }}</td>
+                <td class="px-4 py-3 text-right text-textBase font-mono tabular-nums">{{ row.used_this_week }}</td>
+                <td class="px-4 py-3 text-textMuted whitespace-nowrap font-mono text-xs">
+                    {{ row.last_used.strftime('%Y-%m-%d') if row.last_used else 'never' }}
+                </td>
+                <td class="px-4 py-3 text-right whitespace-nowrap">
+                    {% if row.content_key %}
+                    <div class="inline-flex items-center gap-1 justify-end">
+                        {% if row.pinned %}
+                        <button hx-post="/settings/corrections/{{ row.content_key }}/unpin"
+                                hx-target="#corrections-panel"
+                                hx-swap="innerHTML"
+                                title="Stop always including this lesson"
+                                class="px-2 py-1 rounded-lg text-xs font-medium text-amber-400 bg-amber-500/15 hover:bg-amber-500/25 transition-colors">
+                            Unpin
+                        </button>
+                        {% else %}
+                        <button hx-post="/settings/corrections/{{ row.content_key }}/pin"
+                                hx-target="#corrections-panel"
+                                hx-swap="innerHTML"
+                                title="Always include this lesson, regardless of age"
+                                class="px-2 py-1 rounded-lg text-xs font-medium text-textMuted hover:text-amber-400 hover:bg-amber-500/15 transition-colors">
+                            Pin
+                        </button>
+                        {% endif %}
+
+                        {% if row.suppressed %}
+                        <button hx-post="/settings/corrections/{{ row.content_key }}/restore"
+                                hx-target="#corrections-panel"
+                                hx-swap="innerHTML"
+                                title="Allow this lesson back into prompts"
+                                class="px-2 py-1 rounded-lg text-xs font-medium text-emerald-400 bg-emerald-500/15 hover:bg-emerald-500/25 transition-colors">
+                            Restore
+                        </button>
+                        {% else %}
+                        <button hx-post="/settings/corrections/{{ row.content_key }}/remove"
+                                hx-target="#corrections-panel"
+                                hx-swap="innerHTML"
+                                title="Keep this lesson out of future prompts"
+                                class="px-2 py-1 rounded-lg text-xs font-medium text-textMuted hover:text-red-400 hover:bg-red-500/15 transition-colors">
+                            Remove
+                        </button>
+                        {% endif %}
+                    </div>
+                    {% else %}
+                    <span class="text-xs text-textSubtle italic">no key</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="7" class="px-4 py-8 text-center text-sm text-textMuted italic">
+                    {% if chosen_store or chosen_type %}
+                    No corrections match this filter.
+                    {% else %}
+                    No corrections recorded yet. They appear here once a receipt review is saved with changes.
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

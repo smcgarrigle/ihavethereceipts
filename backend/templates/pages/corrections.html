@@ -58,71 +58,14 @@
         </p>
     </form>
 
-    <div class="rounded-2xl border border-borderDefault bg-bgCard overflow-hidden">
-        <div class="overflow-x-auto">
-            <table id="corrections-table" class="min-w-full text-sm">
-                <thead class="bg-bgMain border-b border-borderDefault">
-                    <tr class="text-left text-xs font-semibold text-textMuted uppercase tracking-wide">
-                        <th scope="col" class="px-4 py-3">Store</th>
-                        <th scope="col" class="px-4 py-3">Input</th>
-                        <th scope="col" class="px-4 py-3">Correction</th>
-                        <th scope="col" class="px-4 py-3 text-right">Seen</th>
-                        <th scope="col" class="px-4 py-3 text-right">Used this week</th>
-                        <th scope="col" class="px-4 py-3">Last used</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-borderLight">
-                    {% for row in rows %}
-                    <tr class="hover:bg-bgHover transition-colors">
-                        <td class="px-4 py-3 text-textBase whitespace-nowrap">
-                            {{ row.store or 'Unknown Store' }}
-                        </td>
-                        <td class="px-4 py-3 text-textMuted whitespace-nowrap">
-                            {{ row.input_type or '—' }}
-                        </td>
-                        <td class="px-4 py-3 text-textBase">
-                            <span class="text-xs font-medium text-textMuted uppercase tracking-wide">{{ row.field }}</span>
-                            {% if row.item_context %}
-                            <span class="text-xs text-textSubtle">&middot; {{ row.item_context }}</span>
-                            {% endif %}
-                            <div class="mt-1 font-mono text-xs">
-                                <span class="text-textSubtle line-through">{{ row.ai_value if row.ai_value is not none else '(missing)' }}</span>
-                                <span class="text-textMuted mx-1">&rarr;</span>
-                                <span class="text-textBase">{{ row.approved_value if row.approved_value is not none else '(removed)' }}</span>
-                            </div>
-                            {% if row.field == 'price' and row.quantity and row.quantity > 1 %}
-                            <p class="text-xs text-textSubtle mt-0.5">a line of {{ '%g' % row.quantity }}</p>
-                            {% endif %}
-                            {% if row.suppressed %}
-                            <span class="inline-block mt-1 text-xs px-1.5 py-0.5 rounded bg-red-500/15 text-red-400">removed</span>
-                            {% endif %}
-                            {% if row.pinned %}
-                            <span class="inline-block mt-1 text-xs px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400">pinned</span>
-                            {% endif %}
-                        </td>
-                        <td class="px-4 py-3 text-right text-textBase font-mono tabular-nums">{{ row.seen }}</td>
-                        <td class="px-4 py-3 text-right text-textBase font-mono tabular-nums">{{ row.used_this_week }}</td>
-                        <td class="px-4 py-3 text-textMuted whitespace-nowrap font-mono text-xs">
-                            {{ row.last_used.strftime('%Y-%m-%d') if row.last_used else 'never' }}
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="6" class="px-4 py-8 text-center text-sm text-textMuted italic">
-                            {% if chosen_store or chosen_type %}
-                            No corrections match this filter.
-                            {% else %}
-                            No corrections recorded yet. They appear here once a receipt review is saved with changes.
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+    {# Every action swaps this panel, so the undo bar and the table replace together. #}
+    <div id="corrections-panel" class="rounded-2xl border border-borderDefault bg-bgCard overflow-hidden">
+        {% include "fragments/corrections_table.html" with context %}
     </div>
 
     <div class="rounded-2xl border border-blue-500/30 bg-blue-500/5 p-5 text-sm text-textMuted space-y-1">
+        <p><strong class="text-textBase">Remove</strong> keeps a lesson out of future prompts. It is not deleted — the decision survives re-saving the receipt it came from, and <strong class="text-textBase">Restore</strong> reverses it at any time.</p>
+        <p><strong class="text-textBase">Pin</strong> holds a lesson in its store's prompt regardless of age. Pins fill first, so a pin costs a slot rather than making the prompt larger.</p>
         <p><strong class="text-textBase">Seen</strong> counts how many stored corrections describe this lesson.</p>
         <p><strong class="text-textBase">Used this week</strong> and <strong class="text-textBase">Last used</strong> come from the prompt usage log, which starts from the day usage logging shipped — an older lesson can read <em>never</em> and still have been sent many times.</p>
         <p>How many lessons one prompt carries is set by <code class="bg-bgMain px-1.5 py-0.5 rounded text-xs">CORRECTION_PROMPT_LIMIT</code> (default 10).</p>
