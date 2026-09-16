@@ -148,18 +148,27 @@ def suppressed_keys(db: Session) -> set[str]:
         return set()
 
 
-def set_suppressed(
-    db: Session,
-    correction: OcrCorrection,
-    suppressed: bool = True,
-) -> CorrectionOverride:
-    """Record that a lesson is kept out of prompts, or allow it back.
+def pinned_keys(db: Session) -> set[str]:
+    """Content keys a person keeps in the prompt regardless of age.
 
-    The override copies the lesson's descriptive values, so it can still be
-    shown after the correction row it was made about has been deleted.
+    Empty on failure, which loses the pins for that call rather than the block.
     """
+    try:
+        rows = (
+            db.query(CorrectionOverride.content_key)
+            .filter(CorrectionOverride.pinned.is_(True))
+            .all()
+        )
+        return {key for (key,) in rows}
+    except Exception:
+        logger.exception("Failed to read pinned corrections")
+        return set()
+
+
+def _override_for(db: Session, correction: OcrCorrection) -> CorrectionOverride:
+    """The stored decision about this lesson, created if there is none yet."""
     if not correction.content_key:
-        raise ValueError("a correction without a content key cannot be suppressed")
+        raise ValueError("a correction without a content key cannot be suppressed or pinned")
 
     override = (
         db.query(CorrectionOverride)
@@ -176,7 +185,37 @@ def set_suppressed(
             approved_value=correction.approved_value,
         )
         db.add(override)
+    return override
+
+
+def set_suppressed(
+    db: Session,
+    correction: OcrCorrection,
+    suppressed: bool = True,
+) -> CorrectionOverride:
+    """Record that a lesson is kept out of prompts, or allow it back.
+
+    The override copies the lesson's descriptive values, so it can still be
+    shown after the correction row it was made about has been deleted.
+    """
+    override = _override_for(db, correction)
     override.suppressed = suppressed
+    db.commit()
+    return override
+
+
+def set_pinned(
+    db: Session,
+    correction: OcrCorrection,
+    pinned: bool = True,
+) -> CorrectionOverride:
+    """Record that a lesson stays in its block regardless of age, or release it.
+
+    One override row carries both decisions, so pinning a suppressed lesson
+    leaves it suppressed: suppression is checked first when a block is built.
+    """
+    override = _override_for(db, correction)
+    override.pinned = pinned
     db.commit()
     return override
 
@@ -438,7 +477,26 @@ def select_corrections(
                 query = store_query
                 scope = store_name
 
-    return _newest_distinct(query, limit), scope
+    # Pins fill first, then the newest corrections take what is left. Splitting
+    # here, after the store scope is settled, means a pin carries the same
+    # store, input type, exclusion and suppression filters as anything else:
+    # a pin on a Costco image lesson never reaches a Safeway block, and never
+    # hands a receipt its own answers back during an eval.
+    pinned = pinned_keys(db)
+    if not pinned:
+        return _newest_distinct(query, limit), scope
+
+    kept = _newest_distinct(query.filter(OcrCorrection.content_key.in_(pinned)), limit)
+    remaining = limit - len(kept)
+    if remaining > 0:
+        rest = query.filter(
+            or_(
+                OcrCorrection.content_key.is_(None),
+                OcrCorrection.content_key.notin_(pinned),
+            )
+        )
+        kept.extend(_newest_distinct(rest, remaining))
+    return kept, scope
 
 
 def render_correction_block(
