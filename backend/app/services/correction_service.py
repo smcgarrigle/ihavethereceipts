@@ -204,6 +204,47 @@ def input_type_of(image_path: str | None) -> str:
     return "pdf" if image_path.lower().endswith(".pdf") else "image"
 
 
+# How many rows to read before removing repeats. The block holds `limit`
+# distinct lessons, and the newest rows of one class contain repeats, so more
+# rows than the limit have to be read to fill it.
+_DEDUPE_FETCH_MULTIPLIER = 5
+_DEDUPE_FETCH_FLOOR = 50
+
+
+def _lesson_identity(correction: OcrCorrection) -> object:
+    """What makes two correction rows the same lesson.
+
+    ``content_key`` is the stored identity (app.services.correction_keys). Rows
+    written before that column existed, or inserted directly by a test, fall
+    back to the values the key is built from.
+    """
+    if correction.content_key:
+        return correction.content_key
+    return (
+        correction.store_id,
+        correction.input_type,
+        correction.field,
+        (correction.ai_value or "").strip(),
+        (correction.approved_value or "").strip(),
+    )
+
+
+def _newest_distinct(query, limit: int) -> list[OcrCorrection]:
+    """The newest ``limit`` distinct lessons from a newest-first query."""
+    seen: set[object] = set()
+    kept: list[OcrCorrection] = []
+    fetch = max(limit * _DEDUPE_FETCH_MULTIPLIER, _DEDUPE_FETCH_FLOOR)
+    for correction in query.limit(fetch).all():
+        identity = _lesson_identity(correction)
+        if identity in seen:
+            continue
+        seen.add(identity)
+        kept.append(correction)
+        if len(kept) >= limit:
+            break
+    return kept
+
+
 def get_correction_prompt(
     db: Session,
     store_name: str | None = None,
@@ -222,6 +263,10 @@ def get_correction_prompt(
     table and a photographed receipt fail in different ways: 123 of the first
     433 corrections came from pasted text, and their price lines taught image
     prompts to double prices. ``None`` keeps every input type.
+
+    Repeats are removed: the same lesson recorded on several receipts takes one
+    slot, so the block holds ``limit`` distinct lessons rather than ``limit``
+    rows.
 
     ``exclude_receipt_ids`` leaves out corrections recorded from those receipts.
     The eval harness needs it: scoring a receipt with its own corrections in the
@@ -255,7 +300,7 @@ def get_correction_prompt(
                     query = store_query
                     scope = store_name
 
-        rows = query.limit(limit).all()
+        rows = _newest_distinct(query, limit)
         if not rows:
             return ""
 
