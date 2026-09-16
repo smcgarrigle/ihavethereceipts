@@ -15,6 +15,7 @@ from rapidfuzz import fuzz
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
+from app.models.correction_override import CorrectionOverride
 from app.models.ocr_correction import OcrCorrection
 
 logger = logging.getLogger(__name__)
@@ -126,6 +127,60 @@ def _is_quantity_mixup(model_value: float, saved_value: float, quantity: float |
     return abs(model_value * quantity - saved_value) <= _UNIT_PRICE_ROUNDING * quantity + 1e-9
 
 
+def suppressed_keys(db: Session) -> set[str]:
+    """Content keys a person has removed from the prompt. Empty on failure.
+
+    One query rather than a check per row: a review save records up to a few
+    dozen corrections, and a prompt reads at most the correction limit.
+    """
+    try:
+        rows = (
+            db.query(CorrectionOverride.content_key)
+            .filter(CorrectionOverride.suppressed.is_(True))
+            .all()
+        )
+        return {key for (key,) in rows}
+    except Exception:
+        # A lookup failure must not stop a review from being saved. Failing
+        # open means a suppressed lesson can come back, which a further save
+        # undoes; failing closed would lose the correction entirely.
+        logger.exception("Failed to read suppressed corrections")
+        return set()
+
+
+def set_suppressed(
+    db: Session,
+    correction: OcrCorrection,
+    suppressed: bool = True,
+) -> CorrectionOverride:
+    """Record that a lesson is kept out of prompts, or allow it back.
+
+    The override copies the lesson's descriptive values, so it can still be
+    shown after the correction row it was made about has been deleted.
+    """
+    if not correction.content_key:
+        raise ValueError("a correction without a content key cannot be suppressed")
+
+    override = (
+        db.query(CorrectionOverride)
+        .filter(CorrectionOverride.content_key == correction.content_key)
+        .first()
+    )
+    if override is None:
+        override = CorrectionOverride(
+            content_key=correction.content_key,
+            store_id=correction.store_id,
+            input_type=correction.input_type or input_type_of(None),
+            field=correction.field,
+            ai_value=correction.ai_value,
+            approved_value=correction.approved_value,
+        )
+        db.add(override)
+    override.suppressed = suppressed
+    db.commit()
+    return override
+
+
 def record_corrections(db: Session, receipt, reviewed_items: list) -> int:
     """Diff the AI extraction against the human-approved items and persist fixes.
 
@@ -149,6 +204,7 @@ def record_corrections(db: Session, receipt, reviewed_items: list) -> int:
         db.query(OcrCorrection).filter(OcrCorrection.receipt_id == receipt.id).delete()
 
         kind = input_type_of(receipt.image_path)
+        suppressed = suppressed_keys(db)
         corrections: list[OcrCorrection] = []
 
         def add(field, ai_value, approved_value, item_context=None, quantity=None):
@@ -156,15 +212,26 @@ def record_corrections(db: Session, receipt, reviewed_items: list) -> int:
             # backfill reading the stored row produces the same key.
             ai_stored = _bounded(ai_value, MAX_STORED_VALUE)
             approved_stored = _bounded(approved_value, MAX_STORED_VALUE)
+            key = content_key(receipt.store_id, kind, field, ai_stored, approved_stored)
+            # Every save deletes this receipt's rows and writes them again, so a
+            # lesson removed by a person would come straight back on the next
+            # save without this. The decision is keyed on content precisely
+            # because the row it was made about no longer exists.
+            if key in suppressed:
+                logger.debug(
+                    "Not re-recording a suppressed lesson on receipt %s: %s %s",
+                    receipt.id,
+                    field,
+                    key,
+                )
+                return
             corrections.append(
                 OcrCorrection(
                     receipt_id=receipt.id,
                     store_id=receipt.store_id,
                     field=field,
                     input_type=kind,
-                    content_key=content_key(
-                        receipt.store_id, kind, field, ai_stored, approved_stored
-                    ),
+                    content_key=key,
                     item_context=_bounded(item_context, MAX_STORED_VALUE),
                     quantity=quantity,
                     ai_value=ai_stored,
@@ -341,6 +408,17 @@ def select_corrections(
     excluded = list(exclude_receipt_ids or [])
     if excluded:
         query = query.filter(OcrCorrection.receipt_id.notin_(excluded))
+    # record_corrections stops writing a suppressed lesson, but rows written
+    # before the decision stay until their review is saved again. Filtering
+    # here keeps them out of prompts from the moment of the decision.
+    suppressed = suppressed_keys(db)
+    if suppressed:
+        query = query.filter(
+            or_(
+                OcrCorrection.content_key.is_(None),
+                OcrCorrection.content_key.notin_(suppressed),
+            )
+        )
     if input_type is not None:
         query = query.join(Receipt, Receipt.id == OcrCorrection.receipt_id)
         no_file = or_(Receipt.image_path.is_(None), Receipt.image_path == "")
