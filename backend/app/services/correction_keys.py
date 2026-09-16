@@ -2,7 +2,7 @@
 
 ``ocr_corrections`` rows are deleted and re-created every time a review is saved
 again, so a row id is not a durable way to refer to a lesson. The content key
-is: the same store, kind of receipt, field and from/to values always produce
+is: the same store, class of receipt, field and from/to values always produce
 the same key. Usage records and a person's suppress or pin decisions are keyed
 on it, so they survive a re-save.
 
