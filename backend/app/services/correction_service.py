@@ -8,6 +8,7 @@ guidance — per store when the store is known, global otherwise.
 
 import json
 import logging
+import os
 from collections.abc import Iterable
 
 from rapidfuzz import fuzz
@@ -20,8 +21,8 @@ logger = logging.getLogger(__name__)
 
 # How much of any one model-derived value is kept. The stored bound exists so
 # unbounded model output never reaches the database at all; the prompt bound is
-# tighter because ten corrections are pasted into every subsequent receipt's
-# prompt and a real item name is nowhere near this long.
+# tighter because every correction in the block is pasted into every subsequent
+# receipt's prompt and a real item name is nowhere near this long.
 MAX_STORED_VALUE = 300
 MAX_PROMPT_VALUE = 120
 
@@ -244,6 +245,40 @@ def input_type_of(image_path: str | None) -> str:
 _DEDUPE_FETCH_MULTIPLIER = 5
 _DEDUPE_FETCH_FLOOR = 50
 
+_DEFAULT_CORRECTION_PROMPT_LIMIT = 10
+
+
+def _correction_prompt_limit() -> int:
+    """How many distinct lessons the block holds, from the environment.
+
+    Read per call rather than at import so a change to the setting applies
+    without a restart, and so tests can set it with monkeypatch.
+
+    A limit below 1 would build an empty block and silently turn the feature
+    off, and a non-numeric value would otherwise raise inside OCR. Both fall
+    back to the default instead.
+    """
+    raw = os.getenv("CORRECTION_PROMPT_LIMIT")
+    if raw is None or not raw.strip():
+        return _DEFAULT_CORRECTION_PROMPT_LIMIT
+    try:
+        value = int(raw)
+    except ValueError:
+        logger.warning(
+            "CORRECTION_PROMPT_LIMIT=%r is not a whole number; using %d",
+            raw,
+            _DEFAULT_CORRECTION_PROMPT_LIMIT,
+        )
+        return _DEFAULT_CORRECTION_PROMPT_LIMIT
+    if value < 1:
+        logger.warning(
+            "CORRECTION_PROMPT_LIMIT=%d is below 1, which would send an empty block; using %d",
+            value,
+            _DEFAULT_CORRECTION_PROMPT_LIMIT,
+        )
+        return _DEFAULT_CORRECTION_PROMPT_LIMIT
+    return value
+
 
 def _lesson_identity(correction: OcrCorrection) -> object:
     """What makes two correction rows the same lesson.
@@ -282,7 +317,7 @@ def _newest_distinct(query, limit: int) -> list[OcrCorrection]:
 def get_correction_prompt(
     db: Session,
     store_name: str | None = None,
-    limit: int = 10,
+    limit: int | None = None,
     exclude_receipt_ids: Iterable[int] | None = None,
     input_type: str | None = None,
 ) -> str:
@@ -302,12 +337,18 @@ def get_correction_prompt(
     slot, so the block holds ``limit`` distinct lessons rather than ``limit``
     rows.
 
+    ``limit`` defaults to the ``CORRECTION_PROMPT_LIMIT`` setting (10 when
+    unset), so both OCR paths follow the setting without passing it. A caller
+    that needs a fixed size regardless of the setting passes one explicitly.
+
     ``exclude_receipt_ids`` leaves out corrections recorded from those receipts.
     The eval harness needs it: scoring a receipt with its own corrections in the
     prompt hands the model the answers it is being scored on.
     """
     if input_type is not None and input_type not in INPUT_TYPES:
         raise ValueError(f"input_type must be one of {INPUT_TYPES}, not {input_type!r}")
+    if limit is None:
+        limit = _correction_prompt_limit()
     try:
         from app.models import Receipt, Store
 
