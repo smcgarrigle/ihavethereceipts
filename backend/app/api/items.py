@@ -363,6 +363,7 @@ def update_item(item_id: int, update: UpdateItemRequest, db: Session = Depends(g
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
 
+    old_name = item.name
     if update.name:
         item.name = update.name
         item.normalized_name = update.name.lower().strip()
@@ -372,7 +373,15 @@ def update_item(item_id: int, update: UpdateItemRequest, db: Session = Depends(g
 
     db.commit()
 
-    return {"success": True, "message": "Item updated"}
+    # A rename is a person saying what this item is called, so it also
+    # becomes a name lesson for future receipts from the stores it came from.
+    lessons = {"lessons": 0, "superseded": 0}
+    if update.name and old_name and update.name.strip() != old_name.strip():
+        from app.services.correction_service import record_rename_corrections
+
+        lessons = record_rename_corrections(db, item, old_name, update.name)
+
+    return {"success": True, "message": "Item updated", **lessons}
 
 
 class UpdateNutritionRequest(BaseModel):

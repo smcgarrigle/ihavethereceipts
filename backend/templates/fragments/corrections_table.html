@@ -56,6 +56,9 @@
                     {% if row.field == 'price' and row.quantity and row.quantity > 1 %}
                     <p class="text-xs text-textSubtle mt-0.5">a line of {{ '%g' % row.quantity }}</p>
                     {% endif %}
+                    {% if row.from_item_editor %}
+                    <span class="inline-block mt-1 text-xs px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400">from item editor</span>
+                    {% endif %}
                     {% if row.suppressed %}
                     <span class="inline-block mt-1 text-xs px-1.5 py-0.5 rounded bg-red-500/15 text-red-400">removed</span>
                     {% endif %}

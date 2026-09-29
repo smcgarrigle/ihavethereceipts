@@ -38,6 +38,14 @@ class OcrCorrection(Base):
     # How many of the item the line held, for price and quantity fixes. Null on
     # rows written before the column existed; there is no way to recover it.
     quantity: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # 'review' (a fix on the review screen) | 'item_editor' (an item renamed
+    # afterwards). Saving a review re-records only its own review rows.
+    source: Mapped[str] = mapped_column(
+        String, nullable=False, default="review", server_default="review", index=True
+    )
+    # The item a rename lesson is for, so a second rename replaces the first
+    # one's lessons. Null for review lessons.
+    item_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     ai_value: Mapped[str | None] = mapped_column(Text, nullable=True)
     approved_value: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
