@@ -23,6 +23,9 @@ function receiptReview(config) {
         metadataSaved: false,
         categories: [],
         allExpanded: false,
+        // Store names this save pointed at a different item, with past lines to offer moving
+        relink: [],
+        relinkOpen: false,
 
         init() {
             const categoriesElement = document.getElementById('categories-data');
@@ -314,7 +317,14 @@ function receiptReview(config) {
                 });
 
                 const data = await response.json();
-                if (data.success) {
+                if (data.success && (data.relink_suggestions || []).length) {
+                    // Saved, but past lines may now be on the wrong item: ask before leaving.
+                    window.dispatchEvent(new CustomEvent('process-start', {
+                        detail: { message: `Successfully saved ${data.items_saved} items!` }
+                    }));
+                    this.relink = data.relink_suggestions.map(s => ({ ...s, state: 'pending', preview: null, moved: 0, error: '' }));
+                    this.relinkOpen = true;
+                } else if (data.success) {
                     window.dispatchEvent(new CustomEvent('process-start', {
                         detail: { message: `Successfully saved ${data.items_saved} items!` }
                     }));
@@ -329,6 +339,55 @@ function receiptReview(config) {
             } finally {
                 window.dispatchEvent(new CustomEvent('process-end'));
             }
+        },
+
+        async previewRelink(s) {
+            s.error = '';
+            const query = new URLSearchParams({
+                store_id: s.store_id,
+                text_key: s.text_key,
+                from_item_id: s.from_item_id,
+                to_item_id: s.to_item_id,
+                exclude_receipt_id: this.receiptId
+            });
+            try {
+                const response = await fetch(`/api/store-names/relink/preview?${query}`);
+                if (!response.ok) throw new Error(response.status);
+                s.preview = (await response.json()).lines;
+            } catch (error) {
+                console.error('Preview error:', error);
+                s.error = 'Could not load the lines. Nothing was changed.';
+            }
+        },
+
+        async applyRelink(s) {
+            // Only what was previewed can move.
+            if (!s.preview) return;
+            s.error = '';
+            try {
+                const response = await fetch('/api/store-names/relink', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+                    body: JSON.stringify({
+                        store_id: s.store_id,
+                        text_key: s.text_key,
+                        from_item_id: s.from_item_id,
+                        to_item_id: s.to_item_id,
+                        line_ids: s.preview.map(line => line.line_id)
+                    })
+                });
+                if (!response.ok) throw new Error(response.status);
+                s.moved = (await response.json()).moved;
+                s.state = 'moved';
+            } catch (error) {
+                console.error('Move error:', error);
+                s.error = 'Could not move the lines. Nothing was changed.';
+            }
+        },
+
+        finishRelink() {
+            this.relinkOpen = false;
+            window.location.href = '/receipts';
         },
 
         async deleteReceipt() {

@@ -34,6 +34,7 @@ from app.api import (
     receipts_review,
     search_router,
     settings_router,
+    store_names_router,
     trends,
     trends_nutrition,
     xray,
@@ -263,6 +264,7 @@ app.include_router(receipts.router, prefix="/api/receipts", tags=["receipts"])
 app.include_router(receipts_review.router, prefix="/api/receipts", tags=["receipts"])
 app.include_router(receipts_fragments.router, prefix="/api/receipts", tags=["receipts"])
 app.include_router(items.router, prefix="/api/items", tags=["items"])
+app.include_router(store_names_router.router, prefix="/api/store-names", tags=["store names"])
 app.include_router(categories.router, prefix="/api/categories", tags=["categories"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
 app.include_router(analytics_fragments.router, prefix="/api/analytics", tags=["analytics"])

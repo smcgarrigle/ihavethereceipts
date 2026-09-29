@@ -111,6 +111,62 @@
 
 <div class="max-w-5xl mx-auto space-y-6" x-data="receiptReview(getReviewConfig())">
 
+    <!-- Store names changed: offer to move past lines (CM-23) -->
+    <div x-show="relinkOpen" x-trap="relinkOpen" x-cloak @keydown.escape.window="relinkOpen && finishRelink()"
+        class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="relink-title">
+        <div class="fixed inset-0 bg-bgOverlay transition-opacity"></div>
+        <div class="flex min-h-screen items-center justify-center p-4 text-center sm:p-0">
+            <div class="relative transform overflow-hidden rounded-lg bg-bgCard text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-md">
+                <div class="bg-bgCard px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+                    <h3 class="text-base font-semibold leading-6 text-textBase mb-2" id="relink-title">Saved. A store name now means a different item</h3>
+                    <p class="text-sm text-textMuted mb-4">Moving changes past purchases, so check the lines first.</p>
+                    <div class="space-y-4">
+                        <template x-for="s in relink" :key="s.store_id + '-' + s.text_key">
+                            <div class="rounded-md border border-borderDefault p-3">
+                                <p class="text-sm text-textBase">
+                                    At <span x-text="s.store"></span>, <span class="font-mono" x-text="s.printed_text"></span> now means
+                                    <strong x-text="s.to_item"></strong>.
+                                    <span x-text="s.lines"></span> earlier <span x-text="s.lines === 1 ? 'line is' : 'lines are'"></span>
+                                    saved as <strong x-text="s.from_item"></strong>.
+                                </p>
+                                <div x-show="s.state === 'pending'" class="mt-3">
+                                    <ul x-show="s.preview" class="mb-3 text-xs text-textMuted font-mono space-y-1">
+                                        <template x-for="line in (s.preview || [])" :key="line.line_id">
+                                            <li x-text="(line.purchase_date || 'no date') + ' · receipt ' + line.receipt_id + ' · ' + line.quantity + ' × ' + Number(line.price).toFixed(2)"></li>
+                                        </template>
+                                    </ul>
+                                    <div class="flex flex-wrap gap-2">
+                                        <button type="button" x-show="!s.preview" @click="previewRelink(s)"
+                                            class="inline-flex justify-center rounded-md bg-bgInput px-3 py-2 text-sm font-semibold text-textBase shadow-sm ring-1 ring-inset ring-borderInput hover:bg-bgHover">
+                                            Show the lines
+                                        </button>
+                                        <button type="button" x-show="s.preview" @click="applyRelink(s)"
+                                            class="inline-flex justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+                                            x-text="'Move them to ' + s.to_item"></button>
+                                        <button type="button" @click="s.state = 'kept'"
+                                            class="inline-flex justify-center rounded-md bg-bgInput px-3 py-2 text-sm font-semibold text-textBase shadow-sm ring-1 ring-inset ring-borderInput hover:bg-bgHover">
+                                            Keep as they are
+                                        </button>
+                                    </div>
+                                </div>
+                                <p x-show="s.state === 'moved'" class="mt-2 text-sm text-textMuted"
+                                    x-text="'Moved ' + s.moved + (s.moved === 1 ? ' line' : ' lines') + ' to ' + s.to_item + '.'"></p>
+                                <p x-show="s.state === 'kept'" class="mt-2 text-sm text-textMuted" x-text="'Left on ' + s.from_item + '.'"></p>
+                                <p x-show="s.error" class="mt-2 text-sm text-red-500" role="alert" x-text="s.error"></p>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+                <div class="bg-bgHover px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6 gap-2">
+                    <button type="button" @click="finishRelink()"
+                        class="inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 sm:w-auto">
+                        Done
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
