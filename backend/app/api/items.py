@@ -827,6 +827,7 @@ def merge_items(request: MergeItemsRequest, db: Session = Depends(get_db)):
     import json
 
     from app.models import MergeLog, ReceiptItem
+    from app.services import store_names
 
     try:
         target_item = db.query(Item).filter(Item.id == request.keep_item_id).first()
@@ -852,12 +853,16 @@ def merge_items(request: MergeItemsRequest, db: Session = Depends(get_db)):
                 {"item_id": request.keep_item_id}, synchronize_session=False
             )
 
+            # What the stores print for the merged item now means the kept one
+            alias_ids = store_names.repoint(db, source_id, request.keep_item_id)
+
             # Log the merge
             log = MergeLog(
                 target_item_id=request.keep_item_id,
                 source_item_name=source_item.name,
                 source_item_category_id=source_item.category_id,
                 receipt_item_ids=json.dumps(receipt_item_ids),
+                alias_ids=json.dumps(alias_ids),
             )
             db.add(log)
 
@@ -881,6 +886,7 @@ def undo_merge(db: Session = Depends(get_db)):
     import json
 
     from app.models import MergeLog, ReceiptItem
+    from app.services import store_names
 
     # Find the most recent merge log
     log = db.query(MergeLog).order_by(MergeLog.merged_at.desc()).first()
@@ -904,7 +910,12 @@ def undo_merge(db: Session = Depends(get_db)):
                 {"item_id": source_item.id}, synchronize_session=False
             )
 
-        # 3. Delete the log
+        # 3. Store names the merge moved go back to the recreated item
+        store_names.restore(
+            db, json.loads(log.alias_ids or "[]"), log.target_item_id, source_item.id
+        )
+
+        # 4. Delete the log
         db.delete(log)
         db.commit()
 

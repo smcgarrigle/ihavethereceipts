@@ -8,6 +8,7 @@ from app.models.merge_log import MergeLog
 from app.models.ocr_correction import OcrCorrection
 from app.models.receipt import Receipt, ReceiptItem
 from app.models.store import Store
+from app.models.store_item_alias import StoreItemAlias
 
 __all__ = [
     "Base",
@@ -21,4 +22,5 @@ __all__ = [
     "OcrCorrection",
     "CorrectionUsage",
     "CorrectionOverride",
+    "StoreItemAlias",
 ]

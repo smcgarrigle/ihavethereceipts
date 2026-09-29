@@ -1298,6 +1298,7 @@ def process_receipt_task(receipt_id: int, image_path: str, claimed: bool = False
             from rapidfuzz import fuzz
 
             from app.models import Item, ReceiptItem
+            from app.services import store_names
             from app.services.category_tagger import categorize_items_batch
             from app.services.item_matcher import normalize_item_name
 
@@ -1310,7 +1311,9 @@ def process_receipt_task(receipt_id: int, image_path: str, claimed: bool = False
                     continue
 
                 normalized = normalize_item_name(item_name)
-                exact_match = next(
+                # Text this store has printed before names its item outright: it
+                # survives renames and never ages out, unlike prompt lessons.
+                exact_match = store_names.item_for(db, receipt.store_id, item_name) or next(
                     (it for it in all_db_items if it.normalized_name == normalized), None
                 )
 
@@ -1696,6 +1699,7 @@ def process_text_receipt_task(receipt_id: int, raw_text: str) -> None:
             from rapidfuzz import fuzz
 
             from app.models import Item, ReceiptItem
+            from app.services import store_names
             from app.services.category_tagger import categorize_items_batch
             from app.services.item_matcher import normalize_item_name
 
@@ -1708,7 +1712,9 @@ def process_text_receipt_task(receipt_id: int, raw_text: str) -> None:
                     continue
 
                 normalized = normalize_item_name(item_name)
-                exact_match = next(
+                # Text this store has printed before names its item outright: it
+                # survives renames and never ages out, unlike prompt lessons.
+                exact_match = store_names.item_for(db, receipt.store_id, item_name) or next(
                     (it for it in all_db_items if it.normalized_name == normalized), None
                 )
 

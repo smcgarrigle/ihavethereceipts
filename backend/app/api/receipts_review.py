@@ -363,6 +363,11 @@ def save_reviewed_items(
         if recorded:
             logger.info(f"Recorded {recorded} OCR corrections for receipt {receipt.id}")
 
+        # Permanent memory: what this store printed, and the item each line became
+        from app.services.store_names import remember_receipt
+
+        remember_receipt(db, receipt)
+
         db.commit()
 
         return {
