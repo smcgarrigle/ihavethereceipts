@@ -28,6 +28,9 @@ This populates the database with ~4months of ~52 fictional receipts across multi
 - **Smart Parsing**: Handles discounts, varied unit types (oz, lb, etc.), and complex "2 for $X" deals.
 - **Interactive Review (Human-in-the-Loop)**: Verify, edit, and approve OCR results before saving. Your analytics remain untouched until you explicitly click "Save". *It's your data, you approve it.*
 - **Self-Improving OCR (Feedback Loop)**: Every correction you make is remembered. Renames, price edits, and missed items are stored per-store and injected into future OCR prompts as few-shot examples — the extractor literally learns your stores' receipt dialects over time.
+  - **Two ways in**: fixing a line on the review screen, or renaming an item later on its item page. A rename becomes a name lesson for every store the item was bought at, using the text the model actually read on those receipts, so the next receipt comes back with the new name.
+  - **Kept per store and per input type**: photo, PDF and pasted-text lessons stay separate, and each prompt carries up to `CORRECTION_PROMPT_LIMIT` lessons (default 10) — pinned ones first, then the newest.
+  - **Reviewable**: **Settings → Corrections** lists every lesson with how often it was recorded and sent. Remove a bad lesson, pin a good one, and see which ones came from the item editor.
 - **Structured Outputs + Eval Harness**: The Gemini path uses a response schema for guaranteed-valid JSON. `scripts/ocr_eval.py` measures extraction accuracy against your own reviewed receipts (`--stored` for a free baseline, `--live` to benchmark prompt or model changes).
 - **Reprocessing Tool**: CLI script to re-run OCR on historical receipts to test different models.
 - **Auto-Ingest**: Drop PDFs/images into `data/inbox` and they process automatically through the full OCR + review pipeline. (`FOLDER_WATCH=0` to disable.)

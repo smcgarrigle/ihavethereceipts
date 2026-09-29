@@ -281,7 +281,11 @@
                         <div class="space-y-4">
                             <div>
                                 <label for="insight-item-name" class="block text-xs font-bold text-textSubtle uppercase tracking-wider mb-1">Item Name</label>
-                                <input id="insight-item-name" type="text" x-model="name" class="w-full bg-bgCard border border-borderDefault text-textBase rounded-xl px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all">
+                                <input id="insight-item-name" type="text" x-model="name" aria-describedby="insight-item-name-hint" class="w-full bg-bgCard border border-borderDefault text-textBase rounded-xl px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all">
+                                <p id="insight-item-name-hint" class="mt-1 text-xs text-textSubtle leading-relaxed">
+                                    Renaming also adds a correction. Future receipts from the stores this item was bought at will be read with the new name.
+                                    <a href="/settings/corrections" class="text-blue-600 dark:text-blue-400 underline">See corrections</a>
+                                </p>
                             </div>
                             <div>
                                 <label for="insight-item-category" class="block text-xs font-bold text-textSubtle uppercase tracking-wider mb-1">Category</label>

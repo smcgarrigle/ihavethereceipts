@@ -75,6 +75,11 @@ def as_prompt_data(value: object, limit: int = MAX_PROMPT_VALUE) -> str:
 # Below this similarity an AI item and a reviewed item are considered
 # different products, not a rename of the same line
 _PAIR_THRESHOLD = 55
+
+# Where a correction came from: a fix on the review screen, or an item renamed
+# afterwards in the item editor.
+REVIEW_SOURCE = "review"
+RENAME_SOURCE = "item_editor"
 # Above this the names are close enough that storing a correction adds noise
 _NOISE_THRESHOLD = 97
 
@@ -236,7 +241,12 @@ def list_corrections(
                 "quantity": correction.quantity,
                 "seen": 1,
                 "last_recorded": correction.created_at,
-                "recorded_at": [correction.created_at],
+                # Recurrence means the model got it wrong again on review. A
+                # rename recorded after the lesson was sent is not that.
+                "recorded_at": (
+                    [correction.created_at] if correction.source != RENAME_SOURCE else []
+                ),
+                "from_item_editor": correction.source == RENAME_SOURCE,
                 "used_this_week": 0,
                 "last_used": None,
                 "recurred": 0,
@@ -245,7 +255,10 @@ def list_corrections(
             }
         else:
             row["seen"] += 1
-            row["recorded_at"].append(correction.created_at)
+            if correction.source == RENAME_SOURCE:
+                row["from_item_editor"] = True
+            else:
+                row["recorded_at"].append(correction.created_at)
 
     keys = [row["content_key"] for row in grouped.values() if row["content_key"]]
     if keys:
@@ -387,7 +400,12 @@ def record_corrections(db: Session, receipt, reviewed_items: list) -> int:
     try:
         from app.services.correction_keys import content_key
 
-        db.query(OcrCorrection).filter(OcrCorrection.receipt_id == receipt.id).delete()
+        # Only this receipt's review lessons are re-derived from the review.
+        # Rename lessons attached to it came from the item editor and stay.
+        db.query(OcrCorrection).filter(
+            OcrCorrection.receipt_id == receipt.id,
+            OcrCorrection.source == REVIEW_SOURCE,
+        ).delete()
 
         kind = input_type_of(receipt.image_path)
         suppressed = suppressed_keys(db)
@@ -470,6 +488,156 @@ def record_corrections(db: Session, receipt, reviewed_items: list) -> int:
     except Exception:
         logger.exception(f"Failed to record OCR corrections for receipt {receipt.id}")
         return 0
+
+
+def record_rename_corrections(db: Session, item, old_name: str, new_name: str) -> dict[str, int]:
+    """Turn an item rename into name lessons for every store it was bought at.
+
+    The lesson has to name what the model actually read, which is often not the
+    item's old name: measured on the live database, 19% of purchase lines were
+    matched to their item from different receipt text. So each receipt holding
+    the item is paired against its stored extraction, the way a review save
+    pairs it, and the extracted text becomes the lesson's model value. One row
+    per receipt, attached to that receipt, so the eval's rule of never giving a
+    receipt its own answers still holds.
+
+    Renaming the same item again replaces its earlier rename lessons. A review
+    lesson that pointed the same receipt text at the old name is suppressed,
+    because the prompt would otherwise carry both names for one text; it can be
+    restored from the Corrections page.
+
+    Returns ``{"lessons": distinct lessons written, "superseded": review lessons
+    suppressed}``. Commits its own work. Never raises: the rename is already
+    saved, and bookkeeping must not undo it.
+    """
+    result = {"lessons": 0, "superseded": 0}
+    old_name = (old_name or "").strip()
+    new_name = (new_name or "").strip()
+    # Same threshold as review lessons: a change of case or spacing teaches nothing.
+    if (
+        not old_name
+        or not new_name
+        or fuzz.ratio(old_name.lower(), new_name.lower()) >= _NOISE_THRESHOLD
+    ):
+        return result
+
+    try:
+        from types import SimpleNamespace
+
+        from app.models import Receipt
+        from app.models.receipt import ReceiptItem
+        from app.services.correction_keys import content_key
+        from app.services.spend import line_total
+
+        db.query(OcrCorrection).filter(
+            OcrCorrection.source == RENAME_SOURCE,
+            OcrCorrection.item_id == item.id,
+        ).delete(synchronize_session=False)
+
+        receipt_ids = [
+            rid
+            for (rid,) in db.query(ReceiptItem.receipt_id)
+            .filter(ReceiptItem.item_id == item.id)
+            .distinct()
+        ]
+        receipts = (
+            db.query(Receipt).filter(Receipt.id.in_(receipt_ids)).all() if receipt_ids else []
+        )
+
+        approved = _bounded(new_name, MAX_STORED_VALUE)
+        suppressed = suppressed_keys(db)
+        rows: list[OcrCorrection] = []
+        texts: set[tuple] = set()
+        for receipt in receipts:
+            try:
+                ocr_data = json.loads(receipt.ocr_data) if receipt.ocr_data else {}
+            except (json.JSONDecodeError, TypeError):
+                continue
+            if not isinstance(ocr_data, dict) or ocr_data.get("produce_mode"):
+                continue
+            ai_items = ocr_data.get("items") or []
+            if not ai_items:
+                continue
+
+            # The review saw this item under its old name; pair against that.
+            lines = [
+                SimpleNamespace(
+                    item_id=line.item_id,
+                    name=old_name
+                    if line.item_id == item.id
+                    else (line.item.name if line.item else ""),
+                    final_price=line_total(line),
+                )
+                for line in receipt.items
+            ]
+            pairs, leftover_ai, leftover_lines = _pair_items(ai_items, lines)
+            # Name pairing misses text far from the item's name, as after a
+            # merge. A leftover line and a single leftover extracted line at the
+            # same price are the same line. Measured on the live database, name
+            # pairing links 94.0% of lines and this links 0.8% more, with no
+            # case of two leftover lines sharing the price.
+            for line in leftover_lines:
+                if line.item_id != item.id:
+                    continue
+                same_price = [
+                    ai
+                    for ai in leftover_ai
+                    if ai.get("final_price") is not None
+                    and abs(ai["final_price"] - line.final_price) < 0.01
+                ]
+                if len(same_price) == 1:
+                    pairs.append((same_price[0], line))
+                    leftover_ai.remove(same_price[0])
+            kind = input_type_of(receipt.image_path)
+            for ai, line in pairs:
+                if line.item_id != item.id:
+                    continue
+                read = (ai.get("original_ocr_name") or ai.get("name") or "").strip()
+                if not read or fuzz.ratio(read.lower(), new_name.lower()) >= _NOISE_THRESHOLD:
+                    continue
+                ai_value = _bounded(read, MAX_STORED_VALUE)
+                key = content_key(receipt.store_id, kind, "name", ai_value, approved)
+                if key in suppressed:
+                    continue
+                rows.append(
+                    OcrCorrection(
+                        receipt_id=receipt.id,
+                        store_id=receipt.store_id,
+                        field="name",
+                        input_type=kind,
+                        content_key=key,
+                        ai_value=ai_value,
+                        approved_value=approved,
+                        source=RENAME_SOURCE,
+                        item_id=item.id,
+                    )
+                )
+                texts.add((receipt.store_id, kind, ai_value))
+
+        db.add_all(rows)
+
+        superseded: set[str] = set()
+        if texts:
+            stale = db.query(OcrCorrection).filter(
+                OcrCorrection.source == REVIEW_SOURCE,
+                OcrCorrection.field == "name",
+                func.lower(func.trim(OcrCorrection.approved_value)) == old_name.lower(),
+            )
+            for row in stale:
+                if not row.content_key or row.content_key in superseded:
+                    continue
+                if (row.store_id, row.input_type, row.ai_value) in texts:
+                    _override_for(db, row).suppressed = True
+                    superseded.add(row.content_key)
+
+        db.commit()
+        result["lessons"] = len({row.content_key for row in rows})
+        result["superseded"] = len(superseded)
+        return result
+    except Exception:
+        db.rollback()
+        logger.exception("Failed to record rename lessons for item %s", getattr(item, "id", None))
+        return {"lessons": 0, "superseded": 0}
 
 
 INPUT_TYPES = ("image", "pdf", "paste")
