@@ -328,6 +328,105 @@ def test_a_second_rename_replaces_the_first(db):
     assert [(r.ai_value, r.approved_value) for r in rows] == [("Chips", "Kettle Chips")]
 
 
+def _used(db, receipt, key):
+    """Record that a lesson was in this receipt's prompt, as OCR logging does."""
+    db.add(CorrectionUsage(content_key=key, receipt_id=receipt.id))
+    db.commit()
+
+
+def test_a_reading_the_model_took_from_a_lesson_names_the_printed_text(db):
+    """Receipt 2 was read with A in its prompt, so its stored reading is A's answer.
+
+    Written as-is, the second rename would add Potato Chips -> Salt & Vinegar,
+    a lesson that only matches while A is in the prompt, which it no longer is.
+    """
+    costco = _store(db)
+    chips = _item(db, "Chips")
+    first = _bought(db, costco, [(chips, "Chips", 3.99)])
+    _rename(db, chips, "Potato Chips")
+    key_a = _rename_rows(db, chips)[0].content_key
+    second = _bought(db, costco, [(chips, "Potato Chips", 3.99)])
+    _used(db, second, key_a)
+
+    result = _rename(db, chips, "Salt & Vinegar Potato Chips")
+
+    assert result["lessons"] == 1
+    rows = _rename_rows(db, chips)
+    assert {(r.ai_value, r.approved_value) for r in rows} == {
+        ("Chips", "Salt & Vinegar Potato Chips")
+    }
+    assert sorted(r.receipt_id for r in rows) == sorted([first.id, second.id])
+
+
+def test_a_third_rename_still_names_the_printed_text(db):
+    """By now A's rows are gone, so its usage alone cannot say what receipt 2 printed."""
+    costco = _store(db)
+    chips = _item(db, "Chips")
+    _bought(db, costco, [(chips, "Chips", 3.99)])
+    _rename(db, chips, "Potato Chips")
+    # A string, not the row: SQLite reuses the ids of deleted rows.
+    key_a = _rename_rows(db, chips)[0].content_key
+    second = _bought(db, costco, [(chips, "Potato Chips", 3.99)])
+    _used(db, second, key_a)
+    _rename(db, chips, "Salt & Vinegar Potato Chips")
+    assert db.query(OcrCorrection).filter_by(content_key=key_a).count() == 0
+
+    result = _rename(db, chips, "Kettle Salt & Vinegar Chips")
+
+    assert result["lessons"] == 1
+    assert {r.ai_value for r in _rename_rows(db, chips)} == {"Chips"}
+
+
+def test_a_reading_with_no_lesson_behind_it_is_kept(db):
+    """Without usage evidence the model may really have read Potato Chips."""
+    costco = _store(db)
+    chips = _item(db, "Chips")
+    _bought(db, costco, [(chips, "Chips", 3.99)])
+    _bought(db, costco, [(chips, "Potato Chips", 3.99)])
+
+    result = _rename(db, chips, "Salt & Vinegar Potato Chips")
+
+    assert result["lessons"] == 2
+    assert {r.ai_value for r in _rename_rows(db, chips)} == {"Chips", "Potato Chips"}
+
+
+def test_a_lesson_in_the_prompt_that_did_not_produce_the_reading_is_ignored(db):
+    costco = _store(db)
+    chips = _item(db, "Chips")
+    receipt = _bought(db, costco, [(chips, "Potato Chips", 3.99)])
+    milk = _review_lesson(db, _bought(db, costco, [(_item(db, "Milk"), "MLK", 4.0)]), "MLK", "Milk")
+    _used(db, receipt, milk.content_key)
+
+    _rename(db, chips, "Salt & Vinegar Potato Chips")
+
+    assert {r.ai_value for r in _rename_rows(db, chips)} == {"Potato Chips"}
+
+
+def test_a_removed_lesson_is_still_read_from_its_override(db):
+    """A removed lesson's rows can be gone while its usage rows remain."""
+    costco = _store(db)
+    chips = _item(db, "Chips")
+    receipt = _bought(db, costco, [(chips, "Chips", 3.99)])
+    key = content_key(costco.id, "image", "name", "CHP", "Chips")
+    db.add(
+        CorrectionOverride(
+            content_key=key,
+            store_id=costco.id,
+            input_type="image",
+            field="name",
+            ai_value="CHP",
+            approved_value="Chips",
+            suppressed=True,
+        )
+    )
+    db.commit()
+    _used(db, receipt, key)
+
+    _rename(db, chips, "Potato Chips")
+
+    assert {r.ai_value for r in _rename_rows(db, chips)} == {"CHP"}
+
+
 def test_a_review_lesson_pointing_at_the_old_name_is_removed(db):
     """CHP -> Chips and CHP -> Potato Chips in one prompt would contradict."""
     costco = _store(db)

@@ -490,6 +490,75 @@ def record_corrections(db: Session, receipt, reviewed_items: list) -> int:
         return 0
 
 
+def _previous_rename_texts(db: Session, item_id: int) -> dict[int, set[str]]:
+    """Per receipt, the printed text this item's last rename already resolved."""
+    texts: dict[int, set[str]] = {}
+    for receipt_id, ai_value in db.query(OcrCorrection.receipt_id, OcrCorrection.ai_value).filter(
+        OcrCorrection.source == RENAME_SOURCE,
+        OcrCorrection.item_id == item_id,
+    ):
+        if ai_value:
+            texts.setdefault(receipt_id, set()).add(ai_value)
+    return texts
+
+
+def _name_lessons_in_prompt(db: Session, receipt_ids: list[int]) -> dict[int, dict[str, str]]:
+    """Per receipt, the name lessons its prompt carried: corrected value -> model value.
+
+    The corrected value is lowercased for lookup. Lesson text comes from any
+    correction row still carrying the key, else from an override's copy, since
+    a lesson's rows can be gone while its usage rows remain.
+    """
+    from app.models import CorrectionUsage
+
+    if not receipt_ids:
+        return {}
+    used = (
+        db.query(CorrectionUsage.receipt_id, CorrectionUsage.content_key)
+        .filter(CorrectionUsage.receipt_id.in_(receipt_ids))
+        .all()
+    )
+    keys = {key for _, key in used}
+    if not keys:
+        return {}
+
+    content: dict[str, tuple[str, str]] = {}
+    for model in (OcrCorrection, CorrectionOverride):
+        for key, field, ai_value, approved in db.query(
+            model.content_key, model.field, model.ai_value, model.approved_value
+        ).filter(model.content_key.in_(keys)):
+            if field == "name" and ai_value and approved:
+                content.setdefault(key, (ai_value.strip(), approved.strip()))
+
+    lessons: dict[int, dict[str, str]] = {}
+    for receipt_id, key in used:
+        if key in content:
+            ai_value, approved = content[key]
+            lessons.setdefault(receipt_id, {})[approved.lower()] = ai_value
+    return lessons
+
+
+def _printed_text(read: str, previous: set[str] | None, taught: dict[str, str] | None) -> str:
+    """What the receipt printed, where the stored reading is a lesson's answer.
+
+    A reading taken while a lesson was in the prompt can be the lesson's
+    corrected value rather than the receipt's text. Written as a lesson it would
+    name text the model only produces while that lesson is present, so it would
+    take a slot and never fire once the lesson is gone.
+
+    - The item's previous rename already resolved this receipt: reuse its text.
+      That lesson may since have been replaced, so its usage cannot be relied on.
+    - A name lesson in this receipt's prompt has the reading as its corrected
+      value: the model applied it, so use the text the lesson corrects.
+    - Otherwise the reading is taken as printed.
+    """
+    if previous and len(previous) == 1:
+        return next(iter(previous))
+    if read and taught:
+        return taught.get(read.lower(), read)
+    return read
+
+
 def record_rename_corrections(db: Session, item, old_name: str, new_name: str) -> dict[str, int]:
     """Turn an item rename into name lessons for every store it was bought at.
 
@@ -529,11 +598,6 @@ def record_rename_corrections(db: Session, item, old_name: str, new_name: str) -
         from app.services.correction_keys import content_key
         from app.services.spend import line_total
 
-        db.query(OcrCorrection).filter(
-            OcrCorrection.source == RENAME_SOURCE,
-            OcrCorrection.item_id == item.id,
-        ).delete(synchronize_session=False)
-
         receipt_ids = [
             rid
             for (rid,) in db.query(ReceiptItem.receipt_id)
@@ -543,6 +607,16 @@ def record_rename_corrections(db: Session, item, old_name: str, new_name: str) -
         receipts = (
             db.query(Receipt).filter(Receipt.id.in_(receipt_ids)).all() if receipt_ids else []
         )
+
+        # Read before the delete below: the previous rename's rows are part of
+        # the evidence for what each receipt actually printed.
+        previous = _previous_rename_texts(db, item.id)
+        taught = _name_lessons_in_prompt(db, receipt_ids)
+
+        db.query(OcrCorrection).filter(
+            OcrCorrection.source == RENAME_SOURCE,
+            OcrCorrection.item_id == item.id,
+        ).delete(synchronize_session=False)
 
         approved = _bounded(new_name, MAX_STORED_VALUE)
         suppressed = suppressed_keys(db)
@@ -592,7 +666,11 @@ def record_rename_corrections(db: Session, item, old_name: str, new_name: str) -
             for ai, line in pairs:
                 if line.item_id != item.id:
                     continue
-                read = (ai.get("original_ocr_name") or ai.get("name") or "").strip()
+                read = _printed_text(
+                    (ai.get("original_ocr_name") or ai.get("name") or "").strip(),
+                    previous.get(receipt.id),
+                    taught.get(receipt.id),
+                )
                 if not read or fuzz.ratio(read.lower(), new_name.lower()) >= _NOISE_THRESHOLD:
                     continue
                 ai_value = _bounded(read, MAX_STORED_VALUE)
