@@ -415,6 +415,68 @@ def set_pinned(
     return override
 
 
+def _supersede(db: Session, correction: OcrCorrection) -> bool:
+    """Remove a lesson a newer one contradicts, unless a person has kept it.
+
+    A lesson someone restored or pinned has an override that is not suppressed:
+    that is a decision, and an automatic rule does not overturn it. Returns
+    whether the lesson was removed.
+    """
+    override = (
+        db.query(CorrectionOverride)
+        .filter(CorrectionOverride.content_key == correction.content_key)
+        .first()
+    )
+    if override is not None and not override.suppressed:
+        return False
+    _override_for(db, correction).suppressed = True
+    return True
+
+
+def _supersede_contradicted(db: Session, receipt, corrections: list[OcrCorrection]) -> int:
+    """Remove older name lessons that this review contradicts.
+
+    Same store, input type and model text (ignoring case) with a different
+    answer: the latest save wins, as it does for store names. Two answers on
+    one receipt are both kept, since both are in this review's answers; they
+    are two lines, not a correction of a correction. A rename lesson attached
+    to this same receipt is compared like any other. Name lessons only: a price
+    or quantity value means nothing across different items.
+
+    Measured on the live database, 6 of 199 name-lesson groups gave two answers
+    for one text: corrections of corrections, formatting variants, one pair on
+    a single receipt, and one text that names two different products.
+    """
+    answers: dict[tuple, set[str]] = {}
+    for correction in corrections:
+        if correction.field == "name" and correction.ai_value and correction.approved_value:
+            text = correction.ai_value.strip().lower()
+            answers.setdefault((correction.input_type, text), set()).add(
+                correction.approved_value.strip().lower()
+            )
+    if not answers:
+        return 0
+
+    # Flushed so this review's own rows are seen whatever the session's
+    # autoflush setting. They are never removed: their answers are in the set.
+    db.flush()
+    older = db.query(OcrCorrection).filter(
+        OcrCorrection.field == "name",
+        OcrCorrection.store_id == receipt.store_id,
+        func.lower(func.trim(OcrCorrection.ai_value)).in_({text for _, text in answers}),
+    )
+    removed: set[str] = set()
+    for row in older:
+        new = answers.get((row.input_type, (row.ai_value or "").strip().lower()))
+        if new is None or not row.content_key or row.content_key in removed:
+            continue
+        if (row.approved_value or "").strip().lower() in new:
+            continue
+        if _supersede(db, row):
+            removed.add(row.content_key)
+    return len(removed)
+
+
 def record_corrections(db: Session, receipt, reviewed_items: list) -> int:
     """Diff the AI extraction against the human-approved items and persist fixes.
 
@@ -518,6 +580,18 @@ def record_corrections(db: Session, receipt, reviewed_items: list) -> int:
             add("item_missed", None, human.name)
 
         db.add_all(corrections)
+        # Separately guarded: failing to tidy older lessons must not cost the
+        # lessons this review just produced.
+        try:
+            superseded = _supersede_contradicted(db, receipt, corrections)
+            if superseded:
+                logger.info(
+                    "Receipt %s: removed %d older lessons its review contradicts",
+                    receipt.id,
+                    superseded,
+                )
+        except Exception:
+            logger.exception("Failed to remove contradicted lessons for receipt %s", receipt.id)
         # Caller's commit persists these together with the reviewed items
         return len(corrections)
     except Exception:
@@ -722,8 +796,7 @@ def record_rename_corrections(db: Session, item, old_name: str, new_name: str) -
             for row in stale:
                 if not row.content_key or row.content_key in superseded:
                     continue
-                if (row.store_id, row.input_type, row.ai_value) in texts:
-                    _override_for(db, row).suppressed = True
+                if (row.store_id, row.input_type, row.ai_value) in texts and _supersede(db, row):
                     superseded.add(row.content_key)
 
         db.commit()
