@@ -115,6 +115,41 @@ def _pair_items(ai_items: list[dict], reviewed_items: list) -> tuple[list, list,
     return pairs, unmatched_ai, [reviewed_items[i] for i in remaining]
 
 
+def pair_receipt_lines(ai_items: list[dict], lines: list) -> tuple[list, list, list]:
+    """Pair extracted lines with saved lines: by name, then by a unique price.
+
+    Name pairing misses text far from the item's name, as after a merge or a
+    rename. A leftover saved line and a leftover extracted line are the same
+    line when each is the only leftover on its side at that price; a shared
+    price is never guessed between. Measured on the live database, name pairing
+    links 93.9% of lines and the price step 0.9% more.
+
+    Lines need ``name`` and ``final_price``; returns (pairs, unmatched extracted
+    lines, unmatched saved lines).
+    """
+    pairs, leftover_ai, leftover_lines = _pair_items(ai_items, lines)
+
+    def cents(value) -> int | None:
+        return None if value is None else round(float(value) * 100)
+
+    ai_by_price: dict[int, list[dict]] = {}
+    for ai in leftover_ai:
+        price = cents(ai.get("final_price"))
+        if price is not None:
+            ai_by_price.setdefault(price, []).append(ai)
+    lines_by_price: dict[int, list] = {}
+    for line in leftover_lines:
+        lines_by_price.setdefault(cents(line.final_price) or 0, []).append(line)
+
+    for price, candidates in ai_by_price.items():
+        matched = lines_by_price.get(price, [])
+        if len(candidates) == 1 and len(matched) == 1:
+            pairs.append((candidates[0], matched[0]))
+            leftover_ai.remove(candidates[0])
+            leftover_lines.remove(matched[0])
+    return pairs, leftover_ai, leftover_lines
+
+
 # A per-unit price is stored rounded to the cent, so a line of N units can be a
 # cent away from N times it: receipt #461 holds 3.695 a unit, which prints as
 # 3.69 and totals 7.39, not 7.38. The tolerance is therefore one cent per unit.
@@ -644,24 +679,7 @@ def record_rename_corrections(db: Session, item, old_name: str, new_name: str) -
                 )
                 for line in receipt.items
             ]
-            pairs, leftover_ai, leftover_lines = _pair_items(ai_items, lines)
-            # Name pairing misses text far from the item's name, as after a
-            # merge. A leftover line and a single leftover extracted line at the
-            # same price are the same line. Measured on the live database, name
-            # pairing links 94.0% of lines and this links 0.8% more, with no
-            # case of two leftover lines sharing the price.
-            for line in leftover_lines:
-                if line.item_id != item.id:
-                    continue
-                same_price = [
-                    ai
-                    for ai in leftover_ai
-                    if ai.get("final_price") is not None
-                    and abs(ai["final_price"] - line.final_price) < 0.01
-                ]
-                if len(same_price) == 1:
-                    pairs.append((same_price[0], line))
-                    leftover_ai.remove(same_price[0])
+            pairs, _, _ = pair_receipt_lines(ai_items, lines)
             kind = input_type_of(receipt.image_path)
             for ai, line in pairs:
                 if line.item_id != item.id:

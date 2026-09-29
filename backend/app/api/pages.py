@@ -588,6 +588,7 @@ def review_receipt(request: Request, receipt_id: int, db: Session = Depends(get_
     # and categorization history. This fixes test regressions and ensures UI accuracy.
     if ocr_data and "items" in ocr_data:
         from app.models import Item, ReceiptItem
+        from app.services import store_names
         from app.services.item_matcher import get_best_match, get_store_item_ids
 
         # Pre-fetch all items and store purchase history for batch matching
@@ -599,8 +600,10 @@ def review_receipt(request: Request, receipt_id: int, db: Session = Depends(get_
             if not item_name:
                 continue
 
-            # Try to find existing item match
-            master_item = get_best_match(
+            # What this store printed last time comes first; then name matching.
+            master_item = store_names.item_for(
+                db, receipt.store_id, store_names.read_text(item_data)
+            ) or get_best_match(
                 item_name, db, threshold=90, existing_items=all_items, store_item_ids=store_item_ids
             )
 

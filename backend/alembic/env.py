@@ -29,6 +29,7 @@ import app.models.merge_log  # noqa: F401
 import app.models.ocr_correction  # noqa: F401
 import app.models.receipt  # noqa: F401
 import app.models.store  # noqa: F401
+import app.models.store_item_alias  # noqa: F401
 from app.database import Base
 
 target_metadata = Base.metadata
