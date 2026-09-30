@@ -62,11 +62,19 @@ def item_for(db: Session, store_id: int | None, text: str | None) -> Item | None
         return None
 
 
-def remember_receipt(db: Session, receipt, source: str = REVIEW_SOURCE) -> int:
+def remember_receipt(
+    db: Session,
+    receipt,
+    source: str = REVIEW_SOURCE,
+    changes: list[dict] | None = None,
+) -> int:
     """Record each saved line's printed text against the item it was saved as.
 
-    The latest save wins. Returns the number of names written. The caller
-    commits. Never raises: the review is already saved.
+    The latest save wins. Returns the number of names written. When ``changes``
+    is given, each name that now points at a different item is appended to it
+    as ``{store_id, text_key, printed_text, from_item_id, to_item_id}``, so the
+    caller can offer to move past lines. The caller commits. Never raises: the
+    review is already saved.
     """
     if not receipt.store_id or not receipt.ocr_data:
         return 0
@@ -134,6 +142,16 @@ def remember_receipt(db: Session, receipt, source: str = REVIEW_SOURCE) -> int:
                     )
                 )
             else:
+                if changes is not None and alias.item_id != item_id:
+                    changes.append(
+                        {
+                            "store_id": receipt.store_id,
+                            "text_key": key,
+                            "printed_text": text,
+                            "from_item_id": alias.item_id,
+                            "to_item_id": item_id,
+                        }
+                    )
                 alias.item_id = item_id
                 alias.printed_text = text
                 alias.source = source
@@ -168,3 +186,118 @@ def restore(db: Session, alias_ids: list[int], from_item_id: int, to_item_id: in
     for alias in back:
         alias.item_id = to_item_id
     return len(back)
+
+
+def past_lines(
+    db: Session,
+    store_id: int,
+    key: str,
+    from_item_id: int,
+    exclude_receipt_id: int | None = None,
+) -> list:
+    """Past lines at this store that printed ``key`` and are saved as ``from_item_id``.
+
+    Found the way a review save links them: each candidate receipt's extraction
+    is paired with its saved lines, and a line counts when the text paired to
+    it has this key. Only receipts with a line on the old item are read.
+    """
+    from app.models import Receipt, ReceiptItem
+    from app.services.correction_service import pair_receipt_lines
+    from app.services.spend import line_total
+
+    key = text_key(key)
+    receipts = (
+        db.query(Receipt)
+        .join(ReceiptItem, ReceiptItem.receipt_id == Receipt.id)
+        .filter(
+            Receipt.store_id == store_id,
+            Receipt.ocr_data.isnot(None),
+            ReceiptItem.item_id == from_item_id,
+        )
+        .distinct()
+        .order_by(Receipt.purchase_date, Receipt.id)
+        .all()
+    )
+    found = []
+    for receipt in receipts:
+        if receipt.id == exclude_receipt_id:
+            continue
+        try:
+            data = json.loads(receipt.ocr_data or "")
+        except (json.JSONDecodeError, TypeError):
+            continue
+        if not isinstance(data, dict) or data.get("produce_mode"):
+            continue
+        lines = (
+            db.query(ReceiptItem)
+            .filter(ReceiptItem.receipt_id == receipt.id, ReceiptItem.item_id.isnot(None))
+            .all()
+        )
+        ids = {line.item_id for line in lines}
+        names = {row[0]: row[1] for row in db.query(Item.id, Item.name).filter(Item.id.in_(ids))}
+        saved = [
+            SimpleNamespace(
+                line=line,
+                item_id=line.item_id,
+                name=names.get(line.item_id) or "",
+                final_price=line_total(line),
+            )
+            for line in lines
+        ]
+        pairs, _, _ = pair_receipt_lines(data.get("items") or [], saved)
+        found += [
+            pair.line
+            for extracted, pair in pairs
+            if pair.item_id == from_item_id and text_key(read_text(extracted)) == key
+        ]
+    return found
+
+
+def relink_suggestions(db: Session, receipt, changes: list[dict]) -> list[dict]:
+    """The name changes from a review save that have past lines to offer moving."""
+    from app.models import Store
+
+    suggestions = []
+    for change in changes:
+        lines = past_lines(
+            db,
+            change["store_id"],
+            change["text_key"],
+            change["from_item_id"],
+            exclude_receipt_id=receipt.id,
+        )
+        if not lines:
+            continue
+        old, new = db.get(Item, change["from_item_id"]), db.get(Item, change["to_item_id"])
+        store = db.get(Store, change["store_id"])
+        suggestions.append(
+            {
+                **change,
+                "store": store.name if store else None,
+                "from_item": old.name if old else None,
+                "to_item": new.name if new else None,
+                "lines": len(lines),
+            }
+        )
+    return suggestions
+
+
+def move_lines(
+    db: Session,
+    store_id: int,
+    key: str,
+    from_item_id: int,
+    to_item_id: int,
+    line_ids: list[int],
+) -> int:
+    """Move the previewed lines that still qualify. The caller commits.
+
+    Only lines in ``line_ids`` that ``past_lines`` still finds are moved, so a
+    line edited since the preview is left alone. The same call with the items
+    swapped moves them back.
+    """
+    wanted = set(line_ids)
+    lines = [line for line in past_lines(db, store_id, key, from_item_id) if line.id in wanted]
+    for line in lines:
+        line.item_id = to_item_id
+    return len(lines)

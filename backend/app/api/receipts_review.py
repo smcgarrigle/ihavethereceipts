@@ -364,9 +364,17 @@ def save_reviewed_items(
             logger.info(f"Recorded {recorded} OCR corrections for receipt {receipt.id}")
 
         # Permanent memory: what this store printed, and the item each line became
-        from app.services.store_names import remember_receipt
+        from app.services.store_names import relink_suggestions, remember_receipt
 
-        remember_receipt(db, receipt)
+        changes: list[dict] = []
+        remember_receipt(db, receipt, changes=changes)
+        # A name that now means a different item may have past lines to move;
+        # the page offers them. Never allowed to fail the save.
+        try:
+            relink = relink_suggestions(db, receipt, changes)
+        except Exception:
+            logger.exception(f"Failed to find past lines to move for receipt {receipt.id}")
+            relink = []
 
         db.commit()
 
@@ -374,6 +382,7 @@ def save_reviewed_items(
             "success": True,
             "items_saved": items_saved,
             "merge_suggestions": merge_suggestions,
+            "relink_suggestions": relink,
         }
     except Exception as e:
         db.rollback()
