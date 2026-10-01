@@ -146,31 +146,96 @@ kept rather than deleted.
 
 ## 7. Runs A, C, D, E and F (current code)
 
-Run from `backend/`. After each run, set its cache aside so the next run starts
-empty.
+Run from `backend/`. A run takes about 45 minutes, so each one runs in the
+background:
+
+- `nohup` keeps the run going if the SSH session drops.
+- `caffeinate -i` keeps the Mac awake until the run ends. It comes after
+  `nohup`, so a dropped session does not stop it either.
+- Everything the run prints goes to a log in `~/cm15/`.
+
+Start one run, wait for it to finish, then set its cache aside before starting
+the next. Moving the cache while a run is still going breaks that run.
+
+**A run has finished** when the last line of its log reads `Wrote …json`:
 
 ```bash
-LOCAL_OCR_MAX_HEIGHT=1600 uv run python scripts/ocr_eval.py --live --corrections none --receipt-ids $(grep -v '^#' ~/cm15_ids.txt) --json ~/cm15/a-none.json
+tail -3 ~/cm15/a.log
+```
+
+**Progress** while it runs: only successful reads are cached, so this climbs
+towards 30.
+
+```bash
+ls ../data/ocr_cache | wc -l
+```
+
+**Still running?**
+
+```bash
+pgrep -fl ocr_eval
+```
+
+If a run ends with OCR errors, start the same command again without moving the
+cache: the receipts already read are reused and only the failures are retried.
+
+### Run A: no corrections
+
+```bash
+LOCAL_OCR_MAX_HEIGHT=1600 nohup caffeinate -i uv run python scripts/ocr_eval.py --live --corrections none --receipt-ids $(grep -v '^#' ~/cm15_ids.txt) --json ~/cm15/a-none.json > ~/cm15/a.log 2>&1 &
+```
+
+When `~/cm15/a.log` ends with `Wrote`:
+
+```bash
 mv ../data/ocr_cache ../data/ocr_cache.cm15-a
 ```
 
+### Run C: the current block, all stores, limit 10
+
 ```bash
-LOCAL_OCR_MAX_HEIGHT=1600 CORRECTION_PROMPT_LIMIT=10 uv run python scripts/ocr_eval.py --live --corrections global --receipt-ids $(grep -v '^#' ~/cm15_ids.txt) --json ~/cm15/c-new-global-10.json
+LOCAL_OCR_MAX_HEIGHT=1600 CORRECTION_PROMPT_LIMIT=10 nohup caffeinate -i uv run python scripts/ocr_eval.py --live --corrections global --receipt-ids $(grep -v '^#' ~/cm15_ids.txt) --json ~/cm15/c-new-global-10.json > ~/cm15/c.log 2>&1 &
+```
+
+When `~/cm15/c.log` ends with `Wrote`:
+
+```bash
 mv ../data/ocr_cache ../data/ocr_cache.cm15-c
 ```
 
+### Run D: the current block, this store only, limit 10
+
 ```bash
-LOCAL_OCR_MAX_HEIGHT=1600 CORRECTION_PROMPT_LIMIT=10 uv run python scripts/ocr_eval.py --live --corrections store --receipt-ids $(grep -v '^#' ~/cm15_ids.txt) --json ~/cm15/d-new-store-10.json
+LOCAL_OCR_MAX_HEIGHT=1600 CORRECTION_PROMPT_LIMIT=10 nohup caffeinate -i uv run python scripts/ocr_eval.py --live --corrections store --receipt-ids $(grep -v '^#' ~/cm15_ids.txt) --json ~/cm15/d-new-store-10.json > ~/cm15/d.log 2>&1 &
+```
+
+When `~/cm15/d.log` ends with `Wrote`:
+
+```bash
 mv ../data/ocr_cache ../data/ocr_cache.cm15-d
 ```
 
+### Run E: the current block, all stores, limit 25
+
 ```bash
-LOCAL_OCR_MAX_HEIGHT=1600 CORRECTION_PROMPT_LIMIT=25 uv run python scripts/ocr_eval.py --live --corrections global --receipt-ids $(grep -v '^#' ~/cm15_ids.txt) --json ~/cm15/e-new-global-25.json
+LOCAL_OCR_MAX_HEIGHT=1600 CORRECTION_PROMPT_LIMIT=25 nohup caffeinate -i uv run python scripts/ocr_eval.py --live --corrections global --receipt-ids $(grep -v '^#' ~/cm15_ids.txt) --json ~/cm15/e-new-global-25.json > ~/cm15/e.log 2>&1 &
+```
+
+When `~/cm15/e.log` ends with `Wrote`:
+
+```bash
 mv ../data/ocr_cache ../data/ocr_cache.cm15-e
 ```
 
+### Run F: the current block, all stores, limit 50
+
 ```bash
-LOCAL_OCR_MAX_HEIGHT=1600 CORRECTION_PROMPT_LIMIT=50 uv run python scripts/ocr_eval.py --live --corrections global --receipt-ids $(grep -v '^#' ~/cm15_ids.txt) --json ~/cm15/f-new-global-50.json
+LOCAL_OCR_MAX_HEIGHT=1600 CORRECTION_PROMPT_LIMIT=50 nohup caffeinate -i uv run python scripts/ocr_eval.py --live --corrections global --receipt-ids $(grep -v '^#' ~/cm15_ids.txt) --json ~/cm15/f-new-global-50.json > ~/cm15/f.log 2>&1 &
+```
+
+When `~/cm15/f.log` ends with `Wrote`:
+
+```bash
 mv ../data/ocr_cache ../data/ocr_cache.cm15-f
 ```
 
@@ -179,17 +244,36 @@ mv ../data/ocr_cache ../data/ocr_cache.cm15-f
 The old code fixes the block at 10 corrections, so `CORRECTION_PROMPT_LIMIT` is
 not needed.
 
+Check out the old code:
+
 ```bash
-cd ..
-git checkout 8e68d2a
-cd backend
-uv sync --extra dev
-LOCAL_OCR_MAX_HEIGHT=1600 uv run python scripts/ocr_eval.py --live --corrections global --receipt-ids $(grep -v '^#' ~/cm15_ids.txt) --json ~/cm15/b-old-global-10.json
+cd .. && git checkout 8e68d2a && cd backend && uv sync --extra dev
+```
+
+Start the run:
+
+```bash
+LOCAL_OCR_MAX_HEIGHT=1600 nohup caffeinate -i uv run python scripts/ocr_eval.py --live --corrections global --receipt-ids $(grep -v '^#' ~/cm15_ids.txt) --json ~/cm15/b-old-global-10.json > ~/cm15/b.log 2>&1 &
+```
+
+Wait until `~/cm15/b.log` ends with `Wrote` before going back to `main`. The run
+loads some of its code as it goes, so switching branches mid-run would mix old
+and new code.
+
+```bash
 mv ../data/ocr_cache ../data/ocr_cache.cm15-b
-cd ..
-git checkout main
-cd backend
-uv sync --extra dev
+```
+
+```bash
+cd .. && git checkout main && cd backend && uv sync --extra dev
+```
+
+## 8a. Check every result
+
+Each file must account for all 30 receipts:
+
+```bash
+for f in ~/cm15/*.json; do python3 -c "import json,sys; d=json.load(open(sys.argv[1])); s,e,u=len(d['receipts']),len(d['ocr_errors']),len(d['unscored']); print(f\"{sys.argv[1].split('/')[-1]:24} scored {s:2}  ocr errors {e:2}  no items {u:2}  total {s+e+u}/30\", '' if s+e+u==30 else '  <-- INCOMPLETE')" "$f"; done
 ```
 
 ## 9. Send the results back
