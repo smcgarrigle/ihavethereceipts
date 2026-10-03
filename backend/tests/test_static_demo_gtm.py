@@ -31,6 +31,16 @@ def test_tags_pages_and_skips_fragments(tmp_path):
     assert (tmp_path / "items" / "frag.html").read_text() == FRAGMENT
 
 
+def test_gt_inside_a_body_attribute_does_not_end_the_tag(tmp_path):
+    # base.html's toast x-data contains "remaining > 0"; the first cut of the
+    # regex stopped there and broke every page of the live demo.
+    page = """<html><head></head><body x-data="{ f() { if (r > 0) {} } }" class='b>c'><p>hi</p></body></html>"""
+    (tmp_path / "index.html").write_text(page)
+    gtm.inject_gtm(tmp_path, "GTM-ABC123")
+    text = (tmp_path / "index.html").read_text()
+    assert "if (r > 0) {} } }\" class='b>c'>\n<!-- Google Tag Manager (noscript) -->" in text
+
+
 def test_rerun_does_not_double_tag(tmp_path):
     (tmp_path / "index.html").write_text(PAGE)
     gtm.inject_gtm(tmp_path, "GTM-ABC123")
