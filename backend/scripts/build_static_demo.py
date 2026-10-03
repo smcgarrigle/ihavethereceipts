@@ -507,9 +507,18 @@ DEMO_SHIM = """
     e.stopPropagation();
     toast('Read-only demo \\u2014 forms are disabled');
   }, true);
+  // Only the app's own writes are blocked. Cross-origin POSTs (GA4 sends
+  // its hits as fetch POSTs to google-analytics.com) must pass through.
+  function sameOrigin(url) {
+    try {
+      var href = (url && url.url) || String(url);
+      return new URL(href, window.location.href).origin === window.location.origin;
+    } catch (e) { return true; }
+  }
   var realFetch = window.fetch;
   window.fetch = function (url, opts) {
-    if (opts && opts.method && opts.method.toUpperCase() !== 'GET') {
+    var method = (opts && opts.method) || (url && url.method) || 'GET';
+    if (method.toUpperCase() !== 'GET' && sameOrigin(url)) {
       toast('Read-only demo \\u2014 editing is disabled');
       return Promise.reject(new Error('static demo: write blocked'));
     }
