@@ -925,6 +925,12 @@ def main() -> int:
         default="",
         help="URL prefix the demo will be hosted under, e.g. /grocery-tracker/demo",
     )
+    parser.add_argument(
+        "--gtm-id",
+        default=os.environ.get("GTM_ID", ""),
+        help="Google Tag Manager container ID (GTM-XXXXXXX) to add to every page; "
+        "defaults to $GTM_ID, omitted when empty",
+    )
     args = parser.parse_args()
     final_out = Path(args.out).resolve()
 
@@ -953,6 +959,12 @@ def main() -> int:
         print(f"🔗 Rewrote root-relative URLs in {count} files for base path {args.base_path!r}")
         for escaped in check_base_path(out, args.base_path):
             print(f"  ⚠️  escapes the base path — {escaped}")
+
+    if args.gtm_id:
+        from gtm import inject_gtm
+
+        tagged = inject_gtm(out, args.gtm_id)
+        print(f"📈 Added GTM container {args.gtm_id} to {tagged} pages")
 
     for gap in check_template_literal_fetches(out):
         print(f"  ⚠️  unreachable endpoint — {gap}")
