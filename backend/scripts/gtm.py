@@ -26,8 +26,11 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 <!-- End Google Tag Manager (noscript) -->
 """
 
-_HEAD_OPEN = re.compile(r"<head(?:\s[^>]*)?>", re.IGNORECASE)
-_BODY_OPEN = re.compile(r"<body(?:\s[^>]*)?>", re.IGNORECASE)
+# Quoted attribute values may contain ">" (Alpine x-data on <body> does), so a
+# bare [^>]* would end the tag early and splice the snippet into the attribute.
+_ATTRS = r"""(?:\s(?:[^>"']|"[^"]*"|'[^']*')*)?"""
+_HEAD_OPEN = re.compile(rf"<head{_ATTRS}>", re.IGNORECASE)
+_BODY_OPEN = re.compile(rf"<body{_ATTRS}>", re.IGNORECASE)
 
 
 def inject_gtm(out: Path, gtm_id: str) -> int:
