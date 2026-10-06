@@ -378,6 +378,24 @@ def save_reviewed_items(
 
         db.commit()
 
+        # Nutrition Catch-up Trigger
+        try:
+            from app.api.settings_router import _load_feature_flags
+
+            flags = _load_feature_flags()
+            if flags.get("nutrition_catchup_enabled", True):
+                threshold = float(flags.get("nutrition_catchup_threshold", 70.0))
+                from app.services.nutrition_enricher import (
+                    get_enrichable_coverage,
+                    nutrition_enricher,
+                )
+
+                coverage = get_enrichable_coverage(db)
+                if coverage < threshold:
+                    nutrition_enricher.start(batch_size=50)
+        except Exception as e:
+            logger.error(f"Error triggering nutrition catch-up: {e}")
+
         return {
             "success": True,
             "items_saved": items_saved,

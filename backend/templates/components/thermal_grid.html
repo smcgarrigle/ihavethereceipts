@@ -1,0 +1,62 @@
+<div class="overflow-x-auto rounded-xl border border-borderDefault bg-bgCard">
+    <table class="w-full text-sm text-left">
+        <thead class="text-xs text-textMuted uppercase bg-bgSkeleton">
+            <tr>
+                <th scope="col" class="px-4 py-3 sticky left-0 bg-bgSkeleton z-10 font-bold">Item</th>
+                <th scope="col" class="px-2 py-3 text-xs">Basis</th>
+                {% for store in grid_data.stores %}
+                <th scope="col" class="px-4 py-3 text-right font-bold">{{ store }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in grid_data.items %}
+            <tr class="border-b border-borderDefault hover:bg-bgSkeleton/20 transition-colors group">
+                <td class="px-4 py-3 font-medium text-textBase sticky left-0 bg-bgCard group-hover:bg-bgSkeleton/20 transition-colors z-10 min-w-[200px] max-w-[300px] truncate">
+                    <a href="/items/{{ item.id }}/insights" class="hover:underline" title="{{ item.name }}">{{ item.name }}</a>
+                </td>
+                <td class="px-2 py-3 text-[10px] text-textMuted">{{ item.basis }}</td>
+                {% for store in grid_data.stores %}
+                    {% set price = item.prices.get(store) %}
+                    {% if price %}
+                        {# Calculate relative thermal color #}
+                        {% if item.min_price == item.max_price %}
+                            {% set bg = "bg-bgSkeleton/5" %}
+                            {% set text = "text-textBase" %}
+                        {% else %}
+                            {% set ratio = (price - item.min_price) / (item.max_price - item.min_price) %}
+                            {% if ratio <= 0.2 %}
+                                {% set bg = "bg-emerald-100 dark:bg-emerald-900/40" %}
+                                {% set text = "text-emerald-700 dark:text-emerald-300 font-bold" %}
+                            {% elif ratio <= 0.4 %}
+                                {% set bg = "bg-emerald-50 dark:bg-emerald-900/20" %}
+                                {% set text = "text-emerald-600 dark:text-emerald-400" %}
+                            {% elif ratio <= 0.6 %}
+                                {% set bg = "bg-bgSkeleton/10" %}
+                                {% set text = "text-textBase" %}
+                            {% elif ratio <= 0.8 %}
+                                {% set bg = "bg-amber-50 dark:bg-amber-900/20" %}
+                                {% set text = "text-amber-600 dark:text-amber-400" %}
+                            {% else %}
+                                {% set bg = "bg-red-100 dark:bg-red-900/40" %}
+                                {% set text = "text-red-700 dark:text-red-300 font-bold" %}
+                            {% endif %}
+                        {% endif %}
+                        <td class="px-4 py-3 text-right font-mono text-xs {{ bg }} {{ text }}">
+                            ${{ "%.2f"|format(price) }}
+                        </td>
+                    {% else %}
+                        <td class="px-4 py-3 text-right text-textSubtle bg-bgSkeleton/5 font-mono text-xs">-</td>
+                    {% endif %}
+                {% endfor %}
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="{{ grid_data.stores|length + 2 }}" class="px-4 py-8 text-center text-textMuted">
+                    Not enough multi-store data to generate a thermal grid.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

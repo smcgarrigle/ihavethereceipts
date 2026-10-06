@@ -112,47 +112,114 @@
                 // Ensure Chart.js is available
                 if (typeof Chart === 'undefined') return;
 
-                // Per-unit prices on one basis, oldest first. The `price` column is
-                // NOT what goes here -- see item_insights_page in app/api/pages.py.
-                const points = {{ price_trend | tojson }};
+                // Per-unit prices on one basis, oldest first.
+                const allPoints = {{ price_trend | tojson }};
+                const storeTrends = {{ store_trends | default('{}') | tojson }};
                 const basisLabel = {{ price_summary.label | tojson }};
-                const dates = points.map(p => p.label);
-                const prices = points.map(p => p.price);
 
-                // Tufte style: min 3 data points for a meaningful line, but we'll draw whatever we have
-                if (prices.length > 0) {
+                const masterDates = allPoints.map(p => p.label);
+
+                // Color palette for different stores
+                const colors = [
+                    { border: '#10b981', bg: '#a7f3d0' }, // emerald
+                    { border: '#3b82f6', bg: '#bfdbfe' }, // blue
+                    { border: '#8b5cf6', bg: '#ede9fe' }, // violet
+                    { border: '#f59e0b', bg: '#fef3c7' }, // amber
+                    { border: '#ef4444', bg: '#fecaca' }, // red
+                    { border: '#ec4899', bg: '#fbcfe8' }, // pink
+                ];
+
+                const datasets = [];
+                const storeNames = Object.keys(storeTrends);
+                const isDark = document.documentElement.classList.contains('dark');
+
+                // Track global min/max for Y-axis scaling
+                let minPrice = Infinity;
+                let maxPrice = -Infinity;
+
+                // If we don't have store trends for some reason, fallback to single line
+                if (storeNames.length === 0) {
+                    const prices = allPoints.map(p => p.price);
+                    if (prices.length > 0) {
+                        minPrice = Math.min(...prices);
+                        maxPrice = Math.max(...prices);
+                        datasets.push({
+                            label: 'Price',
+                            data: prices,
+                            borderColor: isDark ? '#9ca3af' : '#4b5563',
+                            borderWidth: 2,
+                            pointBackgroundColor: prices.map((p, i) => i === prices.length - 1 ? '#10b981' : (isDark ? '#4b5563' : '#9ca3af')),
+                            pointRadius: prices.map((p, i) => i === prices.length - 1 ? 4 : 0),
+                            pointHoverRadius: 5,
+                            fill: false,
+                            tension: 0
+                        });
+                    }
+                } else {
+                    storeNames.forEach((store, index) => {
+                        const storePoints = storeTrends[store];
+                        const color = colors[index % colors.length];
+
+                        // Map store points to master timeline, using null for gaps
+                        const data = masterDates.map(date => {
+                            const found = storePoints.find(p => p.label === date);
+                            if (found) {
+                                minPrice = Math.min(minPrice, found.price);
+                                maxPrice = Math.max(maxPrice, found.price);
+                                return found.price;
+                            }
+                            return null;
+                        });
+
+                        datasets.push({
+                            label: store,
+                            data: data,
+                            borderColor: color.border,
+                            borderWidth: 2,
+                            pointBackgroundColor: color.bg,
+                            pointBorderColor: color.border,
+                            pointRadius: 4,
+                            pointHoverRadius: 6,
+                            fill: false,
+                            spanGaps: true,
+                            tension: 0.1
+                        });
+                    });
+                }
+
+                if (datasets.length > 0) {
                     const ctx = document.getElementById('priceTrendChart').getContext('2d');
-                    const isDark = document.documentElement.classList.contains('dark');
 
                     new Chart(ctx, {
                         type: 'line',
                         data: {
-                            labels: dates,
-                            datasets: [{
-                                data: prices,
-                                borderColor: isDark ? '#9ca3af' : '#4b5563',
-                                borderWidth: 1.5,
-                                pointBackgroundColor: prices.map((p, i) => i === prices.length - 1 ? '#10b981' : (isDark ? '#4b5563' : '#9ca3af')),
-                                pointRadius: prices.map((p, i) => i === prices.length - 1 ? 4 : 0),
-                                pointHoverRadius: 5,
-                                fill: false,
-                                tension: 0
-                            }]
+                            labels: masterDates,
+                            datasets: datasets
                         },
                         options: {
                             responsive: true,
                             maintainAspectRatio: false,
                             plugins: {
-                                legend: { display: false },
+                                legend: {
+                                    display: storeNames.length > 1, // Only show legend if multiple stores
+                                    position: 'top',
+                                    labels: {
+                                        color: isDark ? '#9ca3af' : '#4b5563',
+                                        boxWidth: 12,
+                                        usePointStyle: true
+                                    }
+                                },
                                 tooltip: {
-                                    displayColors: false,
+                                    displayColors: storeNames.length > 1,
                                     backgroundColor: isDark ? '#1f2937' : '#ffffff',
                                     titleColor: isDark ? '#ffffff' : '#111827',
                                     bodyColor: isDark ? '#9ca3af' : '#4b5563',
                                     borderColor: isDark ? '#374151' : '#e5e7eb',
                                     borderWidth: 1,
                                     callbacks: {
-                                        label: function(context) { return '$' + context.parsed.y.toFixed(2) + ' ' + basisLabel; }
+                                        label: function(context) {
+                                            return (context.dataset.label ? context.dataset.label + ': ' : '') + '$' + context.parsed.y.toFixed(2) + ' ' + basisLabel;
+                                        }
                                     }
                                 }
                             },
@@ -170,8 +237,8 @@
                                 },
                                 y: {
                                     display: false,
-                                    min: Math.max(0, Math.min(...prices) * 0.95),
-                                    max: Math.max(...prices) * 1.05
+                                    min: Math.max(0, minPrice * 0.95),
+                                    max: maxPrice * 1.05
                                 }
                             },
                             animation: false

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
@@ -765,6 +765,120 @@ def get_store_diff(db: Session = Depends(get_db)):
     return {"labels": labels, "datasets": datasets}
 
 
+def get_thermal_grid_data(db: Session, time_range: str = "6m") -> dict:
+    """
+    Get data for a Store vs Item thermal price grid.
+    Finds the top 20 most frequently purchased items that appear at multiple stores.
+    For each item, finds the latest comparable price at each store.
+    Returns: { "stores": ["Store A", "Store B"], "items": [ { "id": 1, "name": "Milk", "prices": {"Store A": 2.99, "Store B": 3.49}, "min_price": 2.99, "max_price": 3.49 }, ... ] }
+    """
+    from collections import defaultdict
+    from datetime import datetime, timedelta
+
+    from sqlalchemy import func
+    from sqlalchemy.orm import joinedload
+
+    from app.models import Item, Receipt, ReceiptItem, Store
+
+    end_date = datetime.now()
+    if time_range == "3m":
+        start_date = end_date - timedelta(days=90)
+    elif time_range == "6m":
+        start_date = end_date - timedelta(days=180)
+    elif time_range == "year":
+        start_date = end_date - timedelta(days=365)
+    elif time_range == "all":
+        start_date = None
+    else:
+        start_date = end_date - timedelta(days=180)
+
+    # Find top 20 items purchased at >= 2 stores
+    multi_store_items = (
+        db.query(ReceiptItem.item_id)
+        .join(Receipt, ReceiptItem.receipt_id == Receipt.id)
+        .group_by(ReceiptItem.item_id)
+        .having(func.count(func.distinct(Receipt.store_id)) > 1)
+        .scalar_subquery()
+    )
+
+    top_items_query = (
+        db.query(Item.id, Item.name, func.count(ReceiptItem.id).label("freq"))
+        .join(ReceiptItem, Item.id == ReceiptItem.item_id)
+        .filter(Item.id.in_(multi_store_items))
+    )
+    if start_date:
+        top_items_query = top_items_query.join(
+            Receipt, ReceiptItem.receipt_id == Receipt.id
+        ).filter(Receipt.purchase_date >= start_date)
+
+    top_items = (
+        top_items_query.group_by(Item.id, Item.name)
+        .order_by(func.count(ReceiptItem.id).desc())
+        .limit(20)
+        .all()
+    )
+
+    if not top_items:
+        return {"stores": [], "items": []}
+
+    item_ids = [ti.id for ti in top_items]
+    item_names = {ti.id: ti.name for ti in top_items}
+
+    # Fetch all lines for these items
+    lines_query = (
+        db.query(ReceiptItem)
+        .join(Receipt, ReceiptItem.receipt_id == Receipt.id)
+        .join(Store, Receipt.store_id == Store.id)
+        .filter(ReceiptItem.item_id.in_(item_ids))
+        .options(joinedload(ReceiptItem.receipt).joinedload(Receipt.store))
+    )
+    if start_date:
+        lines_query = lines_query.filter(Receipt.purchase_date >= start_date)
+
+    lines = lines_query.order_by(Receipt.purchase_date.asc()).all()
+
+    lines_by_item: dict[int, list[ReceiptItem]] = defaultdict(list)
+    for line in lines:
+        lines_by_item[line.item_id].append(line)
+
+    item_data = []
+    all_stores = set()
+
+    for item_id, lines in lines_by_item.items():
+        basis, series = comparable_price_series(lines)
+        if not basis:
+            continue
+
+        # We want the LATEST price for each store
+        latest_prices = {}
+        for line, price in series:
+            store_name = line.receipt.store.name if line.receipt and line.receipt.store else None
+            if store_name:
+                latest_prices[store_name] = price
+                all_stores.add(store_name)
+
+        if latest_prices:
+            prices_values = list(latest_prices.values())
+            item_data.append(
+                {
+                    "id": item_id,
+                    "name": item_names[item_id],
+                    "basis": price_basis_label(basis),
+                    "prices": latest_prices,
+                    "min_price": min(prices_values),
+                    "max_price": max(prices_values),
+                }
+            )
+
+    # Sort stores alphabetically
+    sorted_stores = sorted(all_stores)
+
+    # Sort items by name
+    item_data.sort(key=lambda x: x["name"])
+
+    return {"stores": sorted_stores, "items": item_data}
+
+
 @router.get("/weekly-trajectory")
 def get_weekly_trajectory(time_range: str = "6m", db: Session = Depends(get_db)):
     """
@@ -822,6 +936,25 @@ def get_weekly_trajectory(time_range: str = "6m", db: Session = Depends(get_db))
             }
         ],
     }
+
+
+@router.get("/volatility")
+def get_volatility_alerts(threshold: float = 0.15, days: int = 30, db: Session = Depends(get_db)):
+    """Get items with recent price shifts above the threshold."""
+    from app.services.volatility import get_volatile_items
+
+    return get_volatile_items(db, threshold_pct=threshold, days=days)
+
+
+@router.get("/fragment/thermal-grid", response_class=HTMLResponse)
+def thermal_grid_fragment(request: Request, time_range: str = "6m", db: Session = Depends(get_db)):
+    """Render the thermal grid table for multi-store price comparisons."""
+    from app.api.templates import templates
+
+    grid_data = get_thermal_grid_data(db, time_range)
+    return templates.TemplateResponse(
+        request, "components/thermal_grid.html", {"grid_data": grid_data}
+    )
 
 
 @router.get("/fragment/all-charts")
