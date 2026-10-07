@@ -237,7 +237,11 @@ def test_html_escaping_in_items_and_categories_pages(client, db):
     # Get items list
     resp_items = client.get("/api/items/list")
     assert resp_items.status_code == 200
-    assert html.escape(malicious_item.name) in resp_items.text
+    escaped_item = html.escape(malicious_item.name)
+    assert (
+        escaped_item in resp_items.text
+        or escaped_item.replace("&#x27;", "&#39;") in resp_items.text
+    )
     assert malicious_item.name not in resp_items.text
 
     # Get categories list

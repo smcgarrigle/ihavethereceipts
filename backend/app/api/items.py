@@ -1,7 +1,7 @@
 import html as html_mod
 import logging
 
-from fastapi import APIRouter, Depends, Form, HTTPException
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from sqlalchemy import func
@@ -31,8 +31,20 @@ class UpdateItemRequest(BaseModel):
 
 
 @router.get("/list", response_class=HTMLResponse)
-def list_items(category_id: int | None = None, db: Session = Depends(get_db)):
-    """List all items with stats, optionally filtered by category"""
+def list_items(
+    request: Request,
+    category_id: int | None = None,
+    page: int = 1,
+    per_page: int = 50,
+    db: Session = Depends(get_db),
+):
+    """List all items with stats, optionally filtered by category, paginated"""
+    import math
+
+    from sqlalchemy import String, cast
+
+    from app.api.templates import templates
+    from app.models import Category, Receipt, Store
 
     # Base query
     query = db.query(
@@ -57,19 +69,21 @@ def list_items(category_id: int | None = None, db: Session = Depends(get_db)):
     items_query = sorted(items_query, key=lambda x: 1 if "CRV" in (x[0].name or "").upper() else 0)
 
     if not items_query:
-        return """
-        <div class="text-center py-12 text-gray-500 dark:text-gray-400">
-            <p class="text-lg font-medium">No items in this category yet</p>
-        </div>
-        """
+        return templates.TemplateResponse(request, "components/items_list.html", {"items": []})
 
     # Get all categories for the dropdown
-    from app.models import Category, Receipt, Store
-
     all_categories = db.query(Category).order_by(Category.name).all()
 
+    # Pagination
+    total_items = len(items_query)
+    total_pages = max(1, math.ceil(total_items / per_page))
+    page = max(1, min(page, total_pages))
+    start_idx = (page - 1) * per_page
+    end_idx = start_idx + per_page
+    page_items = items_query[start_idx:end_idx]
+
     # --- Pre-fetch logic to avoid N+1 queries ---
-    item_ids = [row[0].id for row in items_query if row[1] > 0]
+    item_ids = [row[0].id for row in page_items if row[1] > 0]
 
     # Map containers
     receipt_items_map = {}
@@ -95,8 +109,6 @@ def list_items(category_id: int | None = None, db: Session = Depends(get_db)):
                 receipt_items_map[ri.item_id].append(ri)
 
         # 2. Batch fetch lowest prices per store for all items
-        from sqlalchemy import String, cast
-
         is_sqlite = db.bind.dialect.name == "sqlite"
         agg_func = (
             func.group_concat(Receipt.id)
@@ -122,28 +134,27 @@ def list_items(category_id: int | None = None, db: Session = Depends(get_db)):
         for item_id, s_name, low_p, r_ids in batch_store_prices:
             if item_id not in store_prices_map:
                 store_prices_map[item_id] = []
-            store_prices_map[item_id].append((s_name, low_p, r_ids))
+            store_prices_map[item_id].append(
+                {
+                    "name": s_name,
+                    "lowest_price": float(low_p or 0),
+                    "receipt_ids": ",".join(list(set(r_ids.split(",")))) if r_ids else "",
+                }
+            )
 
-    html = '<div class="space-y-2">'
-    for (
-        item,
-        purchase_count,
-        avg_price,
-        total_spent,
-        min_price,
-        max_price,
-    ) in items_query:
+    # Prepare data for template
+    items_data = []
+    for item, purchase_count, avg_price, total_spent, min_price, max_price in page_items:
         if purchase_count == 0:
             continue
 
-        total_spent = float(total_spent or 0)
-        avg_price = float(avg_price or 0)
-        min_price = float(min_price or 0)
-        max_price = float(max_price or 0)
+        total_spent_val = float(total_spent or 0)
+        avg_price_val = float(avg_price or 0)
+        min_price_val = float(min_price or 0)
+        max_price_val = float(max_price or 0)
 
-        # Calculate Normalized Unit Price (using pre-fetched data)
+        # Calculate Normalized Unit Price
         receipt_items = receipt_items_map.get(item.id, [])
-
         avg_unit_price_str = ""
         if receipt_items:
             total_norm = 0
@@ -156,7 +167,6 @@ def list_items(category_id: int | None = None, db: Session = Depends(get_db)):
                 try:
                     up = float(ri.unit_price)
                     ut = ri.unit_type
-                    # Normalize to Price Per oz/fl oz
                     p_norm = 0
                     if unit_mode == "oz":
                         if ut == "lb":
@@ -188,170 +198,34 @@ def list_items(category_id: int | None = None, db: Session = Depends(get_db)):
                 avg = total_norm / count
                 avg_unit_price_str = f"${avg:.2f}/{unit_mode}"
 
-        # Get store prices for this item (lowest price per store) (using pre-fetched data)
-        store_prices = store_prices_map.get(item.id, [])
-
-        # Build store price pills
-        store_pills = ""
-        if store_prices:
-            for store_name, lowest_price, receipt_ids in store_prices:
-                # Color coding: green for lowest, blue for others
-                if lowest_price == store_prices[0][1]:  # Lowest price
-                    pill_color = "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-300 dark:border-green-700 font-bold ring-1 ring-green-500"
-                    badge_text = "BEST PRICE"
-                else:
-                    pill_color = "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-300 dark:border-blue-700"
-                    badge_text = ""
-
-                # Filter out nulls and dups from receipt_ids string if SQLite allowed non-distinct concat
-                clean_ids = ",".join(list(set(receipt_ids.split(","))))
-
-                store_pills += f"""
-                <span class='inline-flex items-center px-2 py-1 text-xs font-medium rounded-full border cursor-pointer hover:shadow-sm transition {pill_color}'
-                      role="button" tabindex="0"
-                      @click="$dispatch('open-relevant-receipts', {{ids: '{clean_ids}'}})"
-                      @keydown.enter="$dispatch('open-relevant-receipts', {{ids: '{clean_ids}'}})"
-                      @keydown.space.prevent="$dispatch('open-relevant-receipts', {{ids: '{clean_ids}'}})">
-                    {html_mod.escape(store_name)} ${lowest_price:.2f} {f"<span class='ml-1 text-[10px] uppercase opacity-75'>({badge_text})</span>" if badge_text else ""}
-                </span>
-                """
-
-        # Category pill doubles as the editor: a styled <select> that PATCHes
-        # the item in place (no page reload, no separate edit form)
-        cat_pill_cls = (
-            "text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
-            if item.category
-            else "text-xs bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
+        items_data.append(
+            {
+                "id": item.id,
+                "name": item.name,
+                "category_id": item.category_id,
+                "purchase_count": purchase_count,
+                "avg_price": avg_price_val,
+                "total_spent": total_spent_val,
+                "min_price": min_price_val,
+                "max_price": max_price_val,
+                "avg_unit_price_str": avg_unit_price_str,
+                "store_prices": store_prices_map.get(item.id, []),
+                "fdc_id": item.fdc_id,
+                "gtin": item.gtin,
+            }
         )
 
-        # Show FDC/GTIN badges
-        fdc_badge = (
-            f"<span class='text-[10px] bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded border border-blue-100 dark:border-blue-800' title='USDA FDC ID'>FDC:{item.fdc_id}</span>"
-            if item.fdc_id
-            else ""
-        )
-        gtin_badge = (
-            f"<span class='text-[10px] bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 px-1.5 py-0.5 rounded border border-purple-100 dark:border-purple-800' title='GTIN/UPC'>UPC:{item.gtin}</span>"
-            if item.gtin
-            else ""
-        )
-
-        # Build category options for dropdown
-        category_options = "<option value=''>Uncategorized</option>"
-        for cat in all_categories:
-            selected = "selected" if item.category_id == cat.id else ""
-            category_options += (
-                f"<option value='{cat.id}' {selected}>{html_mod.escape(cat.name)}</option>"
-            )
-
-        escaped_item_name = html_mod.escape(item.name)
-        escaped_name = escaped_item_name.replace("'", "\\'")
-
-        html += f"""
-        <div class='bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md transition overflow-hidden'
-             x-data='{{expanded: false, categoryId: {item.category_id or "null"}}}'>
-
-            <!-- Header (Always Visible). The expand/collapse control itself lives on the
-                 chevron below, not this whole row, since it also wraps a real <a> link
-                 (nested interactive controls aren't allowed) -->
-            <div @click="expanded = !expanded" class="p-4 flex justify-between items-center cursor-pointer bg-gray-50/50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors">
-                <div class="flex-1 min-w-0">
-                    <h3 class='font-semibold truncate pr-2'>
-                        <a href='/items/{item.id}/insights' @click.stop
-                           class='text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors'
-                           title='Open item page'>{escaped_item_name}</a>
-                    </h3>
-                    <div class="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                        <span>{purchase_count} pur.</span>
-                        <span>•</span>
-                        <span class="font-medium text-gray-700 dark:text-gray-300">${avg_price:.2f} avg</span>
-                    </div>
-                </div>
-                <div @click.stop="expanded = !expanded" @keydown.enter="expanded = !expanded" @keydown.space.prevent="expanded = !expanded"
-                     role="button" tabindex="0" :aria-expanded="expanded" aria-controls="item-details-{item.id}"
-                     aria-label="Toggle details for {escaped_item_name}"
-                     class="flex-shrink-0 text-right pl-2">
-                    <span class="block font-bold text-gray-900 dark:text-white">${total_spent:.0f}</span>
-                    <svg class="w-5 h-5 text-gray-400 transform transition-transform duration-200 mx-auto mt-1"
-                         :class="expanded ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                    </svg>
-                </div>
-            </div>
-
-            <!-- Drawer (Collapsible) -->
-            <div id="item-details-{item.id}" x-show="expanded" x-collapse class="border-t border-gray-100 dark:border-gray-700">
-                <div class="p-4 space-y-4">
-
-                    <!-- Item Details -->
-                    <div>
-                        <!-- Stats Grid -->
-                        <div class="grid grid-cols-2 gap-4 text-sm mb-4">
-                             <div>
-                                <p class="text-xs text-gray-500 dark:text-gray-400">Unit Price</p>
-                                <p class="font-medium text-blue-600 dark:text-blue-400">{avg_unit_price_str if avg_unit_price_str else "N/A"}</p>
-                             </div>
-                             <div>
-                                <p class="text-xs text-gray-500 dark:text-gray-400">Price Range</p>
-                                <p class="font-medium text-gray-700 dark:text-gray-300">
-                                    {f"${min_price:.2f} - ${max_price:.2f}" if min_price else "—"}
-                                </p>
-                             </div>
-                        </div>
-
-                        <div class="flex justify-between items-center mb-4">
-                             <div class="flex items-center space-x-2">
-                                 <select x-model='categoryId' @click.stop title='Change category'
-                                         @change='fetch("/api/items/{item.id}", {{
-                                             method: "PUT",
-                                             headers: {{
-                                                 "Content-Type": "application/json",
-                                                 "X-CSRF-Token": document.querySelector("meta[name=csrf-token]")?.content || ""
-                                             }},
-                                             body: JSON.stringify({{category_id: categoryId ? parseInt(categoryId) : null}})
-                                         }})'
-                                         class='{cat_pill_cls} px-2 py-1 rounded border-0 cursor-pointer focus:ring-2 focus:ring-blue-500'>
-                                     {category_options}
-                                 </select>
-                                 {fdc_badge}
-                                 {gtin_badge}
-                             </div>
-                             <!-- Store Pills -->
-                             {f"<div class='flex flex-wrap justify-end gap-1.5'>{store_pills}</div>" if store_pills else ""}
-                        </div>
-
-                        <!-- Action Buttons -->
-                        <div class="grid grid-cols-3 gap-2 pt-2 border-t border-gray-100 dark:border-gray-700">
-                             <button onclick="showPriceHistory(this)"
-                                     data-item-id="{item.id}"
-                                     data-item-name="{escaped_name}"
-                                     class="py-2 px-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center justify-center transition-all">
-                                <svg class="w-3.5 h-3.5 mr-1.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg>
-                                History
-                            </button>
-
-                            <a href="/items/{item.id}/insights"
-                               class="py-2 px-3 {"bg-green-600 text-white hover:bg-green-700 shadow-sm" if item.fdc_id else "bg-gray-50 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 border border-transparent hover:bg-gray-100 dark:hover:bg-gray-600"} rounded-lg text-xs font-bold flex items-center justify-center transition-all uppercase tracking-tight">
-                                <svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-                                Insights
-                            </a>
-
-                            <button @click="autoEnrich({item.id})"
-                                    class="py-2 px-3 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 rounded-lg text-xs font-medium hover:bg-indigo-100 dark:hover:bg-indigo-900/40 border border-transparent flex items-center justify-center transition-all">
-                                <svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                                USDA Match
-                            </button>
-
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-        </div>
-        """
-    html += "</div>"
-
-    return html
+    return templates.TemplateResponse(
+        request,
+        "components/items_list.html",
+        {
+            "items": items_data,
+            "all_categories": all_categories,
+            "category_id": category_id,
+            "current_page": page,
+            "total_pages": total_pages,
+        },
+    )
 
 
 @router.put("/{item_id}")
