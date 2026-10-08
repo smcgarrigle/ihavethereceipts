@@ -332,6 +332,34 @@
         {% endif %}
     </div>
 
+    <!-- 2.5 Thermal Grid -->
+    <div class="space-y-6 pt-8 border-t border-borderDefault">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
+            <div>
+                <h2 class="text-2xl font-bold text-textBase flex items-center gap-3">
+                    <span class="text-2xl">🔥</span> PRICE HEATMAP
+                </h2>
+                <p class="text-textMuted mt-1">Cross-store price comparison for your most frequent multi-store items</p>
+            </div>
+        </div>
+
+        <div hx-get="/api/trends/fragment/thermal-grid"
+             hx-trigger="load, change from:form"
+             hx-include="#time_range_input, [name='stores']"
+             class="w-full">
+            <div class="flex justify-center p-12 bg-bgCard rounded-3xl border border-borderDefault shadow-xl">
+                <div class="animate-pulse flex space-x-4 w-full max-w-lg">
+                    <div class="flex-1 space-y-4 py-1">
+                        <div class="h-4 bg-bgSkeleton rounded w-3/4"></div>
+                        <div class="space-y-2">
+                            <div class="h-4 bg-bgSkeleton rounded"></div>
+                            <div class="h-4 bg-bgSkeleton rounded w-5/6"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Low-Data Bootstrap Charts -->
     <div class="space-y-6 pt-8 border-t border-borderDefault">

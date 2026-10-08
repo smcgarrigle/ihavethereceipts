@@ -1,0 +1,83 @@
+{% extends "layouts/base.html" %}
+{% block title %}Nutrition Review — The Receipts{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-8 space-y-8">
+
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div class="flex items-center gap-4">
+            <div class="w-12 h-12 rounded-2xl bg-indigo-500/15 flex items-center justify-center text-2xl">🥦</div>
+            <div>
+                <h1 class="text-2xl font-bold text-textBase">Nutrition Catch-up <span class="text-base font-normal text-textMuted">— Review Matches</span></h1>
+                <p class="text-sm text-textMuted mt-0.5">Approve or reject automated FDC nutrition matches for your items.</p>
+            </div>
+        </div>
+        <div class="flex gap-2">
+            <a href="/settings" class="px-4 py-2 rounded-xl bg-bgCard border border-borderDefault text-textMuted hover:text-textBase text-sm font-semibold transition-colors">
+                Back to Settings
+            </a>
+        </div>
+    </div>
+
+    <!-- Review Table -->
+    <div class="bg-bgCard rounded-2xl border border-borderDefault overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-bgMain/50 text-xs text-textMuted uppercase tracking-wider font-semibold border-b border-borderDefault">
+                        <th class="px-4 py-3 font-medium">Original Item</th>
+                        <th class="px-4 py-3 font-medium">Matched Product</th>
+                        <th class="px-4 py-3 font-medium w-32 text-center">Confidence</th>
+                        <th class="px-4 py-3 font-medium w-40 text-center">Action</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-borderDefault text-sm">
+                    {% for sugg, item in suggestions %}
+                    <tr id="suggestion-row-{{ sugg.id }}" class="hover:bg-bgHover transition-colors">
+                        <td class="px-4 py-3 font-medium text-textBase align-middle">{{ item.name }}</td>
+                        <td class="px-4 py-3 align-middle">
+                            <div class="text-textBase">{{ sugg.fdc_description }}</div>
+                            {% if sugg.fdc_brand %}
+                            <div class="text-xs text-textMuted">{{ sugg.fdc_brand }}</div>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 align-middle text-center">
+                            {% set score = sugg.match_score | round | int %}
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold
+                                {% if score >= 85 %}bg-emerald-500/15 text-emerald-500
+                                {% elif score >= 70 %}bg-amber-500/15 text-amber-500
+                                {% else %}bg-red-500/15 text-red-500{% endif %}">
+                                {{ score }}%
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 align-middle text-center space-x-1">
+                            <button class="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 rounded-lg text-xs font-semibold transition-colors"
+                                    hx-post="/settings/nutrition-review/{{ sugg.id }}/approve"
+                                    hx-target="#suggestion-row-{{ sugg.id }}"
+                                    hx-swap="outerHTML swap:0.3s">
+                                Approve
+                            </button>
+                            <button class="px-3 py-1.5 bg-bgMain hover:bg-red-500/10 text-textMuted hover:text-red-500 rounded-lg text-xs font-semibold transition-colors"
+                                    hx-post="/settings/nutrition-review/{{ sugg.id }}/reject"
+                                    hx-target="#suggestion-row-{{ sugg.id }}"
+                                    hx-swap="outerHTML swap:0.3s">
+                                Reject
+                            </button>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="px-4 py-12 text-center text-textMuted">
+                            <div class="text-3xl mb-3">🎉</div>
+                            <div class="font-medium text-textBase">No pending suggestions!</div>
+                            <div class="text-sm mt-1">Check back later once the background task finds more matches.</div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

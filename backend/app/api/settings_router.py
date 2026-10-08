@@ -99,6 +99,65 @@ def exclusions_page_redirect(_request: Request) -> RedirectResponse:
     return RedirectResponse(url="/settings", status_code=301)
 
 
+@router.get("/nutrition-review", response_class=HTMLResponse)
+def nutrition_review_page(request: Request, db: Session = Depends(get_db)):
+    """Page to review and approve/reject FDC nutrition suggestions."""
+    from app.models.item import Item
+    from app.models.nutrition_suggestion import NutritionSuggestion
+
+    # Get pending suggestions with item names
+    suggestions = (
+        db.query(NutritionSuggestion, Item)
+        .join(Item, NutritionSuggestion.item_id == Item.id)
+        .filter(NutritionSuggestion.status == "pending")
+        .order_by(NutritionSuggestion.match_score.desc())
+        .limit(100)
+        .all()
+    )
+
+    return templates.TemplateResponse(
+        request, "pages/nutrition_review.html", {"suggestions": suggestions}
+    )
+
+
+@router.get("/nutrition-review/count")
+def nutrition_review_count(db: Session = Depends(get_db)):
+    """Return the number of pending nutrition suggestions."""
+    from app.models.nutrition_suggestion import NutritionSuggestion
+
+    count = db.query(NutritionSuggestion).filter(NutritionSuggestion.status == "pending").count()
+    return JSONResponse({"count": count})
+
+
+@router.post("/nutrition-review/{suggestion_id}/{action}")
+def handle_nutrition_review_action(suggestion_id: int, action: str, db: Session = Depends(get_db)):
+    """Approve or reject a suggestion via HTMX, returns an empty row."""
+    from app.models.item import Item
+    from app.models.nutrition_suggestion import NutritionSuggestion
+
+    suggestion = (
+        db.query(NutritionSuggestion).filter(NutritionSuggestion.id == suggestion_id).first()
+    )
+    if not suggestion:
+        return HTMLResponse("<tr class='hidden'></tr>")
+
+    if action == "approve":
+        suggestion.status = "approved"
+        # Apply data to item
+        item = db.query(Item).filter(Item.id == suggestion.item_id).first()
+        if item:
+            item.fdc_id = suggestion.fdc_id
+            item.nutrients = suggestion.nutrients
+    elif action == "reject":
+        suggestion.status = "rejected"
+    else:
+        return HTMLResponse("<tr><td colspan='4' class='text-red-500'>Invalid action</td></tr>")
+
+    db.commit()
+    # Return empty response to remove the row from the table via HTMX swap
+    return HTMLResponse("")
+
+
 CORRECTION_SORTS = ("used", "recurred")
 
 
@@ -481,6 +540,31 @@ def set_currency(body: CurrencyUpdate) -> JSONResponse:
             "currency_code": flags["currency_code"],
         }
     )
+
+
+@router.post("/flags/nutrition-catchup")
+def toggle_nutrition_catchup(enabled: bool) -> JSONResponse:
+    """Enable or disable automatic background nutrition catch-up."""
+    flags = _load_feature_flags()
+    flags["nutrition_catchup_enabled"] = enabled
+    _save_feature_flags(flags)
+    logger.info("Nutrition catch-up %s via settings toggle.", "enabled" if enabled else "disabled")
+    return JSONResponse({"success": True, "nutrition_catchup_enabled": enabled})
+
+
+@router.post("/flags/nutrition-catchup-threshold")
+def set_nutrition_catchup_threshold(threshold: float) -> JSONResponse:
+    """Set the coverage threshold to trigger nutrition catch-up (0-100)."""
+    if not (0.0 <= threshold <= 100.0):
+        return JSONResponse(
+            {"success": False, "error": "Threshold must be between 0 and 100."},
+            status_code=422,
+        )
+    flags = _load_feature_flags()
+    flags["nutrition_catchup_threshold"] = threshold
+    _save_feature_flags(flags)
+    logger.info("Nutrition catch-up threshold set to %s via settings.", threshold)
+    return JSONResponse({"success": True, "nutrition_catchup_threshold": threshold})
 
 
 # ---------------------------------------------------------------------------

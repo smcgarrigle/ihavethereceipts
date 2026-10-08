@@ -235,6 +235,48 @@
         </div>
     </div>
 
+    <!-- Volatility Alerts -->
+    <div x-data="{ alerts: [], loading: true }" x-init="fetch('/api/trends/volatility').then(r => r.json()).then(d => { alerts = d.alerts || []; loading = false; })" class="bg-bgCard rounded-xl shadow-lg border border-borderDefault p-6 mb-10">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-xl font-bold text-textBase flex items-center">
+                <span class="bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 p-2 rounded-lg mr-3">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                </span>
+                Price Volatility Alerts
+            </h2>
+            <div class="text-[10px] font-bold text-textSubtle uppercase tracking-widest bg-bgSkeleton px-3 py-1.5 rounded-full">
+                >15% Shift (Last 30 Days)
+            </div>
+        </div>
+
+        <div x-show="loading" class="animate-pulse space-y-4 py-4">
+            <div class="h-4 bg-bgSkeleton rounded w-3/4"></div>
+            <div class="h-4 bg-bgSkeleton rounded w-1/2"></div>
+        </div>
+
+        <div x-show="!loading && alerts.length === 0" class="text-center py-8 text-textMuted bg-bgHover rounded-xl border border-dashed border-borderDefault">
+            <p class="text-sm">No significant price shifts detected recently.</p>
+        </div>
+
+        <div x-show="!loading && alerts.length > 0" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <template x-for="alert in alerts.slice(0, 6)" :key="alert.id">
+                <div class="flex items-center justify-between p-4 rounded-xl border border-borderDefault hover:shadow-md transition-shadow bg-bgMain/20">
+                    <div class="flex flex-col overflow-hidden mr-4">
+                        <a :href="'/items/' + alert.id + '/insights'" class="text-sm font-bold text-textBase hover:underline truncate" :title="alert.name" x-text="alert.name"></a>
+                        <span class="text-[10px] text-textSubtle mt-1" x-text="'Baseline: $' + alert.baseline_avg.toFixed(2) + ' ' + alert.basis"></span>
+                    </div>
+                    <div class="flex flex-col items-end flex-shrink-0">
+                        <span class="text-lg font-black" :class="alert.shift_pct > 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'" x-text="(alert.shift_pct > 0 ? '+' : '') + alert.shift_pct.toFixed(1) + '%'"></span>
+                        <span class="text-xs text-textBase font-mono mt-0.5" x-text="'$' + alert.recent_avg.toFixed(2)"></span>
+                    </div>
+                </div>
+            </template>
+        </div>
+        <div x-show="!loading && alerts.length > 6" class="mt-4 text-center">
+            <a href="/trends" class="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline">View all alerts on Trends page &rarr;</a>
+        </div>
+    </div>
+
     <!-- Summary Tables Grid (Moved Below) -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         <!-- Top Categories -->

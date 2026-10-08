@@ -81,10 +81,13 @@ def _flour(db, store):
 
 
 def _charted(html):
-    """The prices the sparkline is actually drawn from, oldest first."""
-    match = re.search(r"const points = (\[.*?\]);", html, re.DOTALL)
+    """The prices the chart is actually drawn from, oldest first."""
+    match = re.search(r"const storeTrends = (\{.*?\});", html, re.DOTALL)
     assert match, "the insights page did not emit a price series"
-    return json.loads(match.group(1))
+    data = json.loads(match.group(1))
+    if not data:
+        return []
+    return list(data.values())[0]
 
 
 class TestComparablePriceSeries:
@@ -213,4 +216,4 @@ class TestTheSparkline:
         orphan = _item(db, "NEVER BOUGHT")
         resp = client.get(f"/items/{orphan.id}/insights")
         assert resp.status_code == 200
-        assert "const points" not in resp.text
+        assert "const storeTrends" not in resp.text or "const storeTrends = {};" in resp.text

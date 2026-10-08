@@ -7,16 +7,16 @@
 ### 1. Nutrition Catch-Up
 Automated background enrichment that detects FDC coverage gaps and surfaces candidates for user review — turning the manual `scripts/backfill_nutrients.py` workflow into a self-service feature.
 
-- [ ] **`NutritionEnricher` daemon**: Singleton background thread (same pattern as `BulkProcessor`). Searches FDC for uncovered items prioritized by spend; stores candidates in `nutrition_suggestions` for review.
-- [ ] **Trigger logic**: Auto-fires after receipt saves when enrichable coverage drops below a configurable threshold (default 70%). Manual "Run Catch-Up" button in Settings.
-- [ ] **Review page** (`/settings/nutrition-review`): Items sorted by spend impact with approve/reject/search actions. Batch approve for speed.
-- [ ] **Persistent notification banner**: Shows pending suggestion count across all pages until reviewed or dismissed.
-- [ ] **Settings card**: Coverage indicator, threshold slider, enable/disable toggle. Exclude Fees & Taxes / Household from the enrichable denominator.
+- [x] **`NutritionEnricher` daemon**: Singleton background thread (same pattern as `BulkProcessor`). Searches FDC for uncovered items prioritized by spend; stores candidates in `nutrition_suggestions` for review.
+- [x] **Trigger logic**: Auto-fires after receipt saves when enrichable coverage drops below a configurable threshold (default 70%). Manual "Run Catch-Up" button in Settings.
+- [x] **Review page** (`/settings/nutrition-review`): Items sorted by spend impact with approve/reject/search actions. Batch approve for speed.
+- [x] **Persistent notification banner**: Shows pending suggestion count across all pages until reviewed or dismissed.
+- [x] **Settings card**: Coverage indicator, threshold slider, enable/disable toggle. Exclude Fees & Taxes / Household from the enrichable denominator.
 
 ### 2. Price History & Volatility
-- [ ] **Retailer Overlays**: Overlay multiple stores on a single item's price history chart.
-- [ ] **Volatility Alerts**: UI notifications for items with >15% price shifts in the last 30 days.
-- [ ] **Advanced Spreadsheet Grid**: High-density thermal-coded grid for price history analysis.
+- [x] **Retailer Overlays**: Overlay multiple stores on a single item's price history chart.
+- [x] **Volatility Alerts**: UI notifications for items with >15% price shifts in the last 30 days.
+- [x] **Advanced Spreadsheet Grid**: High-density thermal-coded grid for price history analysis.
 
 ### 3. AI & Data Enrichment
 - [ ] **Barcode Scanning**: Mobile camera integration pulling product metadata from OpenFoodFacts.

@@ -805,6 +805,15 @@ def item_insights_page(request: Request, item_id: int, db: Session = Depends(get
         }
 
     price_basis, comparable = comparable_price_series(purchase_history)
+
+    # Extract grouped data for multi-store chart overlay
+    from collections import defaultdict
+
+    store_trends = defaultdict(list)
+    for ri, price in reversed(comparable):
+        store_name = ri.receipt.store.name if ri.receipt and ri.receipt.store else "Unknown"
+        store_trends[store_name].append({"label": _purchase_day(ri), "price": round(price, 4)})
+
     # Oldest first, the direction the sparkline is read in.
     price_trend = [
         {"label": _purchase_day(ri), "price": round(price, 4)} for ri, price in reversed(comparable)
@@ -968,6 +977,7 @@ def item_insights_page(request: Request, item_id: int, db: Session = Depends(get
             "line_prices": line_prices,
             "price_trend": price_trend,
             "price_summary": price_summary,
+            "store_trends": dict(store_trends),
             "categories": db.query(Category).order_by(Category.name).all(),
         },
     )
