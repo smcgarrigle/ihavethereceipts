@@ -4,39 +4,19 @@
 
 ## 🟡 Near-Term Backlog
 
-### 1. Nutrition Catch-Up
-Automated background enrichment that detects FDC coverage gaps and surfaces candidates for user review — turning the manual `scripts/backfill_nutrients.py` workflow into a self-service feature.
 
-- [x] **`NutritionEnricher` daemon**: Singleton background thread (same pattern as `BulkProcessor`). Searches FDC for uncovered items prioritized by spend; stores candidates in `nutrition_suggestions` for review.
-- [x] **Trigger logic**: Auto-fires after receipt saves when enrichable coverage drops below a configurable threshold (default 70%). Manual "Run Catch-Up" button in Settings.
-- [x] **Review page** (`/settings/nutrition-review`): Items sorted by spend impact with approve/reject/search actions. Batch approve for speed.
-- [x] **Persistent notification banner**: Shows pending suggestion count across all pages until reviewed or dismissed.
-- [x] **Settings card**: Coverage indicator, threshold slider, enable/disable toggle. Exclude Fees & Taxes / Household from the enrichable denominator.
 
-### 2. Price History & Volatility
-- [x] **Retailer Overlays**: Overlay multiple stores on a single item's price history chart.
-- [x] **Volatility Alerts**: UI notifications for items with >15% price shifts in the last 30 days.
-- [x] **Advanced Spreadsheet Grid**: High-density thermal-coded grid for price history analysis.
-
-### 3. AI & Data Enrichment
-- [ ] **Barcode Scanning**: Mobile camera integration pulling product metadata from OpenFoodFacts.
-
-### 4. Dynamic Trends & Dashboards
-- [ ] **Interactive Chart Controllers**: Dropdown filters by date range, store, or category. Use `hx-push-url="true"` to keep state bookmarkable.
-- [x] **Low-Data "Bootstrap" Charts**: Shipped as the Quick Insights row on `/trends` — Basket Spend Composition, Identical Item Store Diff, Weekly Spend Trajectory.
-- [ ] **Shopping Habits Gallery**: Recurring trend charts with improved signal/noise filtering.
-
-### 5. Automation & Scalability
-- [ ] **Household Support**: Individual accounts with shared or separate grocery databases.
-- [ ] **Cross-Device Sync (Offline-First)**: PWA with IndexedDB for offline scanning; syncs back to server on reconnect.
-
-### 6. UI/UX Refinements
+### 1. UI/UX Refinements
 - [ ] **Items Page Pagination**: `/items` renders all 1,493 items with no pagination (~80K DOM nodes). Prerequisite: extract `list_items` into a paginated Jinja fragment. Also unblocks column-reorder and the a11y axe suite.
 - [ ] **Reorderable Item Columns**: Drag-to-reorder column headers (Category, qty, total spent, weight/vol, unit, $/unit) persisted in localStorage. Requires paginated fragment above. Full scope: `scratch/TODO_items_column_reorder.md`.
 - [ ] **Mobile Slide-out Drawers**: HTMX-powered slide-up drawers for Item Insights on mobile, replacing full-page navigations.
 - [ ] **PDF Viewer 'Esc' Key Fix**: Native `<embed>` swallows the 'Esc' key when focused, preventing modal close. Option A (lightweight): auto-focus the "Close" button on open. Option B (heavy): migrate to PDF.js.
 
-### 7. Custom Category Lenses
+### 2. Dynamic Trends & Dashboards
+- [ ] **Interactive Chart Controllers**: Expand dropdown filters by date range or category across all charts. Use `hx-push-url="true"` to keep state bookmarkable.
+- [ ] **Shopping Habits Gallery**: Recurring trend charts with improved signal/noise filtering.
+
+### 3. Custom Category Lenses
 Let users create personally meaningful categories (e.g. "Protein-Maxxing") that cut across canonical lines. The data model and charts already support it — the work is UX only.
 
 - [ ] **Per-category item list with checkboxes** + bulk "move to…" + "create category from selection".
@@ -44,13 +24,29 @@ Let users create personally meaningful categories (e.g. "Protein-Maxxing") that 
 - [ ] **Prerequisite**: Retire or redirect the orphaned `/categories` page left unlinked by the nav redesign.
 - [ ] **Later**: Feedback-loop taxonomy learning so new item variants land in user lenses automatically.
 
-### 8. AI Agent Assistant shopping
+### 4. AI Agent Assistant shopping
 - [ ] **Agentic Shopping**: Hand off the prediction list to an agent that shops online for you and builds cart based around opitmal pricing and the urgency of restock
 - [ ] **currently prohibited by TOS**
+
+### 5. AI, Automation & Scalability
+- [ ] **Barcode Scanning**: Mobile camera integration pulling product metadata from OpenFoodFacts.
+- [ ] **Household Support**: Individual accounts with shared or separate grocery databases.
+- [ ] **Cross-Device Sync (Offline-First)**: PWA with IndexedDB for offline scanning; syncs back to server on reconnect.
 
 ---
 
 ## 🏛️ Completed Milestones Archive
+
+<details>
+<summary><b>Nutrition & Volatility (Oct 2026)</b></summary>
+
+- **Nutrition Catch-Up**: Background `NutritionEnricher` daemon, threshold triggers, batch review UI (`/settings/nutrition-review`), and settings card.
+- **Price History & Volatility**: Retailer overlays for multi-store comparisons, >15% price shift volatility alerts, and the interactive Thermal Price Grid.
+- **Interactive Chart Controllers**: Added HTMX-powered multi-select store filtering to the Thermal Grid to seamlessly toggle columns.
+- **Low-Data "Bootstrap" Charts**: Shipped the Quick Insights row on `/trends` — Basket Spend Composition, Identical Item Store Diff, and Weekly Spend Trajectory.
+- **Open Graph SEO**: Added metadata tags and `og-image.png` for improved social link sharing.
+
+</details>
 
 <details>
 <summary><b>Public Static Demo (Aug 2026)</b></summary>
@@ -165,4 +161,4 @@ Let users create personally meaningful categories (e.g. "Protein-Maxxing") that 
 </details>
 
 ---
-*Last Updated: August 3, 2026*
+*Last Updated: October 8, 2026*
