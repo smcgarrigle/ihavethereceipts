@@ -1,7 +1,7 @@
 import html as html_mod
 import logging
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from sqlalchemy import func
@@ -36,6 +36,7 @@ def list_items(
     category_id: int | None = None,
     page: int = 1,
     limit: int = 50,
+    view: str = Query("cards"),
     db: Session = Depends(get_db),
 ):
     """List all items with stats, optionally filtered by category"""
@@ -234,6 +235,7 @@ def list_items(
             "page": page,
             "limit": limit,
             "has_more": has_more,
+            "view": view,
         },
     )
 
