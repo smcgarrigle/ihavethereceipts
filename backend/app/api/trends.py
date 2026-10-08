@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
@@ -765,7 +765,9 @@ def get_store_diff(db: Session = Depends(get_db)):
     return {"labels": labels, "datasets": datasets}
 
 
-def get_thermal_grid_data(db: Session, time_range: str = "6m") -> dict:
+def get_thermal_grid_data(
+    db: Session, time_range: str = "6m", store_ids: list[int] | None = None
+) -> dict:
     """
     Get data for a Store vs Item thermal price grid.
     Finds the top 20 most frequently purchased items that appear at multiple stores.
@@ -793,10 +795,14 @@ def get_thermal_grid_data(db: Session, time_range: str = "6m") -> dict:
         start_date = end_date - timedelta(days=180)
 
     # Find top 20 items purchased at >= 2 stores
+    multi_store_query = db.query(ReceiptItem.item_id).join(
+        Receipt, ReceiptItem.receipt_id == Receipt.id
+    )
+    if store_ids:
+        multi_store_query = multi_store_query.filter(Receipt.store_id.in_(store_ids))
+
     multi_store_items = (
-        db.query(ReceiptItem.item_id)
-        .join(Receipt, ReceiptItem.receipt_id == Receipt.id)
-        .group_by(ReceiptItem.item_id)
+        multi_store_query.group_by(ReceiptItem.item_id)
         .having(func.count(func.distinct(Receipt.store_id)) > 1)
         .scalar_subquery()
     )
@@ -834,6 +840,8 @@ def get_thermal_grid_data(db: Session, time_range: str = "6m") -> dict:
     )
     if start_date:
         lines_query = lines_query.filter(Receipt.purchase_date >= start_date)
+    if store_ids:
+        lines_query = lines_query.filter(Receipt.store_id.in_(store_ids))
 
     lines = lines_query.order_by(Receipt.purchase_date.asc()).all()
 
@@ -947,13 +955,23 @@ def get_volatility_alerts(threshold: float = 0.15, days: int = 30, db: Session =
 
 
 @router.get("/fragment/thermal-grid", response_class=HTMLResponse)
-def thermal_grid_fragment(request: Request, time_range: str = "6m", db: Session = Depends(get_db)):
+def thermal_grid_fragment(
+    request: Request,
+    time_range: str = "6m",
+    stores: list[int] = Query(default=[]),
+    db: Session = Depends(get_db),
+):
     """Render the thermal grid table for multi-store price comparisons."""
     from app.api.templates import templates
+    from app.models import Store
 
-    grid_data = get_thermal_grid_data(db, time_range)
+    grid_data = get_thermal_grid_data(db, time_range, stores)
+    all_stores = db.query(Store).order_by(Store.name).all()
+
     return templates.TemplateResponse(
-        request, "components/thermal_grid.html", {"grid_data": grid_data}
+        request,
+        "components/thermal_grid.html",
+        {"grid_data": grid_data, "all_stores": all_stores, "selected_store_ids": stores},
     )
 
 
