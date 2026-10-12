@@ -41,7 +41,7 @@
                 {% set item = data.item %}
                 <tr class="hover:bg-bgHover transition-colors item-row group">
                     <td class="p-3">
-                        <a href='/items/{{ item.id }}/insights' class='font-medium text-textBase hover:text-blue-500 transition-colors' title='Open item page'>{{ item.name }}</a>
+                        <a href='/items/{{ item.id }}/insights' class='font-medium text-textBase hover:text-blue-500 transition-colors item-insight-link' title='Open item page'>{{ item.name }}</a>
                         <div class="flex gap-1 mt-1">
                             {% if item.fdc_id %}
                                 <span class='text-[9px] bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-1 rounded border border-blue-100 dark:border-blue-800' title='USDA FDC ID'>FDC</span>
@@ -134,7 +134,7 @@
                 <div class="flex-1 min-w-0">
                     <h3 class='font-semibold truncate pr-2'>
                         <a href='/items/{{ item.id }}/insights' @click.stop
-                           class='text-textBase hover:text-blue-500 transition-colors'
+                           class='text-textBase hover:text-blue-500 transition-colors item-insight-link'
                            title='Open item page'>{{ item.name }}</a>
                     </h3>
                     <div class="flex items-center space-x-2 text-xs text-textMuted mt-0.5">
@@ -231,7 +231,7 @@
                         </button>
 
                         <a href="/items/{{ item.id }}/insights"
-                           class="py-2 px-3 {{ 'bg-green-600 text-white hover:bg-green-700 shadow-sm' if item.fdc_id else 'bg-bgSkeleton text-textMuted border border-transparent hover:bg-bgSkeleton/80' }} rounded-lg text-xs font-bold flex items-center justify-center transition-all uppercase tracking-tight">
+                           class="py-2 px-3 {{ 'bg-green-600 text-white hover:bg-green-700 shadow-sm' if item.fdc_id else 'bg-bgSkeleton text-textMuted border border-transparent hover:bg-bgSkeleton/80' }} rounded-lg text-xs font-bold flex items-center justify-center transition-all uppercase tracking-tight item-insight-link">
                             <svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
                             Insights
                         </a>

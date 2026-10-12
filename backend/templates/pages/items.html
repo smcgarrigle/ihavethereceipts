@@ -543,6 +543,8 @@
             </div>
         </div>
     </div>
+    <!-- Container for the Item Insights Slide-out Drawer (Mobile) -->
+    <div id="insights-drawer-container"></div>
 </div>
 {% endblock %}
 
@@ -884,5 +886,31 @@
         const escapeHandler = (e) => { if (e.key === 'Escape') { closePriceHistoryModal(); document.removeEventListener('keydown', escapeHandler); } };
         document.addEventListener('keydown', escapeHandler);
     }
+
+    // Intercept clicks on Item Insights links on mobile (< 768px) to slide up drawer
+    document.addEventListener('click', function (e) {
+        const link = e.target.closest('.item-insight-link, a[href*="/insights"]');
+        if (!link) return;
+
+        if (window.innerWidth < 768) {
+            e.preventDefault();
+            const url = link.getAttribute('href');
+            if (url) {
+                htmx.ajax('GET', url, {
+                    target: '#insights-drawer-container',
+                    swap: 'innerHTML'
+                });
+                history.pushState({ drawer: true }, '', url);
+            }
+        }
+    });
+
+    // Dismiss drawer when navigating backwards in history
+    window.addEventListener('popstate', function () {
+        const wrapper = document.getElementById('insights-drawer-wrapper');
+        if (wrapper) {
+            wrapper.remove();
+        }
+    });
 </script>
 {% endblock %}

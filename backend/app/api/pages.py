@@ -964,6 +964,11 @@ def item_insights_page(request: Request, item_id: int, db: Session = Depends(get
             "proteins_100g"
         )
 
+    is_htmx = request.headers.get("hx-request") == "true"
+    base_template = (
+        "fragments/item_insights_drawer_wrapper.html" if is_htmx else "layouts/base.html"
+    )
+
     return templates.TemplateResponse(
         request,
         "pages/item_insights.html",
@@ -979,6 +984,7 @@ def item_insights_page(request: Request, item_id: int, db: Session = Depends(get
             "price_summary": price_summary,
             "store_trends": dict(store_trends),
             "categories": db.query(Category).order_by(Category.name).all(),
+            "base_template": base_template,
         },
     )
 

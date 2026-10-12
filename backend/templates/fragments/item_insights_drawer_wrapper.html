@@ -1,0 +1,92 @@
+<div id="insights-drawer-wrapper"
+     x-data="{
+        drawerOpen: false,
+        startY: 0,
+        currentDeltaY: 0,
+        isSwiping: false,
+        init() {
+            setTimeout(() => this.drawerOpen = true, 50);
+        },
+        closeDrawer() {
+            this.drawerOpen = false;
+            setTimeout(() => {
+                const el = document.getElementById('insights-drawer-wrapper');
+                if (el) el.remove();
+                if (window.location.pathname.includes('/insights')) {
+                    history.pushState({}, '', '/items');
+                }
+            }, 300);
+        },
+        onTouchStart(e) {
+            this.startY = e.touches[0].clientY;
+            this.isSwiping = true;
+            this.currentDeltaY = 0;
+        },
+        onTouchMove(e) {
+            if (!this.isSwiping) return;
+            const diff = e.touches[0].clientY - this.startY;
+            if (diff > 0) {
+                this.currentDeltaY = diff;
+                this.$refs.sheet.style.transform = 'translateY(' + diff + 'px)';
+            }
+        },
+        onTouchEnd() {
+            if (!this.isSwiping) return;
+            this.isSwiping = false;
+            if (this.currentDeltaY > 100) {
+                this.closeDrawer();
+            } else if (this.$refs.sheet) {
+                this.$refs.sheet.style.transform = '';
+            }
+            this.currentDeltaY = 0;
+        }
+     }"
+     @keydown.escape.window="closeDrawer()"
+     class="fixed inset-0 z-[120] flex justify-end md:justify-center items-end md:items-center">
+
+    <!-- Backdrop -->
+    <div x-show="drawerOpen"
+         x-transition.opacity
+         @click="closeDrawer()"
+         class="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity"></div>
+
+    <!-- Drawer/Modal Container -->
+    <div x-show="drawerOpen"
+         x-ref="sheet"
+         x-trap="drawerOpen"
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby="drawer-item-title"
+         x-transition:enter="transform transition ease-out duration-300"
+         x-transition:enter-start="translate-y-full md:translate-y-4 md:scale-95 opacity-0"
+         x-transition:enter-end="translate-y-0 md:scale-100 opacity-100"
+         x-transition:leave="transform transition ease-in duration-200"
+         x-transition:leave-start="translate-y-0 md:scale-100 opacity-100"
+         x-transition:leave-end="translate-y-full md:translate-y-4 md:scale-95 opacity-0"
+         class="relative w-full md:w-11/12 max-w-5xl h-[95vh] md:h-[90vh] bg-bgMain rounded-t-3xl md:rounded-3xl shadow-2xl flex flex-col overflow-hidden mx-auto transition-transform">
+
+         <!-- Drag Handle / Header -->
+         <div class="flex-shrink-0 px-4 py-3 border-b border-borderDefault flex items-center justify-between bg-bgCard touch-none cursor-grab active:cursor-grabbing"
+              @touchstart="onTouchStart($event)"
+              @touchmove="onTouchMove($event)"
+              @touchend="onTouchEnd()">
+             <div class="flex flex-col items-center w-full relative">
+                 <div class="w-12 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full mb-3 md:hidden"></div>
+                 <div class="flex justify-between w-full items-center">
+                     <h2 id="drawer-item-title" class="text-lg font-black text-textBase truncate pr-10 pl-2">{{ item.name }}</h2>
+                     <button @click="closeDrawer()"
+                             aria-label="Close insights drawer"
+                             class="p-2 text-textMuted hover:text-textBase hover:bg-bgHover rounded-full transition-colors absolute right-0 top-0 md:-top-1">
+                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                     </button>
+                 </div>
+             </div>
+         </div>
+
+         <!-- Content (Scrollable) -->
+         <div class="flex-1 overflow-y-auto custom-scrollbar">
+             {% block content %}{% endblock %}
+             {% block extra_scripts %}{% endblock %}
+         </div>
+    </div>
+</div>
