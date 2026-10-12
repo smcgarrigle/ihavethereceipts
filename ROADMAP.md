@@ -10,7 +10,7 @@
 - [x] **Items Page Pagination**: `/items` renders all 1,493 items with no pagination (~80K DOM nodes). Prerequisite: extract `list_items` into a paginated Jinja fragment. Also unblocks column-reorder and the a11y axe suite.
 - [x] **Reorderable Item Columns**: Drag-to-reorder column headers (Category, qty, total spent, weight/vol, unit, $/unit) persisted in localStorage. Requires paginated fragment above. Full scope: `scratch/TODO_items_column_reorder.md`.
 - [x] **Mobile Slide-out Drawers**: HTMX-powered slide-up drawers for Item Insights on mobile, replacing full-page navigations.
-- [ ] **PDF Viewer 'Esc' Key Fix**: Native `<embed>` swallows the 'Esc' key when focused, preventing modal close. Option A (lightweight): auto-focus the "Close" button on open. Option B (heavy): migrate to PDF.js.
+- [x] **PDF Viewer 'Esc' Key Fix**: Native `<embed>` swallows the 'Esc' key when focused, preventing modal close. Option A (lightweight): auto-focus the "Close" button on open. Option B (heavy): migrate to PDF.js.
 
 ### 2. Dynamic Trends & Dashboards
 - [ ] **Interactive Chart Controllers**: Expand dropdown filters by date range or category across all charts. Use `hx-push-url="true"` to keep state bookmarkable.
