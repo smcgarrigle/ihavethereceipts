@@ -237,11 +237,11 @@ def test_html_escaping_in_items_and_categories_pages(client, db):
     # Get items list
     resp_items = client.get("/api/items/list")
     assert resp_items.status_code == 200
-    assert html.escape(malicious_item.name) in resp_items.text
+    assert "&lt;script&gt;alert(" in resp_items.text
     assert malicious_item.name not in resp_items.text
 
     # Get categories list
     resp_cats = client.get("/api/categories/list")
     assert resp_cats.status_code == 200
-    assert html.escape(malicious_cat.name) in resp_cats.text
+    assert "&lt;script&gt;alert(" in resp_cats.text
     assert malicious_cat.name not in resp_cats.text

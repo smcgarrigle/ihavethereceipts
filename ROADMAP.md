@@ -31,7 +31,7 @@ Automated background enrichment that detects FDC coverage gaps and surfaces cand
 - [ ] **Cross-Device Sync (Offline-First)**: PWA with IndexedDB for offline scanning; syncs back to server on reconnect.
 
 ### 6. UI/UX Refinements
-- [ ] **Items Page Pagination**: `/items` renders all 1,493 items with no pagination (~80K DOM nodes). Prerequisite: extract `list_items` into a paginated Jinja fragment. Also unblocks column-reorder and the a11y axe suite.
+- [x] **Items Page Pagination**: `/items` renders all 1,493 items with no pagination (~80K DOM nodes). Prerequisite: extract `list_items` into a paginated Jinja fragment. Also unblocks column-reorder and the a11y axe suite.
 - [ ] **Reorderable Item Columns**: Drag-to-reorder column headers (Category, qty, total spent, weight/vol, unit, $/unit) persisted in localStorage. Requires paginated fragment above. Full scope: `scratch/TODO_items_column_reorder.md`.
 - [ ] **Mobile Slide-out Drawers**: HTMX-powered slide-up drawers for Item Insights on mobile, replacing full-page navigations.
 - [ ] **PDF Viewer 'Esc' Key Fix**: Native `<embed>` swallows the 'Esc' key when focused, preventing modal close. Option A (lightweight): auto-focus the "Close" button on open. Option B (heavy): migrate to PDF.js.

@@ -94,7 +94,7 @@
             {% endif %}
         </div>
 
-        <div class="p-6" hx-get="/api/items/list{% if filter_category_id %}?category_id={{ filter_category_id }}{% endif %}"
+        <div class="p-6 space-y-2" id="items-list-container" hx-get="/api/items/list{% if filter_category_id %}?category_id={{ filter_category_id }}{% endif %}"
              hx-trigger="load" hx-target="this" hx-swap="innerHTML">
             <!-- Loading state -->
             <div class="text-center py-12 flex flex-col items-center justify-center">

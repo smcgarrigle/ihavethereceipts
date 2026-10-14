@@ -1,0 +1,140 @@
+{% if page == 1 and not items %}
+<div class="text-center py-12 text-textMuted">
+    <p class="text-lg font-medium">No items in this category yet</p>
+</div>
+{% endif %}
+
+{% for data in items %}
+    {% set item = data.item %}
+    <div class='bg-bgCard border border-borderDefault rounded-lg shadow-sm hover:shadow-md transition overflow-hidden'
+         x-data='{expanded: false, categoryId: {{ item.category_id or "null" }}}'>
+
+        <!-- Header -->
+        <div @click="expanded = !expanded" class="p-4 flex justify-between items-center cursor-pointer bg-bgSkeleton/50 hover:bg-bgSkeleton transition-colors">
+            <div class="flex-1 min-w-0">
+                <h3 class='font-semibold truncate pr-2'>
+                    <a href='/items/{{ item.id }}/insights' @click.stop
+                       class='text-textBase hover:text-blue-500 transition-colors'
+                       title='Open item page'>{{ item.name }}</a>
+                </h3>
+                <div class="flex items-center space-x-2 text-xs text-textMuted mt-0.5">
+                    <span>{{ data.purchase_count }} pur.</span>
+                    <span>•</span>
+                    <span class="font-medium text-textBase">${{ "%.2f"|format(data.avg_price) }} avg</span>
+                </div>
+            </div>
+            <div @click.stop="expanded = !expanded" @keydown.enter="expanded = !expanded" @keydown.space.prevent="expanded = !expanded"
+                 role="button" tabindex="0" :aria-expanded="expanded.toString()" aria-controls="item-details-{{ item.id }}"
+                 aria-label="Toggle details for {{ item.name }}"
+                 class="flex-shrink-0 text-right pl-2">
+                <span class="block font-bold text-textBase">${{ "%.0f"|format(data.total_spent) }}</span>
+                <svg class="w-5 h-5 text-textMuted transform transition-transform duration-200 mx-auto mt-1"
+                     :class="expanded ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+            </div>
+        </div>
+
+        <!-- Drawer (Collapsible) -->
+        <div id="item-details-{{ item.id }}" x-show="expanded" x-collapse class="border-t border-borderDefault">
+            <div class="p-4 space-y-4">
+
+                <!-- Stats Grid -->
+                <div class="grid grid-cols-2 gap-4 text-sm mb-4">
+                     <div>
+                        <p class="text-xs text-textMuted">Unit Price</p>
+                        <p class="font-medium text-blue-500">{{ data.avg_unit_price_str if data.avg_unit_price_str else "N/A" }}</p>
+                     </div>
+                     <div>
+                        <p class="text-xs text-textMuted">Price Range</p>
+                        <p class="font-medium text-textBase">
+                            {% if data.min_price is not none %}
+                                ${{ "%.2f"|format(data.min_price) }} - ${{ "%.2f"|format(data.max_price) }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </p>
+                     </div>
+                </div>
+
+                <div class="flex justify-between items-center mb-4">
+                     <div class="flex items-center space-x-2">
+                         <select x-model='categoryId' @click.stop title='Change category'
+                                 @change='fetch("/api/items/{{ item.id }}", {
+                                     method: "PUT",
+                                     headers: {
+                                         "Content-Type": "application/json",
+                                         "X-CSRF-Token": document.querySelector("meta[name=csrf-token]")?.content || ""
+                                     },
+                                     body: JSON.stringify({category_id: categoryId ? parseInt(categoryId) : null})
+                                 })'
+                                 class='{{ "text-xs bg-bgSkeleton text-textBase" if item.category else "text-xs bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400" }} px-2 py-1 rounded border-0 cursor-pointer focus:ring-2 focus:ring-blue-500'>
+                             <option value=''>Uncategorized</option>
+                             {% for cat in all_categories %}
+                                 <option value='{{ cat.id }}' {% if item.category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+                             {% endfor %}
+                         </select>
+                         {% if item.fdc_id %}
+                             <span class='text-[10px] bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded border border-blue-100 dark:border-blue-800' title='USDA FDC ID'>FDC:{{ item.fdc_id }}</span>
+                         {% endif %}
+                         {% if item.gtin %}
+                             <span class='text-[10px] bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 px-1.5 py-0.5 rounded border border-purple-100 dark:border-purple-800' title='GTIN/UPC'>UPC:{{ item.gtin }}</span>
+                         {% endif %}
+                     </div>
+                     <!-- Store Pills -->
+                     {% if data.store_pills %}
+                         <div class='flex flex-wrap justify-end gap-1.5'>
+                             {% for pill in data.store_pills %}
+                                 <span class='inline-flex items-center px-2 py-1 text-xs font-medium rounded-full border cursor-pointer hover:shadow-sm transition {{ pill.color }}'
+                                       role="button" tabindex="0"
+                                       @click="$dispatch('open-relevant-receipts', {ids: '{{ pill.receipt_ids }}'})"
+                                       @keydown.enter="$dispatch('open-relevant-receipts', {ids: '{{ pill.receipt_ids }}'})"
+                                       @keydown.space.prevent="$dispatch('open-relevant-receipts', {ids: '{{ pill.receipt_ids }}'})">
+                                     {{ pill.name }} ${{ "%.2f"|format(pill.price) }}
+                                     {% if pill.badge %}
+                                         <span class='ml-1 text-[10px] uppercase opacity-75'>({{ pill.badge }})</span>
+                                     {% endif %}
+                                 </span>
+                             {% endfor %}
+                         </div>
+                     {% endif %}
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="grid grid-cols-3 gap-2 pt-2 border-t border-borderDefault">
+                     <button onclick="showPriceHistory(this)"
+                             data-item-id="{{ item.id }}"
+                             data-item-name="{{ item.name|replace('\'', '\\\'') }}"
+                             class="py-2 px-3 bg-bgCard border border-borderDefault rounded-lg text-xs font-medium text-textBase hover:bg-bgSkeleton flex items-center justify-center transition-all">
+                        <svg class="w-3.5 h-3.5 mr-1.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg>
+                        History
+                    </button>
+
+                    <a href="/items/{{ item.id }}/insights"
+                       class="py-2 px-3 {{ 'bg-green-600 text-white hover:bg-green-700 shadow-sm' if item.fdc_id else 'bg-bgSkeleton text-textMuted border border-transparent hover:bg-bgSkeleton/80' }} rounded-lg text-xs font-bold flex items-center justify-center transition-all uppercase tracking-tight">
+                        <svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                        Insights
+                    </a>
+
+                    <button @click="autoEnrich({{ item.id }})"
+                            class="py-2 px-3 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 rounded-lg text-xs font-medium hover:bg-indigo-100 dark:hover:bg-indigo-900/40 border border-transparent flex items-center justify-center transition-all">
+                        <svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        USDA Match
+                    </button>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+{% endfor %}
+
+{% if has_more %}
+<div id="load-more-container-{{ page }}"
+     hx-get="/api/items/list?page={{ page + 1 }}&limit={{ limit }}{% if category_id %}&category_id={{ category_id }}{% endif %}"
+     hx-trigger="revealed"
+     hx-swap="outerHTML"
+     class="py-4 text-center text-textMuted text-sm animate-pulse">
+    Loading more items...
+</div>
+{% endif %}
