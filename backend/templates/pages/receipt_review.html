@@ -602,7 +602,18 @@
     </div>
 
 <!-- Image Viewer Modal -->
-<div x-data="{ open: false }" @open-review-image.window="open = true" @keydown.escape.window="open = false"
+<div x-data="{
+    open: false,
+    focusClose() {
+        this.$nextTick(() => {
+            this.$refs.closeBtn?.focus();
+        });
+    }
+}"
+    x-init="$watch('open', value => { if (value) focusClose(); })"
+    @open-review-image.window="open = true; focusClose();"
+    @keydown.escape.window="open = false"
+    @keydown.window="if (open && ($event.key === 'Escape' || $event.key === 'Esc')) { open = false; }"
     x-show="open" x-trap="open" x-cloak class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="review-image-modal-title" role="dialog"
     aria-modal="true">
 
@@ -610,10 +621,19 @@
 
     <div class="flex min-h-screen items-center justify-center p-4 text-center sm:p-0">
         <div x-show="open"
+            @mouseenter="if (open && document.activeElement?.tagName === 'EMBED') focusClose();"
             class="relative transform overflow-hidden rounded-lg bg-bgCard text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-2xl">
 
             <div class="bg-bgCard px-4 pb-4 pt-5 sm:p-6">
-                <h3 class="text-base font-semibold leading-6 text-textBase mb-4" id="review-image-modal-title">Original Receipt</h3>
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-base font-semibold leading-6 text-textBase" id="review-image-modal-title">Original Receipt</h3>
+                    <button type="button" @click="open = false" aria-label="Close modal"
+                        class="text-textMuted hover:text-textBase p-1 rounded-lg hover:bg-bgHover focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
 
                 {% if not file_status.exists %}
                 <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-8 text-center">
@@ -635,7 +655,7 @@
                 <div class="flex justify-center bg-bgSkeleton rounded-lg p-2">
                     {% set filename = file_status.filename %}
                     {% if filename and filename.lower().endswith('.pdf') %}
-                    <embed src="/api/receipts/{{ receipt_id }}/file" type="application/pdf" class="w-full h-[70vh] rounded">
+                    <embed src="/api/receipts/{{ receipt_id }}/file" type="application/pdf" tabindex="-1" class="w-full h-[70vh] rounded">
                     {% else %}
                     <img src="/api/receipts/{{ receipt_id }}/file" alt="Scanned receipt document"
                         onerror="this.src='/static/placeholder-receipt.png'"
@@ -646,8 +666,11 @@
             </div>
             <div class="bg-bgHover px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
                 <button type="button"
-                    class="mt-3 inline-flex w-full justify-center rounded-md bg-bgInput px-3 py-2 text-sm font-semibold text-textBase shadow-sm ring-1 ring-inset ring-borderInput hover:bg-bgHover sm:mt-0 sm:w-auto"
-                    @click="open = false">Close</button>
+                    x-ref="closeBtn"
+                    class="mt-3 inline-flex w-full justify-center rounded-md bg-bgInput px-3 py-2 text-sm font-semibold text-textBase shadow-sm ring-1 ring-inset ring-borderInput hover:bg-bgHover focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:mt-0 sm:w-auto"
+                    @click="open = false">
+                    Close <span class="hidden sm:inline text-xs text-textMuted ml-1.5">(Esc)</span>
+                </button>
             </div>
         </div>
     </div>
