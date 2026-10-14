@@ -79,6 +79,8 @@ SEED_URLS = [
     "/restock",
     "/produce",
     "/settings",
+    "/settings/corrections",
+    "/settings/nutrition-review",
     "/help/api-keys",
     "/styleguide",
     "/demo-bi",
@@ -531,7 +533,7 @@ DEMO_SHIM = """
 
 def is_page(path: str) -> bool:
     """HTML documents get directory-style output; fragments/JSON keep literal paths."""
-    return not path.startswith(("/api/", "/settings/", "/static/", "/uploads/"))
+    return not path.startswith(("/api/", "/static/", "/uploads/"))
 
 
 def output_path(out: Path, url_path: str, content_type: str) -> Path:
