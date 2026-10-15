@@ -245,3 +245,37 @@ def test_html_escaping_in_items_and_categories_pages(client, db):
     assert resp_cats.status_code == 200
     assert "&lt;script&gt;alert(" in resp_cats.text
     assert malicious_cat.name not in resp_cats.text
+
+
+def test_items_list_zero_and_none_price_formatting(client, db):
+    """Test that items with 0.0 or credit prices render without template formatting crashes."""
+    store = Store(name="Promo Store")
+    db.add(store)
+    db.flush()
+
+    # Item with 0.0 price (free promo item)
+    promo_item = Item(name="Free Promo Item", normalized_name="free promo item")
+    db.add(promo_item)
+    db.flush()
+
+    receipt = Receipt(store_id=store.id, status="completed", total_amount=0.0)
+    db.add(receipt)
+    db.flush()
+
+    ri = ReceiptItem(receipt_id=receipt.id, item_id=promo_item.id, quantity=1, price=0.0)
+    db.add(ri)
+
+    # Item with negative price (bag credit) and regular price
+    credit_item = Item(name="Bag Credit Item", normalized_name="bag credit item")
+    db.add(credit_item)
+    db.flush()
+
+    ri1 = ReceiptItem(receipt_id=receipt.id, item_id=credit_item.id, quantity=1, price=-0.05)
+    ri2 = ReceiptItem(receipt_id=receipt.id, item_id=credit_item.id, quantity=1, price=0.0)
+    db.add_all([ri1, ri2])
+    db.commit()
+
+    resp = client.get("/api/items/list")
+    assert resp.status_code == 200
+    assert "Free Promo Item" in resp.text
+    assert "Bag Credit Item" in resp.text

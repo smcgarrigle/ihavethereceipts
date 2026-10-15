@@ -48,8 +48,12 @@
                      <div>
                         <p class="text-xs text-textMuted">Price Range</p>
                         <p class="font-medium text-textBase">
-                            {% if data.min_price is not none %}
+                            {% if data.min_price is not none and data.max_price is not none %}
                                 ${{ "%.2f"|format(data.min_price) }} - ${{ "%.2f"|format(data.max_price) }}
+                            {% elif data.min_price is not none %}
+                                ${{ "%.2f"|format(data.min_price) }}
+                            {% elif data.max_price is not none %}
+                                ${{ "%.2f"|format(data.max_price) }}
                             {% else %}
                                 —
                             {% endif %}

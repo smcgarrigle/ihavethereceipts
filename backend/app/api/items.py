@@ -213,10 +213,10 @@ def list_items(
             {
                 "item": item,
                 "purchase_count": purchase_count,
-                "avg_price": float(avg_price or 0),
-                "total_spent": float(total_spent or 0),
-                "min_price": float(min_price or 0) if min_price else None,
-                "max_price": float(max_price or 0) if max_price else None,
+                "avg_price": float(avg_price) if avg_price is not None else 0.0,
+                "total_spent": float(total_spent) if total_spent is not None else 0.0,
+                "min_price": float(min_price) if min_price is not None else None,
+                "max_price": float(max_price) if max_price is not None else None,
                 "avg_unit_price_str": avg_unit_price_str,
                 "store_pills": store_pills,
             }
@@ -235,6 +235,7 @@ def list_items(
             "limit": limit,
             "has_more": has_more,
         },
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
     )
 
 
