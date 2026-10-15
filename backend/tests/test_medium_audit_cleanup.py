@@ -275,7 +275,14 @@ def test_items_list_zero_and_none_price_formatting(client, db):
     db.add_all([ri1, ri2])
     db.commit()
 
-    resp = client.get("/api/items/list")
-    assert resp.status_code == 200
-    assert "Free Promo Item" in resp.text
-    assert "Bag Credit Item" in resp.text
+    # Test cards view
+    resp_cards = client.get("/api/items/list?view=cards")
+    assert resp_cards.status_code == 200
+    assert "Free Promo Item" in resp_cards.text
+    assert "Bag Credit Item" in resp_cards.text
+
+    # Test table view
+    resp_table = client.get("/api/items/list?view=table")
+    assert resp_table.status_code == 200
+    assert "Free Promo Item" in resp_table.text
+    assert "Bag Credit Item" in resp_table.text

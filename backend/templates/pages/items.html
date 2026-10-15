@@ -82,9 +82,26 @@
     </div>
 
     <!-- All Items Tab -->
-    <div id="panel-all" role="tabpanel" aria-labelledby="tab-all" x-show="tab === 'all'" x-cloak class="bg-bgCard rounded-lg shadow dark:shadow-gray-900/50">
+    <div id="panel-all" role="tabpanel" aria-labelledby="tab-all" x-show="tab === 'all'" x-cloak class="bg-bgCard rounded-lg shadow dark:shadow-gray-900/50"
+         x-data="{ viewMode: localStorage.getItem('itemsView') || 'cards' }"
+         @change-view.window="viewMode = $event.detail.view; localStorage.setItem('itemsView', viewMode); htmx.trigger('#items-list-container', 'reload-list')">
+
         <div class="p-6 border-b border-borderDefault flex items-center justify-between gap-3">
-            <h2 class="text-lg font-semibold text-textBase">All Items</h2>
+            <div class="flex items-center gap-4">
+                <h2 class="text-lg font-semibold text-textBase">All Items</h2>
+                <div class="flex items-center rounded-lg bg-bgSkeleton p-1">
+                    <button @click="$dispatch('change-view', {view: 'cards'})"
+                            class="px-3 py-1 text-sm font-medium rounded-md transition-colors"
+                            :class="viewMode === 'cards' ? 'bg-bgCard text-textBase shadow-sm' : 'text-textMuted hover:text-textBase'">
+                        Cards
+                    </button>
+                    <button @click="$dispatch('change-view', {view: 'table'})"
+                            class="px-3 py-1 text-sm font-medium rounded-md transition-colors"
+                            :class="viewMode === 'table' ? 'bg-bgCard text-textBase shadow-sm' : 'text-textMuted hover:text-textBase'">
+                        Table
+                    </button>
+                </div>
+            </div>
             {% if filter_category_id and filter_category_name %}
             <a href="/items" title="Clear category filter"
                class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 hover:bg-indigo-500/20 transition">
@@ -95,7 +112,8 @@
         </div>
 
         <div class="p-6 space-y-2" id="items-list-container" hx-get="/api/items/list{% if filter_category_id %}?category_id={{ filter_category_id }}{% endif %}"
-             hx-trigger="load" hx-target="this" hx-swap="innerHTML">
+             hx-vals="js:{view: localStorage.getItem('itemsView') || 'cards'}"
+             hx-trigger="load, reload-list" hx-target="this" hx-swap="innerHTML">
             <!-- Loading state -->
             <div class="text-center py-12 flex flex-col items-center justify-center">
                 <svg class="animate-spin h-10 w-10 text-blue-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none"
@@ -580,6 +598,89 @@
         document.getElementById('relevantReceiptsModal').classList.add('hidden');
         if (_relevantReceiptsOpener) { _relevantReceiptsOpener.focus(); _relevantReceiptsOpener = null; }
     }
+
+    // Alpine.js logic for Table Column Reordering
+    window.tableReorder = function() {
+        return {
+            dragTarget: null,
+            draggedCol: null,
+            columns: [
+                { key: 'category', label: 'Category' },
+                { key: 'purchases', label: 'Purchases' },
+                { key: 'avg_price', label: 'Avg Price' },
+                { key: 'total_spent', label: 'Total Spent' },
+                { key: 'unit_price', label: 'Unit Price' },
+                { key: 'range', label: 'Price Range' },
+                { key: 'best_store', label: 'Best Store' },
+            ],
+            init() {
+                const saved = localStorage.getItem('itemsColumnOrder');
+                if (saved) {
+                    try {
+                        const order = JSON.parse(saved);
+                        this.columns.sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
+                    } catch (e) {}
+                }
+
+                this.$nextTick(() => this.rearrangeDOM());
+
+                // Re-apply order when HTMX appends new pages
+                document.body.addEventListener('htmx:afterSwap', (e) => {
+                    if (e.target.id && e.target.id.startsWith('load-more-container')) {
+                        this.rearrangeDOM();
+                    }
+                });
+            },
+            dragStart(e, key) {
+                this.draggedCol = key;
+                e.dataTransfer.effectAllowed = 'move';
+            },
+            dragOver(e, key) {
+                if (this.draggedCol !== key) {
+                    this.dragTarget = key;
+                }
+            },
+            dragLeave(e) {
+                this.dragTarget = null;
+            },
+            dragEnd(e) {
+                this.dragTarget = null;
+                this.draggedCol = null;
+            },
+            drop(e, key) {
+                this.dragTarget = null;
+                if (!this.draggedCol || this.draggedCol === key) return;
+
+                const fromIdx = this.columns.findIndex(c => c.key === this.draggedCol);
+                const toIdx = this.columns.findIndex(c => c.key === key);
+
+                const [moved] = this.columns.splice(fromIdx, 1);
+                this.columns.splice(toIdx, 0, moved);
+
+                localStorage.setItem('itemsColumnOrder', JSON.stringify(this.columns.map(c => c.key)));
+                this.rearrangeDOM();
+            },
+            rearrangeDOM() {
+                const tbody = document.getElementById('items-table-body');
+                if (!tbody) return;
+
+                const order = this.columns.map(c => c.key);
+
+                Array.from(tbody.querySelectorAll('tr.item-row')).forEach(row => {
+                    const tds = Array.from(row.querySelectorAll('td[data-col]'));
+                    if (tds.length === 0) return;
+
+                    tds.sort((a, b) => order.indexOf(a.dataset.col) - order.indexOf(b.dataset.col));
+
+                    let current = row.firstElementChild; // The Item column is fixed first
+                    tds.forEach(td => {
+                        current.insertAdjacentElement('afterend', td);
+                        current = td;
+                    });
+                });
+            }
+        }
+    };
 
     document.addEventListener('keydown', function (event) {
         const modal = document.getElementById('relevantReceiptsModal');
