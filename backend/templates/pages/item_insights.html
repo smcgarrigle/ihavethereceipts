@@ -1,4 +1,4 @@
-{% extends "layouts/base.html" %}
+{% extends base_template if base_template else "layouts/base.html" %}
 
 {% block title %}USDA Product Insights - {{ item.name }}{% endblock %}
 
@@ -108,8 +108,9 @@
             </div>
         </div>
         <script>
-            document.addEventListener('DOMContentLoaded', function() {
-                // Ensure Chart.js is available
+            (function() {
+                function initItemInsightsChart() {
+                    // Ensure Chart.js is available
                 if (typeof Chart === 'undefined') return;
 
                 // Per-unit prices on one basis, oldest first.
@@ -188,8 +189,16 @@
                 }
 
                 if (datasets.length > 0) {
-                    const ctx = document.getElementById('priceTrendChart').getContext('2d');
+                    const canvas = document.getElementById('priceTrendChart');
+                    if (!canvas) return;
 
+                    // Destroy any existing chart instance on this canvas to prevent memory leaks and display bugs
+                    const existingChart = Chart.getChart(canvas);
+                    if (existingChart) {
+                        existingChart.destroy();
+                    }
+
+                    const ctx = canvas.getContext('2d');
                     new Chart(ctx, {
                         type: 'line',
                         data: {
@@ -245,7 +254,15 @@
                         }
                     });
                 }
-            });
+                }
+
+                // Run immediately if loaded via HTMX, otherwise wait for DOMContentLoaded
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', initItemInsightsChart);
+                } else {
+                    setTimeout(initItemInsightsChart, 50); // Small delay to ensure canvas is in DOM
+                }
+            })();
         </script>
         {% endif %}
     </div>
