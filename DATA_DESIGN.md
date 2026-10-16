@@ -111,6 +111,16 @@ erDiagram
         text receipt_item_ids "JSON list of IDs moved"
         datetime merged_at
     }
+
+    api_tokens {
+        int id PK
+        string name "User-facing label"
+        string token_hash UK "SHA-256 of bearer secret"
+        string token_prefix "First chars for identification"
+        datetime created_at
+        datetime last_used_at "Throttled activity timestamp"
+        datetime revoked_at "Non-null once revoked"
+    }
 ```
 
 ---
@@ -217,6 +227,19 @@ Stores dismissed duplicate suggestions. Prevents the matching engine from re-sug
 
 ### 9. `merge_logs`
 Audit trail for item merges. If "Milk A" is merged into "Milk B", this table records what happened for potential audit or reversal.
+
+### 10. `api_tokens`
+Bearer tokens for the TruePriceMemory browser extension (`/api/ext/*`). The raw secret (`tpm_...`) is displayed once at creation and never persisted; only its SHA-256 hex digest is stored.
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `id` | Integer | Primary Key |
+| `name` | String | User-facing token label (max 60 chars). |
+| `token_hash` | String | Unique SHA-256 hex digest of the bearer secret. |
+| `token_prefix` | String | Short prefix (`tpm_xxxx`) shown in Settings so tokens can be distinguished. |
+| `created_at` | DateTime | Timestamp when the token was issued. |
+| `last_used_at` | DateTime | Timestamp of recent authenticated request (writes throttled to 1 minute). |
+| `revoked_at` | DateTime | Timestamp when revoked (nullable; non-null tokens are rejected). |
 
 ---
 

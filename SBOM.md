@@ -127,7 +127,7 @@ All frontend libraries are downloaded and served locally. No external CDN reques
 | [websockets](https://websockets.readthedocs.io/) | 16.1.1 | WebSocket support (uvicorn `[standard]`) |
 | [pydantic-core](https://github.com/pydantic/pydantic-core) | 2.46.4 | Rust-based core for pydantic v2 |
 | [google-auth](https://google-auth.readthedocs.io/) | 2.56.2 | Auth for Google Gemini API |
-| [mako](https://www.makotemplates.org/) | 1.4.1 | Templating engine (alembic migrations) |
+| [mako](https://www.makotemplates.org/) | 1.4.2 | Templating engine (alembic migrations) |
 | [pdfminer-six](https://pdfminersix.readthedocs.io/) | 20260107 | PDF text extraction (pdfplumber dependency) |
 | [pypdfium2](https://pypdfium2.readthedocs.io/) | 5.12.1 | PDF rendering (pdfplumber dependency) |
 | [cryptography](https://cryptography.io/) | 50.0.0 | Crypto primitives (google-auth dependency) |

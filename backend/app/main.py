@@ -27,6 +27,7 @@ from app.api import (
     bulk,
     categories,
     export,
+    ext_router,
     items,
     predictions_router,
     receipts,
@@ -272,6 +273,7 @@ app.include_router(trends.router, prefix="/api/trends", tags=["trends"])
 app.include_router(trends_nutrition.router, prefix="/api/trends", tags=["trends"])
 app.include_router(bulk.router, prefix="/api/bulk", tags=["bulk"])
 app.include_router(export.router, prefix="/api/export", tags=["export"])
+app.include_router(ext_router.router, prefix="/api/ext", tags=["extension"])
 app.include_router(predictions_router.router, prefix="/api/predictions", tags=["predictions"])
 app.include_router(search_router.router, prefix="/api", tags=["search"])
 app.include_router(settings_router.router, prefix="/settings", tags=["settings"])

@@ -495,6 +495,20 @@
         <span class="text-textSubtle group-hover:text-indigo-500 transition text-xl">→</span>
     </a>
 
+    <!-- TruePriceMemory browser extension -->
+    <section class="rounded-2xl border border-borderDefault bg-bgCard p-5" aria-labelledby="ext-heading">
+        <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center text-xl bg-indigo-500/15" aria-hidden="true">🧩</div>
+            <div>
+                <h2 id="ext-heading" class="text-base font-semibold text-textBase">TruePriceMemory Browser Extension</h2>
+                <p class="text-xs text-textMuted mt-0.5">Create a token to let the extension look up what you have paid before while you shop. It is read-only and can be revoked at any time.</p>
+            </div>
+        </div>
+        <div id="ext-token-panel">
+            {% include "fragments/ext_tokens.html" %}
+        </div>
+    </section>
+
     <!-- Style Guide Link -->
     <a href="/styleguide"
        class="flex items-center justify-between gap-4 rounded-2xl border border-borderDefault bg-bgCard p-5 hover:bg-bgHover transition-colors group">

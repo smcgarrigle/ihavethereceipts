@@ -64,6 +64,7 @@ grep -r "AIza" .    # spot-check for accidentally hardcoded Gemini API keys (use
 - Store all secrets in `.env` (root or `backend/.env` — both are gitignored).
 - If you suspect a key was committed, **revoke it immediately** in [Google AI Studio](https://aistudio.google.com) before attempting to clean git history.
 - Rotate your key periodically. Gemini free-tier keys are rate-limited but not scoped — a leaked key can exhaust your quota.
+- **TruePriceMemory Browser Extension Tokens (`api_tokens`)**: Endpoints under `/api/ext/*` are read-only and require an `Authorization: Bearer tpm_...` header generated in Settings. Only the SHA-256 digest of the token is stored in SQLite (`api_tokens.token_hash`), the secret is shown once at creation, and tokens can be revoked at any time. CORS remains disabled on `/api/ext/*` because a WebExtension with `host_permissions` does not use CORS, preventing arbitrary web pages from reading purchase history off loopback.
 
 ---
 

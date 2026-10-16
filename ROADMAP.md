@@ -48,6 +48,15 @@ Let users create personally meaningful categories (e.g. "Protein-Maxxing") that 
 - [ ] **Agentic Shopping**: Hand off the prediction list to an agent that shops online for you and builds cart based around opitmal pricing and the urgency of restock
 - [ ] **currently prohibited by TOS**
 
+### 9. TruePriceMemory Browser Extension
+Read-only Chrome and Firefox WebExtension that queries the local Grocery Tracker server while shopping on Amazon Fresh and Safeway to surface previously paid prices, store comparisons, and deal verdicts.
+
+- [x] **Phase 1 — Token Auth & Ping (`feat/ext-api-token`)**: `api_tokens` table (SHA-256 hashed at rest, one-time reveal, revocation, throttled `last_used_at`), Settings management card, `require_ext_token` dependency, and `GET /api/ext/ping`.
+- [ ] **Phase 2 — Product Lookup API (`feat/ext-lookup`)**: `ext_matcher.py` retail-title cleaner + `rapidfuzz` matcher, GTIN exact match, unit-compatible price comparison, and `GET /api/ext/lookup`.
+- [ ] **Phase 3 — Extension Core (`feat/ext-extension-core`)**: MV3 WebExtension skeleton (`extension/`), options page, background service worker, popup UI, right-click selection lookup, and Chrome/Firefox build script.
+- [ ] **Phase 4 — Retailer Adapters (`feat/ext-retailer-adapters`)**: Amazon Fresh and Safeway content scripts (JSON-LD + DOM fallback), on-page price memory badge, and deal verdict logic.
+- [ ] **Phase 5 — Offline Snapshot (`feat/ext-offline-snapshot`)**: `GET /api/ext/snapshot` compact cache and offline fallback when the local server is stopped.
+
 ---
 
 ## 🏛️ Completed Milestones Archive
