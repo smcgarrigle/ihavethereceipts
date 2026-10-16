@@ -1,0 +1,66 @@
+{# TruePriceMemory token panel. Swapped wholesale by /settings/extension/tokens.
+   `new_token` is the one-time secret and only exists in the response to the
+   POST that created it. #}
+<div role="status" aria-live="polite">
+    {% if new_token %}
+    <div class="mb-4 rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-4 space-y-3"
+         x-data="{ copied: false, copy() { navigator.clipboard.writeText(this.$refs.tok.textContent.trim()); this.copied = true; } }">
+        <p class="text-sm font-semibold text-textBase">Token created. Copy it now &mdash; it will not be shown again.</p>
+        <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+            <code x-ref="tok" class="flex-1 min-w-0 break-all select-all rounded-lg bg-bgMain border border-borderDefault px-3 py-2 text-xs text-textBase" id="new-ext-token">{{ new_token }}</code>
+            <button type="button" @click="copy()"
+                    class="flex-shrink-0 rounded-lg bg-indigo-600 hover:bg-indigo-500 px-3 py-2 text-sm font-medium text-white transition-colors">
+                <span x-show="!copied">Copy</span>
+                <span x-show="copied" x-cloak>Copied</span>
+            </button>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if at_cap %}
+    <p class="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-textBase">
+        You already have {{ ext_max }} active tokens. Revoke one below before creating another.
+    </p>
+    {% endif %}
+</div>
+
+<form hx-post="/settings/extension/tokens"
+      hx-target="#ext-token-panel"
+      hx-swap="innerHTML"
+      class="flex flex-col sm:flex-row sm:items-end gap-3 mb-5">
+    <div class="flex-1">
+        <label for="ext-token-name" class="block text-xs font-medium text-textMuted mb-1">Token name</label>
+        <input id="ext-token-name" name="name" type="text" maxlength="60" placeholder="e.g. Chrome on my laptop"
+               class="w-full rounded-lg bg-bgMain border border-borderDefault px-3 py-2 text-sm text-textBase placeholder-textSubtle focus:outline-none focus:ring-2 focus:ring-indigo-500">
+    </div>
+    <button type="submit"
+            class="rounded-lg bg-indigo-600 hover:bg-indigo-500 px-4 py-2 text-sm font-medium text-white transition-colors">
+        Create token
+    </button>
+</form>
+
+<ul class="space-y-2">
+    {% for t in tokens %}
+    <li class="flex items-center justify-between gap-3 px-4 py-2.5 rounded-lg bg-bgMain border border-borderDefault">
+        <div class="flex-1 min-w-0">
+            <div class="text-sm text-textBase truncate">{{ t.name }}</div>
+            <div class="text-xs text-textMuted">
+                <span class="font-mono">{{ t.token_prefix }}&hellip;</span>
+                &middot; created {{ t.created_at.strftime("%Y-%m-%d") if t.created_at else "unknown" }}
+                &middot; {% if t.last_used_at %}last used {{ t.last_used_at.strftime("%Y-%m-%d %H:%M") }} UTC{% else %}never used{% endif %}
+            </div>
+        </div>
+        <button type="button"
+                hx-delete="/settings/extension/tokens/{{ t.id }}"
+                hx-target="#ext-token-panel"
+                hx-swap="innerHTML"
+                hx-confirm="Revoke this token? The extension using it will stop working."
+                aria-label="Revoke token {{ t.name }}"
+                class="flex-shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-medium text-textMuted hover:text-red-400 hover:bg-red-500/10 transition-colors">
+            Revoke
+        </button>
+    </li>
+    {% else %}
+    <li class="px-4 py-3 text-sm text-textMuted italic">No tokens yet. The extension cannot connect until you create one.</li>
+    {% endfor %}
+</ul>

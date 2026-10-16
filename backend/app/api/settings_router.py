@@ -28,6 +28,7 @@ from app.api.templates import templates  # noqa: E402
 from app.core.config import settings  # noqa: E402
 from app.database import get_db  # noqa: E402
 from app.models.exclusion import ExclusionRule  # noqa: E402
+from app.services import ext_tokens  # noqa: E402
 from app.services import predictions as predictions_service  # noqa: E402
 from app.utils.error_pages import error_response  # noqa: E402
 
@@ -343,6 +344,8 @@ def _render_settings_page(request: Request, db: Session) -> HTMLResponse:
             "ocr_usage": get_daily_usage(),
             "currency_symbol": flags.get("currency_symbol", "$"),
             "currency_code": flags.get("currency_code", "USD"),
+            "tokens": ext_tokens.active_tokens(db),
+            "ext_max": ext_tokens.MAX_ACTIVE_TOKENS,
         },
     )
 
@@ -451,6 +454,50 @@ def _render_ocr_list(request: Request, filter_type: str, items: list) -> HTMLRes
         "fragments/ocr_filter_list.html",
         {"filter_type": filter_type, "items": items},
     )
+
+
+# ---------------------------------------------------------------------------
+# TruePriceMemory browser extension tokens
+# ---------------------------------------------------------------------------
+
+
+def _render_ext_tokens(
+    request: Request, db: Session, new_token: str | None = None, at_cap: bool = False
+) -> HTMLResponse:
+    response = templates.TemplateResponse(
+        request,
+        "fragments/ext_tokens.html",
+        {
+            "tokens": ext_tokens.active_tokens(db),
+            "ext_max": ext_tokens.MAX_ACTIVE_TOKENS,
+            "new_token": new_token,
+            "at_cap": at_cap,
+        },
+    )
+    # The body can carry a secret that is shown exactly once.
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@router.post("/extension/tokens", response_class=HTMLResponse)
+def create_extension_token(
+    request: Request, name: str = Form(""), db: Session = Depends(get_db)
+) -> HTMLResponse:
+    """Create an extension token and show its secret once."""
+    created = ext_tokens.create_token(db, name)
+    if created is None:
+        return _render_ext_tokens(request, db, at_cap=True)
+    _row, secret = created
+    return _render_ext_tokens(request, db, new_token=secret)
+
+
+@router.delete("/extension/tokens/{token_id}", response_class=HTMLResponse)
+def revoke_extension_token(
+    token_id: int, request: Request, db: Session = Depends(get_db)
+) -> HTMLResponse:
+    """Revoke a token. Revoking one that is gone is not an error."""
+    ext_tokens.revoke_token(db, token_id)
+    return _render_ext_tokens(request, db)
 
 
 # ---------------------------------------------------------------------------

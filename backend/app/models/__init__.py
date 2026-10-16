@@ -1,4 +1,5 @@
 from app.database import Base
+from app.models.api_token import ApiToken
 from app.models.category import Category
 from app.models.correction_override import CorrectionOverride
 from app.models.correction_usage import CorrectionUsage
@@ -13,6 +14,7 @@ from app.models.store_item_alias import StoreItemAlias
 
 __all__ = [
     "Base",
+    "ApiToken",
     "Store",
     "Category",
     "Item",
