@@ -233,6 +233,52 @@ def _normalize_gtin(gtin: str | None) -> str:
     return digits
 
 
+# Generic adjectives/qualifiers that appear across unrelated grocery categories.
+# Sharing ONLY these words (e.g. "Organic Baby Spinach" vs "Organic Blueberry")
+# must never count as a product match.
+_QUALIFIER_WORDS = frozenset(
+    {
+        "organic",
+        "fresh",
+        "natural",
+        "raw",
+        "pure",
+        "whole",
+        "large",
+        "medium",
+        "small",
+        "extra",
+        "grade",
+        "select",
+        "choice",
+        "prime",
+        "original",
+        "classic",
+        "traditional",
+        "homestyle",
+        "artisan",
+        "premium",
+        "fancy",
+        "kosher",
+        "gluten",
+        "free",
+        "non",
+        "gmo",
+        "unsalted",
+        "salted",
+        "sweetened",
+        "unsweetened",
+        "light",
+        "lite",
+        "low",
+        "fat",
+        "reduced",
+        "diet",
+        "zero",
+    }
+)
+
+
 def score_retail_match(cleaned_query: str, item_name: str) -> int:
     """Similarity score (0-100) between a cleaned retail query and an item name.
 
@@ -253,8 +299,9 @@ def score_retail_match(cleaned_query: str, item_name: str) -> int:
         return int(round(sort_score))
 
     shared = q_tokens & i_tokens
-    if not shared:
-        return int(round(sort_score * 0.7))
+    substantive_shared = shared - _QUALIFIER_WORDS
+    if not substantive_shared:
+        return int(round(min(sort_score * 0.5, 45.0)))
 
     # Multi-word subset: e.g. query "schweppes tonic water" vs item "tonic water"
     # or user-selected "tonic water" vs item "schweppes tonic water".

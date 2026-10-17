@@ -373,6 +373,25 @@ class TestLookupEndpoint:
         assert "image_path" not in raw_text
         assert "ocr_data" not in raw_text
 
+    def test_qualifier_only_overlap_is_rejected(self, client, db):
+        """'Organic Baby Spinach' and 'Organic Blueberry Pint' share only 'organic'
+        and must not match each other."""
+        headers = _auth_headers(db)
+        wfm = _seed_store(db, "Whole Foods Market")
+        spinach = _seed_item(db, "365 by Whole Foods Market Organic Baby Spinach Salad, 5 OZ")
+        blueberry = _seed_item(db, "Organic Blueberry Pint")
+        _seed_purchase(db, wfm, spinach, price=2.99, weight=5.0, unit_type="oz")
+        _seed_purchase(db, wfm, blueberry, price=5.99)
+
+        r = client.get(
+            "/api/ext/lookup",
+            params={"q": "Organic Baby Spinach, 16 Ounce", "store": "Amazon Fresh", "price": 4.99},
+            headers=headers,
+        )
+        assert r.status_code == 200
+        matched_ids = [m["item_id"] for m in r.json()["matches"]]
+        assert matched_ids == [spinach.id]
+
     def test_per_token_rate_limit_blocks_runaway_caller(self, client, db, monkeypatch):
         from app.api import ext_router
 
