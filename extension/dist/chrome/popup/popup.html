@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TruePriceMemory</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-icon" aria-hidden="true">🧾</span>
+      <span class="brand-title">TruePriceMemory</span>
+    </div>
+    <button type="button" id="open-options-btn" class="icon-btn" title="Extension options" aria-label="Extension options">⚙️</button>
+  </header>
+
+  <section id="setup-prompt" class="notice hidden">
+    <p>Configure your Grocery Tracker API token to look up prices.</p>
+    <button type="button" id="setup-btn" class="btn-primary">Open Options</button>
+  </section>
+
+  <form id="lookup-form" class="search-panel">
+    <div class="search-row">
+      <label for="query-input" class="sr-only">Product name</label>
+      <input id="query-input" type="search" placeholder="Search item (e.g. Schweppes Tonic Water)…" required>
+    </div>
+    <div class="filter-row">
+      <label for="store-select" class="sr-only">Store</label>
+      <select id="store-select">
+        <option value="">All Stores</option>
+        <option value="Amazon Fresh">Amazon Fresh</option>
+        <option value="Safeway">Safeway</option>
+        <option value="Whole Foods Market">Whole Foods Market</option>
+        <option value="Costco">Costco</option>
+        <option value="Trader Joe's">Trader Joe's</option>
+        <option value="Total Wine">Total Wine</option>
+      </select>
+      <label for="price-input" class="sr-only">Page price</label>
+      <input id="price-input" type="number" step="0.01" min="0" placeholder="Page $" class="price-input">
+      <button type="submit" class="btn-primary">Look up</button>
+    </div>
+  </form>
+
+  <main id="results-area" class="results-area" aria-live="polite">
+    <p class="empty-state">Highlight any product title and right-click <strong>Look up in TruePriceMemory</strong>, or search above.</p>
+  </main>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>
