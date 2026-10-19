@@ -3,6 +3,10 @@
  * Zero-dependency build script that produces unpacked Manifest V3 bundles for:
  *   - extension/dist/chrome   (Chrome / Edge on Windows & macOS)
  *   - extension/dist/firefox  (Firefox on Windows & macOS)
+ *
+ * Also bundles `common.js` + `content/extractors.js` + `content/content_script.js`
+ * into a single self-contained IIFE at `dist/<target>/content/content_script.js`
+ * because Manifest V3 content scripts do not support static ES module imports.
  */
 
 import fs from "node:fs";
@@ -18,6 +22,22 @@ const baseManifest = JSON.parse(
   fs.readFileSync(path.join(EXT_ROOT, "manifest.base.json"), "utf-8")
 );
 
+function stripModuleSyntax(source) {
+  return source
+    .replace(/^\s*import\s+[\s\S]*?from\s+["'][^"']+["'];?\s*$/gm, "")
+    .replace(/^\s*export\s+(?=(?:async\s+)?function\b|const\b|let\b|class\b)/gm, "");
+}
+
+function bundleContentScript() {
+  const parts = [
+    fs.readFileSync(path.join(SRC_DIR, "common.js"), "utf-8"),
+    fs.readFileSync(path.join(SRC_DIR, "content", "extractors.js"), "utf-8"),
+    fs.readFileSync(path.join(SRC_DIR, "content", "content_script.js"), "utf-8"),
+  ].map(stripModuleSyntax);
+
+  return `(() => {\n"use strict";\n${parts.join("\n\n")}\n})();\n`;
+}
+
 function copyRecursive(src, dest) {
   const stat = fs.statSync(src);
   if (stat.isDirectory()) {
@@ -31,12 +51,20 @@ function copyRecursive(src, dest) {
   }
 }
 
+const bundledContent = bundleContentScript();
+
 function buildTarget(targetName, manifestOverrides) {
   const outDir = path.join(DIST_DIR, targetName);
   fs.rmSync(outDir, { recursive: true, force: true });
   fs.mkdirSync(outDir, { recursive: true });
 
   copyRecursive(SRC_DIR, outDir);
+
+  fs.writeFileSync(
+    path.join(outDir, "content", "content_script.js"),
+    bundledContent,
+    "utf-8"
+  );
 
   const manifest = {
     ...baseManifest,

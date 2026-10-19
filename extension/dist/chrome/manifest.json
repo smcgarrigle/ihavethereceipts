@@ -15,6 +15,18 @@
     "https://*.amazon.com/*",
     "https://*.safeway.com/*"
   ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.amazon.com/*",
+        "https://*.safeway.com/*"
+      ],
+      "js": [
+        "content/content_script.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
   "action": {
     "default_title": "TruePriceMemory",
     "default_popup": "popup/popup.html"

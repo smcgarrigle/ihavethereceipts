@@ -197,10 +197,26 @@ if (ext?.runtime?.onMessage) {
       if (tabId && message.payload) {
         tabProducts.set(tabId, {
           ...message.payload,
+          title: message.payload.title || message.payload.q || "",
           updatedAt: Date.now(),
         });
       }
-      performLookup(message.payload).then(sendResponse);
+      performLookup(message.payload).then(async (result) => {
+        if (ext.action?.setBadgeText && tabId) {
+          const count = result.ok ? result.data?.matches?.length || 0 : 0;
+          await ext.action.setBadgeText({
+            tabId,
+            text: result.ok && count > 0 ? String(count) : "",
+          });
+          if (result.ok && count > 0) {
+            await ext.action.setBadgeBackgroundColor?.({
+              tabId,
+              color: "#4f46e5",
+            });
+          }
+        }
+        sendResponse(result);
+      });
       return true;
     }
 
