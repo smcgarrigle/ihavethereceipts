@@ -68,6 +68,13 @@ def test_chrome_and_firefox_manifests_have_least_privilege_and_valid_backgrounds
     assert "gecko" in firefox_manifest["browser_specific_settings"]
     assert firefox_manifest["browser_specific_settings"]["gecko"]["id"]
 
+    for manifest in (chrome_manifest, firefox_manifest):
+        assert "content_scripts" in manifest
+        cs = manifest["content_scripts"][0]
+        assert "content/content_script.js" in cs["js"]
+        assert "https://*.amazon.com/*" in cs["matches"]
+        assert "https://*.safeway.com/*" in cs["matches"]
+
 
 @pytest.mark.parametrize("target_dir", [CHROME_DIST, FIREFOX_DIST], ids=["chrome", "firefox"])
 def test_built_bundle_contains_required_files(target_dir: pathlib.Path):
@@ -75,6 +82,7 @@ def test_built_bundle_contains_required_files(target_dir: pathlib.Path):
         "manifest.json",
         "background.js",
         "common.js",
+        "content/content_script.js",
         "options/options.html",
         "options/options.js",
         "options/options.css",
@@ -89,10 +97,12 @@ def test_built_bundle_contains_required_files(target_dir: pathlib.Path):
 def test_extension_javascript_unit_tests_pass():
     node = shutil.which("node")
     assert node is not None
-    test_file = EXT_DIR / "tests" / "common.test.mjs"
-    assert test_file.is_file()
+    test_files = [
+        str(EXT_DIR / "tests" / "common.test.mjs"),
+        str(EXT_DIR / "tests" / "extractors.test.mjs"),
+    ]
     res = subprocess.run(
-        [node, "--test", str(test_file)],
+        [node, "--test", *test_files],
         cwd=str(ROOT),
         capture_output=True,
         text=True,
