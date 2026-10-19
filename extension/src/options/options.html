@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TruePriceMemory — Options</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <main class="container">
+    <header class="header">
+      <div class="logo" aria-hidden="true">🧾</div>
+      <div>
+        <h1>TruePriceMemory</h1>
+        <p class="subtitle">Connect to your local IHaveTheReceipts server</p>
+      </div>
+    </header>
+
+    <section class="card" aria-labelledby="conn-heading">
+      <h2 id="conn-heading">Server Connection</h2>
+
+      <form id="options-form" novalidate>
+        <div class="field">
+          <label for="server-url">Server URL</label>
+          <input id="server-url" name="serverUrl" type="url"
+                 placeholder="http://127.0.0.1:8000" required>
+          <p class="hint">Default is <code>http://127.0.0.1:8000</code> (works natively on Mac and via WSL2 localhost forwarding on Windows).</p>
+        </div>
+
+        <div class="field">
+          <label for="api-token">API Token</label>
+          <input id="api-token" name="token" type="password" autocomplete="off"
+                 placeholder="tpm_..." required>
+          <p class="hint">Generate a read-only token in <a id="settings-link" href="http://127.0.0.1:8000/settings" target="_blank" rel="noreferrer">Settings &rarr; TruePriceMemory Browser Extension</a>.</p>
+        </div>
+
+        <div class="actions">
+          <button type="submit" id="save-btn" class="btn-primary">Save &amp; Test Connection</button>
+          <button type="button" id="toggle-token-btn" class="btn-secondary">Show Token</button>
+        </div>
+      </form>
+
+      <div id="status-banner" class="status hidden" role="status" aria-live="polite"></div>
+    </section>
+
+    <section class="card info-card" aria-labelledby="privacy-heading">
+      <h2 id="privacy-heading">Privacy &amp; Security</h2>
+      <ul>
+        <li>Only the product title, size, barcode, and store name are sent to your local server.</li>
+        <li>Your token is read-only, stored locally in browser extension storage, and can be revoked in Settings at any time.</li>
+      </ul>
+    </section>
+  </main>
+  <script type="module" src="options.js"></script>
+</body>
+</html>

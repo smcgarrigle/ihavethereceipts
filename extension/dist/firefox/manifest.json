@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "TruePriceMemory — IHaveTheReceipts",
+  "short_name": "TruePriceMemory",
+  "version": "0.1.0",
+  "description": "See what you previously paid for groceries across stores using your local IHaveTheReceipts server.",
+  "permissions": [
+    "storage",
+    "contextMenus",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1:8000/*",
+    "http://localhost:8000/*",
+    "https://*.amazon.com/*",
+    "https://*.safeway.com/*"
+  ],
+  "action": {
+    "default_title": "TruePriceMemory",
+    "default_popup": "popup/popup.html"
+  },
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  },
+  "background": {
+    "scripts": [
+      "background.js"
+    ],
+    "type": "module"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "truepricememory@ihavethereceipts.local",
+      "strict_min_version": "115.0"
+    }
+  }
+}
