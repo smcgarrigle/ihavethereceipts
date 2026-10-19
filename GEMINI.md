@@ -12,6 +12,7 @@ This document serves as the primary blueprint for all AI agents working on this 
 - [DATA_DESIGN.md](DATA_DESIGN.md): Database schema, ERD, and field definitions.
 - [DEMO.md](DEMO.md): The static GitHub Pages demo — what it is, how it's built and deployed.
 - [EXCLUSIONS.md](EXCLUSIONS.md): Logic for junk filters and analytics exclusions.
+- [EXTENSION.md](EXTENSION.md): TruePriceMemory browser extension architecture, setup, and offline snapshot cache.
 - [HARDWARE_REQUIREMENTS.md](HARDWARE_REQUIREMENTS.md): Sizing for local OCR models and low-power hosts.
 - [PRD.md](PRD.md): Core instructions and product requirements.
 - [ROADMAP.md](ROADMAP.md): Feature backlog, strategic vision, and completed milestones.

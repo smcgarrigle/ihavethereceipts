@@ -404,3 +404,68 @@ class TestLookupEndpoint:
             )
         blocked = client.get("/api/ext/lookup", params={"q": "milk"}, headers=headers)
         assert blocked.status_code == 429
+
+
+class TestSnapshotEndpoint:
+    def test_snapshot_requires_auth_token(self, client):
+        r = client.get("/api/ext/snapshot")
+        assert r.status_code == 401
+        assert r.headers.get("Cache-Control") == "no-store"
+
+    def test_snapshot_returns_purchased_items_with_store_summaries_and_no_pii(self, client, db):
+        headers = _auth_headers(db)
+        total_wine = _seed_store(db, "Total Wine")
+        amazon_fresh = _seed_store(db, "Amazon Fresh")
+
+        tonic = _seed_item(db, "Schweppes Tonic Water", gtin="0007800001185")
+        unbought = _seed_item(db, "Never Purchased Decoy")
+
+        _seed_purchase(
+            db,
+            total_wine,
+            tonic,
+            price=1.49,
+            weight=33.8,
+            unit_type="fl oz",
+            date=datetime(2026, 8, 10),
+        )
+        _seed_purchase(
+            db,
+            amazon_fresh,
+            tonic,
+            price=2.49,
+            weight=33.8,
+            unit_type="fl oz",
+            date=datetime(2026, 9, 20),
+        )
+
+        r = client.get("/api/ext/snapshot", headers=headers)
+        assert r.status_code == 200, r.text
+        assert r.headers.get("Cache-Control") == "no-store"
+
+        data = r.json()
+        assert data["item_count"] == 1
+        assert "generated_at" in data
+        assert len(data["items"]) == 1
+
+        entry = data["items"][0]
+        assert entry["item_id"] == tonic.id
+        assert entry["name"] == "Schweppes Tonic Water"
+        assert entry["cleaned_name"] == "schweppes tonic water"
+        assert entry["gtin"] == "0007800001185"
+        assert entry["basis"] == "fl oz"
+        assert entry["last_paid"]["store"] == "Amazon Fresh"
+        assert entry["last_paid"]["price"] == pytest.approx(2.49)
+        assert entry["all_stores"]["best_store"] == "Total Wine"
+        assert entry["all_stores"]["best_price"] == pytest.approx(1.49)
+        assert entry["all_stores"]["total_purchases"] == 2
+        assert {s["store"] for s in entry["stores"]} == {"Total Wine", "Amazon Fresh"}
+
+        item_ids = [i["item_id"] for i in data["items"]]
+        assert unbought.id not in item_ids
+
+        raw_text = r.text
+        assert "/secret/path" not in raw_text
+        assert "secret ocr payload" not in raw_text
+        assert "image_path" not in raw_text
+        assert "ocr_data" not in raw_text

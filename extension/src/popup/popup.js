@@ -136,6 +136,15 @@ function renderLookupResult(result) {
     );
     return;
   }
+  if (result.offline) {
+    resultsArea.appendChild(
+      createEl(
+        "div",
+        "offline-banner",
+        "⚡ Offline mode · matched against your cached snapshot"
+      )
+    );
+  }
   const matches = result.data?.matches || [];
   if (matches.length === 0) {
     resultsArea.appendChild(
