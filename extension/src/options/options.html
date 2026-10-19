@@ -37,10 +37,12 @@
         <div class="actions">
           <button type="submit" id="save-btn" class="btn-primary">Save &amp; Test Connection</button>
           <button type="button" id="toggle-token-btn" class="btn-secondary">Show Token</button>
+          <button type="button" id="sync-snapshot-btn" class="btn-secondary">Sync Offline Snapshot</button>
         </div>
       </form>
 
       <div id="status-banner" class="status hidden" role="status" aria-live="polite"></div>
+      <p id="snapshot-status" class="hint" aria-live="polite"></p>
     </section>
 
     <section class="card info-card" aria-labelledby="privacy-heading">
@@ -48,6 +50,7 @@
       <ul>
         <li>Only the product title, size, barcode, and store name are sent to your local server.</li>
         <li>Your token is read-only, stored locally in browser extension storage, and can be revoked in Settings at any time.</li>
+        <li>An offline snapshot of your item price summaries is cached locally so lookups continue working even when the server is stopped.</li>
       </ul>
     </section>
   </main>

@@ -55,7 +55,7 @@ Read-only Chrome and Firefox WebExtension that queries the local Grocery Tracker
 - [x] **Phase 2 — Product Lookup API (`feat/ext-lookup`)**: `ext_matcher.py` retail-title cleaner + `rapidfuzz` matcher, GTIN exact match, unit-compatible price comparison, and `GET /api/ext/lookup`.
 - [x] **Phase 3 — Extension Core (`feat/ext-extension-core`)**: MV3 WebExtension skeleton (`extension/`), options page, background service worker, popup UI, right-click selection lookup, and Chrome/Firefox build script.
 - [x] **Phase 4 — Retailer Adapters (`feat/ext-retailer-adapters`)**: Amazon Fresh and Safeway content scripts (JSON-LD + DOM fallback), on-page price memory badge, and deal verdict logic.
-- [ ] **Phase 5 — Offline Snapshot (`feat/ext-offline-snapshot`)**: `GET /api/ext/snapshot` compact cache and offline fallback when the local server is stopped.
+- [x] **Phase 5 — Offline Snapshot (`feat/ext-offline-snapshot`)**: `GET /api/ext/snapshot` compact cache and offline fallback when the local server is stopped.
 
 ---
 

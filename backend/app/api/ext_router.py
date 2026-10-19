@@ -140,6 +140,26 @@ class LookupResponse(BaseModel):
     matches: list[LookupMatch]
 
 
+class SnapshotItem(BaseModel):
+    item_id: int
+    name: str
+    cleaned_name: str
+    gtin: str | None
+    unit: str | None
+    basis: str
+    basis_label: str
+    comparable_avg: float | None
+    last_paid: LastPaidInfo
+    all_stores: AllStoresStats
+    stores: list[StoreStats]
+
+
+class SnapshotResponse(BaseModel):
+    generated_at: str
+    item_count: int
+    items: list[SnapshotItem]
+
+
 @router.get("/ping", response_model=PingResponse)
 def ping(request: Request, _token: ApiToken = Depends(require_ext_token)) -> PingResponse:
     """Connectivity and auth check, used by the extension's "Test connection"."""
@@ -168,3 +188,12 @@ def lookup(
         limit=limit,
     )
     return LookupResponse(**result)
+
+
+@router.get("/snapshot", response_model=SnapshotResponse)
+def snapshot(
+    _token: ApiToken = Depends(require_ext_token),
+    db: Session = Depends(get_db),
+) -> SnapshotResponse:
+    """Return a compact snapshot of all purchased items for offline extension fallback."""
+    return SnapshotResponse(**ext_matcher.build_snapshot(db))

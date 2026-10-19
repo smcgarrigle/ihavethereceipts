@@ -160,7 +160,10 @@ function renderBadge(result, product) {
   box.setAttribute("aria-label", "TruePriceMemory price history");
 
   const top = el("div", "tpm-top");
-  top.appendChild(el("span", "tpm-brand", "🧾 TruePriceMemory"));
+  const brandLabel = result.offline
+    ? "🧾 TruePriceMemory · Offline"
+    : "🧾 TruePriceMemory";
+  top.appendChild(el("span", "tpm-brand", brandLabel));
   const closeBtn = el("button", "tpm-close", "×");
   closeBtn.setAttribute("aria-label", "Dismiss price badge");
   closeBtn.addEventListener("click", clearBadge);

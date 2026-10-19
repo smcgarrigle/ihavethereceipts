@@ -7,11 +7,13 @@ import {
   DEFAULT_SERVER_URL,
   buildLookupUrl,
   inferStoreFromUrl,
+  matchOfflineSnapshot,
   normalizeServerUrl,
 } from "./common.js";
 
 const ext = globalThis.browser ?? globalThis.chrome;
 const CONTEXT_MENU_ID = "tpm-lookup-selection";
+const SNAPSHOT_STALE_MS = 30 * 60 * 1000;
 
 const tabProducts = new Map();
 
@@ -21,6 +23,50 @@ async function getConfig() {
     serverUrl: stored.serverUrl || DEFAULT_SERVER_URL,
     token: stored.token || "",
   };
+}
+
+async function syncSnapshot({ serverUrl, token } = {}) {
+  const cfg = await getConfig();
+  let targetUrl;
+  try {
+    targetUrl = normalizeServerUrl(serverUrl ?? cfg.serverUrl);
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+  const secret = String(token ?? cfg.token ?? "").trim();
+  if (!secret) {
+    return { ok: false, error: "No API token configured." };
+  }
+
+  try {
+    const resp = await fetch(`${targetUrl}/api/ext/snapshot`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${secret}`,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    });
+    if (!resp.ok) {
+      return { ok: false, status: resp.status, error: `Snapshot HTTP ${resp.status}` };
+    }
+    const data = await resp.json();
+    const snapshotRecord = {
+      items: Array.isArray(data.items) ? data.items : [],
+      itemCount: Number(data.item_count ?? data.items?.length ?? 0),
+      generatedAt: data.generated_at || new Date().toISOString(),
+      syncedAt: Date.now(),
+    };
+    await ext.storage.local.set({ snapshot: snapshotRecord });
+    return {
+      ok: true,
+      itemCount: snapshotRecord.itemCount,
+      generatedAt: snapshotRecord.generatedAt,
+      syncedAt: snapshotRecord.syncedAt,
+    };
+  } catch {
+    return { ok: false, error: "Could not sync snapshot while server is offline." };
+  }
 }
 
 async function pingServer({ serverUrl, token } = {}) {
@@ -47,7 +93,13 @@ async function pingServer({ serverUrl, token } = {}) {
       return { ok: false, status: resp.status, error: `Server returned HTTP ${resp.status}.` };
     }
     const data = await resp.json();
-    return { ok: true, status: 200, data };
+    const snap = await syncSnapshot({ serverUrl: targetUrl, token: secret });
+    return {
+      ok: true,
+      status: 200,
+      data,
+      snapshot: snap.ok ? snap : null,
+    };
   } catch {
     return {
       ok: false,
@@ -103,18 +155,44 @@ async function performLookup(params = {}) {
     const data = await resp.json();
     const record = {
       ok: true,
+      offline: false,
       status: 200,
       data,
       params,
       timestamp: Date.now(),
     };
     await ext.storage.local.set({ lastLookup: record });
+
+    // Refresh offline snapshot in the background if missing or older than 30 minutes.
+    ext.storage.local.get(["snapshot"]).then((stored) => {
+      const syncedAt = stored?.snapshot?.syncedAt || 0;
+      if (Date.now() - syncedAt > SNAPSHOT_STALE_MS) {
+        syncSnapshot({ serverUrl, token });
+      }
+    });
+
     return record;
   } catch {
+    const stored = await ext.storage.local.get(["snapshot"]);
+    if (stored?.snapshot && Array.isArray(stored.snapshot.items)) {
+      const data = matchOfflineSnapshot(stored.snapshot.items, params);
+      const record = {
+        ok: true,
+        offline: true,
+        snapshotSyncedAt: stored.snapshot.syncedAt || null,
+        snapshotGeneratedAt: stored.snapshot.generatedAt || null,
+        status: 200,
+        data,
+        params,
+        timestamp: Date.now(),
+      };
+      await ext.storage.local.set({ lastLookup: record });
+      return record;
+    }
     return {
       ok: false,
       status: 0,
-      error: "Grocery Tracker is offline or unreachable.",
+      error: "Grocery Tracker is offline and no cached snapshot is stored yet.",
     };
   }
 }
@@ -187,6 +265,11 @@ if (ext?.runtime?.onMessage) {
       return true;
     }
 
+    if (message.type === "tpm:sync-snapshot") {
+      syncSnapshot(message.payload).then(sendResponse);
+      return true;
+    }
+
     if (message.type === "tpm:lookup") {
       performLookup(message.payload).then(sendResponse);
       return true;
@@ -223,13 +306,21 @@ if (ext?.runtime?.onMessage) {
     if (message.type === "tpm:get-state") {
       (async () => {
         const config = await getConfig();
-        const stored = await ext.storage.local.get(["lastLookup"]);
+        const stored = await ext.storage.local.get(["lastLookup", "snapshot"]);
         const tabProduct = message.tabId ? tabProducts.get(message.tabId) || null : null;
+        const snapshotMeta = stored.snapshot
+          ? {
+              itemCount: stored.snapshot.itemCount || 0,
+              syncedAt: stored.snapshot.syncedAt || null,
+              generatedAt: stored.snapshot.generatedAt || null,
+            }
+          : null;
         sendResponse({
           hasToken: Boolean(config.token),
           serverUrl: config.serverUrl,
           lastLookup: stored.lastLookup || null,
           tabProduct,
+          snapshotMeta,
         });
       })();
       return true;

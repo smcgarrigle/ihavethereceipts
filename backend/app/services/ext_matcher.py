@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from rapidfuzz import fuzz
@@ -605,4 +605,152 @@ def lookup_items(
         "cleaned_query": cleaned_q,
         "store": canonical_store,
         "matches": matches,
+    }
+
+
+def build_snapshot(db: Session) -> dict[str, Any]:
+    """Build a compact offline snapshot of all purchased items and their store price summaries."""
+    rows = (
+        db.query(ReceiptItem)
+        .join(Receipt, ReceiptItem.receipt_id == Receipt.id)
+        .join(Item, ReceiptItem.item_id == Item.id)
+        .options(
+            joinedload(ReceiptItem.item),
+            joinedload(ReceiptItem.receipt).joinedload(Receipt.store),
+        )
+        .filter(
+            ReceiptItem.item_id.is_not(None),
+            ReceiptItem.price.is_not(None),
+            ReceiptItem.price > 0,
+        )
+        .all()
+    )
+
+    lines_by_item: dict[int, list[ReceiptItem]] = {}
+    items_by_id: dict[int, Item] = {}
+    for ri in rows:
+        if ri.item_id is None or ri.item is None:
+            continue
+        items_by_id[ri.item_id] = ri.item
+        lines_by_item.setdefault(ri.item_id, []).append(ri)
+
+    snapshot_items: list[dict[str, Any]] = []
+    for item_id in sorted(lines_by_item.keys()):
+        item = items_by_id[item_id]
+        item_lines = lines_by_item[item_id]
+        if not item_lines:
+            continue
+
+        item_lines.sort(
+            key=lambda r: (
+                r.receipt.purchase_date or datetime.min if r.receipt else datetime.min,
+                r.receipt_id or 0,
+                r.id or 0,
+            ),
+            reverse=True,
+        )
+
+        basis, series = comparable_price_series(item_lines)
+        basis = basis or "each"
+        basis_label = price_basis_label(basis)
+        comparable_avg = (
+            round(sum(val for _line, val in series) / len(series), 4) if series else None
+        )
+
+        first = item_lines[0]
+        first_receipt = first.receipt
+        first_store = (
+            first_receipt.store.name
+            if first_receipt and first_receipt.store and first_receipt.store.name
+            else "Unknown Store"
+        )
+        first_date = (
+            first_receipt.purchase_date.strftime("%Y-%m-%d")
+            if first_receipt and first_receipt.purchase_date
+            else None
+        )
+        first_uprice, _ = comparable_unit_price(first)
+        last_paid = {
+            "price": round(float(first.price or 0.0), 2),
+            "unit_price": round(float(first_uprice), 4),
+            "basis": basis,
+            "basis_label": basis_label,
+            "store": first_store,
+            "date": first_date,
+        }
+
+        all_prices = [float(line.price) for line in item_lines if line.price and line.price > 0]
+        best_line = min(item_lines, key=lambda r: float(r.price or 0.0))
+        best_receipt = best_line.receipt
+        best_store_name = (
+            best_receipt.store.name
+            if best_receipt and best_receipt.store and best_receipt.store.name
+            else "Unknown Store"
+        )
+        best_date = (
+            best_receipt.purchase_date.strftime("%Y-%m-%d")
+            if best_receipt and best_receipt.purchase_date
+            else None
+        )
+        all_stores = {
+            "min_price": round(min(all_prices), 2),
+            "max_price": round(max(all_prices), 2),
+            "avg_price": round(sum(all_prices) / len(all_prices), 2),
+            "best_store": best_store_name,
+            "best_price": round(float(best_line.price or 0.0), 2),
+            "best_date": best_date,
+            "total_purchases": len(item_lines),
+        }
+
+        by_store: dict[str, list[ReceiptItem]] = {}
+        for line in item_lines:
+            s_name = (
+                line.receipt.store.name
+                if line.receipt and line.receipt.store and line.receipt.store.name
+                else "Unknown Store"
+            )
+            by_store.setdefault(s_name, []).append(line)
+
+        stores: list[dict[str, Any]] = []
+        for s_name, s_lines in sorted(by_store.items()):
+            s_prices = [float(line.price) for line in s_lines if line.price]
+            s_first = s_lines[0]
+            s_uprice, _ = comparable_unit_price(s_first)
+            s_date = (
+                s_first.receipt.purchase_date.strftime("%Y-%m-%d")
+                if s_first.receipt and s_first.receipt.purchase_date
+                else None
+            )
+            stores.append(
+                {
+                    "store": s_name,
+                    "last_price": round(float(s_first.price or 0.0), 2),
+                    "last_unit_price": round(float(s_uprice), 4),
+                    "last_date": s_date,
+                    "min_price": round(min(s_prices), 2),
+                    "avg_price": round(sum(s_prices) / len(s_prices), 2),
+                    "count": len(s_lines),
+                }
+            )
+
+        snapshot_items.append(
+            {
+                "item_id": item.id,
+                "name": item.name or "",
+                "cleaned_name": clean_retail_title(str(item.normalized_name or item.name or "")),
+                "gtin": item.gtin,
+                "unit": basis if basis != "each" else None,
+                "basis": basis,
+                "basis_label": basis_label,
+                "comparable_avg": comparable_avg,
+                "last_paid": last_paid,
+                "all_stores": all_stores,
+                "stores": stores,
+            }
+        )
+
+    return {
+        "generated_at": datetime.now(UTC).isoformat(),
+        "item_count": len(snapshot_items),
+        "items": snapshot_items,
     }

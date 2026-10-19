@@ -69,6 +69,11 @@ This populates the database with ~4months of ~52 fictional receipts across multi
 - **Drawers**: Complex data on the Items page is tucked into collapsible drawers for a clean mobile experience.
 - **Remote upload**: Mesh VPN/ZTNA like Tailscale or Twingate provide direct mobile upload from your phone camera to your home server.
 
+### 🧩 TruePriceMemory Browser Extension
+- **In-Store Price Memory While Shopping Online**: Unpacked Chrome and Firefox WebExtension (`extension/`) that surfaces your personal purchase history while browsing **Amazon Fresh**, **Whole Foods on Amazon**, and **Safeway** (`safeway.com`).
+- **Cross-Store Comparisons & Deal Verdicts**: Shows what you last paid, your best price across all stores, and a unit-compatible deal verdict (`Good deal`, `Typical price`, `Above avg`).
+- **Offline Snapshot Fallback**: Caches a compact price snapshot locally so lookups continue working even when your local server is stopped. See [EXTENSION.md](EXTENSION.md) for setup instructions on Windows and macOS.
+
 ## 🛠️ Technology Stack
 
 ### 🏗️ Frameworks & Backend
