@@ -4,39 +4,14 @@
 
 ## 🟡 Near-Term Backlog
 
-### 1. Nutrition Catch-Up
-Automated background enrichment that detects FDC coverage gaps and surfaces candidates for user review — turning the manual `scripts/backfill_nutrients.py` workflow into a self-service feature.
+### 1. Barcode Scanning
+- [ ] **Barcode Scanning**: Mobile camera integration pulling product metadata from OpenFoodFacts for zero-friction scanning and packaging metadata lookup.
 
-- [x] **`NutritionEnricher` daemon**: Singleton background thread (same pattern as `BulkProcessor`). Searches FDC for uncovered items prioritized by spend; stores candidates in `nutrition_suggestions` for review.
-- [x] **Trigger logic**: Auto-fires after receipt saves when enrichable coverage drops below a configurable threshold (default 70%). Manual "Run Catch-Up" button in Settings.
-- [x] **Review page** (`/settings/nutrition-review`): Items sorted by spend impact with approve/reject/search actions. Batch approve for speed.
-- [x] **Persistent notification banner**: Shows pending suggestion count across all pages until reviewed or dismissed.
-- [x] **Settings card**: Coverage indicator, threshold slider, enable/disable toggle. Exclude Fees & Taxes / Household from the enrichable denominator.
-
-### 2. Price History & Volatility
-- [x] **Retailer Overlays**: Overlay multiple stores on a single item's price history chart.
-- [x] **Volatility Alerts**: UI notifications for items with >15% price shifts in the last 30 days.
-- [x] **Advanced Spreadsheet Grid**: High-density thermal-coded grid for price history analysis.
-
-### 3. AI & Data Enrichment
-- [ ] **Barcode Scanning**: Mobile camera integration pulling product metadata from OpenFoodFacts.
-
-### 4. Dynamic Trends & Dashboards
+### 2. Dynamic Trends & Dashboards
 - [ ] **Interactive Chart Controllers**: Dropdown filters by date range, store, or category. Use `hx-push-url="true"` to keep state bookmarkable.
-- [x] **Low-Data "Bootstrap" Charts**: Shipped as the Quick Insights row on `/trends` — Basket Spend Composition, Identical Item Store Diff, Weekly Spend Trajectory.
 - [ ] **Shopping Habits Gallery**: Recurring trend charts with improved signal/noise filtering.
 
-### 5. Automation & Scalability
-- [ ] **Household Support**: Individual accounts with shared or separate grocery databases.
-- [ ] **Cross-Device Sync (Offline-First)**: PWA with IndexedDB for offline scanning; syncs back to server on reconnect.
-
-### 6. UI/UX Refinements
-- [x] **Items Page Pagination**: `/items` renders all 1,493 items with no pagination (~80K DOM nodes). Prerequisite: extract `list_items` into a paginated Jinja fragment. Also unblocks column-reorder and the a11y axe suite.
-- [x] **Reorderable Item Columns**: Drag-to-reorder column headers (Category, qty, total spent, weight/vol, unit, $/unit) persisted in localStorage. Requires paginated fragment above. Full scope: `scratch/TODO_items_column_reorder.md`.
-- [ ] **Mobile Slide-out Drawers**: HTMX-powered slide-up drawers for Item Insights on mobile, replacing full-page navigations.
-- [x] **PDF Viewer 'Esc' Key Fix**: Native `<embed>` swallows the 'Esc' key when focused, preventing modal close. Option A (lightweight): auto-focus the "Close" button on open. Option B (heavy): migrate to PDF.js.
-
-### 7. Custom Category Lenses
+### 3. Custom Category Lenses
 Let users create personally meaningful categories (e.g. "Protein-Maxxing") that cut across canonical lines. The data model and charts already support it — the work is UX only.
 
 - [ ] **Per-category item list with checkboxes** + bulk "move to…" + "create category from selection".
@@ -44,22 +19,70 @@ Let users create personally meaningful categories (e.g. "Protein-Maxxing") that 
 - [ ] **Prerequisite**: Retire or redirect the orphaned `/categories` page left unlinked by the nav redesign.
 - [ ] **Later**: Feedback-loop taxonomy learning so new item variants land in user lenses automatically.
 
-### 8. AI Agent Assistant shopping
-- [ ] **Agentic Shopping**: Hand off the prediction list to an agent that shops online for you and builds cart based around opitmal pricing and the urgency of restock
-- [ ] **currently prohibited by TOS**
+### 4. UI/UX Refinements
+- [ ] **Mobile Slide-out Drawers**: HTMX-powered slide-up drawers for Item Insights on mobile, replacing full-page navigations.
 
-### 9. TruePriceMemory Browser Extension
-Read-only Chrome and Firefox WebExtension that queries the local Grocery Tracker server while shopping on Amazon Fresh and Safeway to surface previously paid prices, store comparisons, and deal verdicts.
+### 5. Automation & Scalability
+- [ ] **Household Support**: Individual accounts with shared or separate grocery databases.
+- [ ] **Cross-Device Sync (Offline-First)**: PWA with IndexedDB for offline scanning; syncs back to server on reconnect.
 
-- [x] **Phase 1 — Token Auth & Ping (`feat/ext-api-token`)**: `api_tokens` table (SHA-256 hashed at rest, one-time reveal, revocation, throttled `last_used_at`), Settings management card, `require_ext_token` dependency, and `GET /api/ext/ping`.
-- [x] **Phase 2 — Product Lookup API (`feat/ext-lookup`)**: `ext_matcher.py` retail-title cleaner + `rapidfuzz` matcher, GTIN exact match, unit-compatible price comparison, and `GET /api/ext/lookup`.
-- [x] **Phase 3 — Extension Core (`feat/ext-extension-core`)**: MV3 WebExtension skeleton (`extension/`), options page, background service worker, popup UI, right-click selection lookup, and Chrome/Firefox build script.
-- [x] **Phase 4 — Retailer Adapters (`feat/ext-retailer-adapters`)**: Amazon Fresh and Safeway content scripts (JSON-LD + DOM fallback), on-page price memory badge, and deal verdict logic.
-- [x] **Phase 5 — Offline Snapshot (`feat/ext-offline-snapshot`)**: `GET /api/ext/snapshot` compact cache and offline fallback when the local server is stopped.
+### 6. AI Agent Assistant Shopping
+- [ ] **Agentic Shopping**: Hand off the prediction list to an agent that shops online for you and builds cart based around optimal pricing and the urgency of restock *(currently prohibited / deferred by retailer TOS)*.
 
 ---
 
 ## 🏛️ Completed Milestones Archive
+
+<details>
+<summary><b>TruePriceMemory Browser Extension (Oct 2026)</b></summary>
+
+- **Phase 1 — Token Auth & Ping (`feat/ext-api-token`)**: `api_tokens` table with SHA-256 bearer token hashing at rest, one-time secret reveal, revocation, throttled `last_used_at`, Settings management UI card, `require_ext_token` FastAPI dependency, and `GET /api/ext/ping`.
+- **Phase 2 — Product Lookup API (`feat/ext-lookup`)**: `ext_matcher.py` retail title cleaner + `rapidfuzz` token matcher, GTIN exact match, cross-store unit-compatible price comparison, and `GET /api/ext/lookup`.
+- **Phase 3 — Extension Core (`feat/ext-extension-core`)**: Manifest V3 WebExtension skeleton (`extension/`), options page, background service worker, popup UI, right-click selection lookup, and Chrome/Firefox build script (`extension/scripts/build.mjs`).
+- **Phase 4 — Retailer Adapters (`feat/ext-retailer-adapters`)**: Amazon Fresh and Safeway content scripts with JSON-LD extraction and DOM fallback, isolated Shadow DOM (`mode: "closed"`) on-page price memory badge, and deal verdict logic (`Good deal`, `Typical price`, `Above avg`).
+- **Phase 5 — Offline Snapshot (`feat/ext-offline-snapshot`)**: `GET /api/ext/snapshot` compact cache endpoint and offline fallback enabling lookups when the local server is stopped. See [EXTENSION.md](EXTENSION.md).
+
+</details>
+
+<details>
+<summary><b>Items Grid Modernization & Data Table (Oct 2026)</b></summary>
+
+- **Items Page Pagination**: `/items` renders all items via a server-paginated Jinja fragment, eliminating ~80K DOM nodes and unblocking accessibility audits.
+- **Broker-Style Reorderable Columns**: Drag-to-reorder data table headers (Category, qty, total spent, weight/vol, unit, $/unit) persisted across sessions in `localStorage`.
+- **PDF Viewer 'Esc' Key Focus**: Native `<embed>` focus trap mitigated with auto-focus return on modal open.
+
+</details>
+
+<details>
+<summary><b>Nutrition Catch-Up Pipeline (Sep–Oct 2026)</b></summary>
+
+- **`NutritionEnricher` daemon**: Singleton background worker querying USDA FoodData Central for uncovered items prioritized by spend impact, storing candidates in `nutrition_suggestions`.
+- **Automatic Trigger Logic**: Auto-fires after receipt saves when enrichable coverage drops below threshold (default 70%); manual "Run Catch-Up" action in Settings.
+- **Review UI (`/settings/nutrition-review`)**: Spend-impact sorted review page with approve/reject/search actions and batch approval.
+- **Persistent Notification Banner**: Cross-page banner indicating pending nutrition candidates until reviewed or dismissed.
+- **Settings Card**: Coverage indicator gauge, threshold slider, and toggle excluding non-food lines.
+
+</details>
+
+<details>
+<summary><b>Price Volatility & History Matrix (Sep–Oct 2026)</b></summary>
+
+- **Retailer Overlays**: Multi-store overlays on individual item price history charts.
+- **Volatility Alerts**: Notifications for items exhibiting >15% price shift within 30 days.
+- **Advanced Spreadsheet Grid**: High-density thermal-coded matrix for cross-store price history analysis.
+- **Low-Data "Bootstrap" Charts**: Quick Insights row on `/trends` for Basket Spend Composition, Identical Item Store Diff, and Weekly Spend Trajectory.
+
+</details>
+
+<details>
+<summary><b>OCR Correction Memory & Store Aliases (Sep 2026)</b></summary>
+
+- **Permanent Store Aliases**: `store_item_aliases` table mapping `(store_id, text_key) -> item_id` with `scripts/backfill_store_names.py` backfill script.
+- **Correction Overrides & Pinning**: `correction_overrides` table for persistent user pinning and suppression of OCR corrections.
+- **Prompt Usage Logging**: `correction_usage` table tracking which lessons were injected into OCR calls.
+- **Item Rename Integration**: Renaming an item on its details page records lessons for every store that carried the item.
+
+</details>
 
 <details>
 <summary><b>Public Static Demo (Aug 2026)</b></summary>
@@ -174,4 +197,4 @@ Read-only Chrome and Firefox WebExtension that queries the local Grocery Tracker
 </details>
 
 ---
-*Last Updated: August 3, 2026*
+*Last Updated: October 20, 2026*

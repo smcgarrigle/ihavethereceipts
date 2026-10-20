@@ -59,6 +59,10 @@ backend/
 ├── static/           # CSS, JS, vendor libraries
 ├── templates/        # Jinja2 HTML templates
 └── tests/            # Pytest test suite
+extension/            # TruePriceMemory WebExtension for Chrome & Firefox
+├── src/              # Background worker, popup, options, content scripts
+├── dist/             # Pre-built unpacked bundles (chrome/ and firefox/)
+└── tests/            # Node unit tests for extractors and matchers
 ```
 
 ---

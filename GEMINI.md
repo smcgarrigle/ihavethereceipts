@@ -75,11 +75,12 @@ This document serves as the primary blueprint for all AI agents working on this 
 
 
 ## 5. Directory Structure
-- `backend/app/api/`: FastAPI route handlers (`analytics.py`, `analytics_fragments.py`, `pages.py`, `receipts.py`, `receipts_review.py`, `items.py`, `trends.py`, `xray.py`, `settings_router.py`, `predictions_router.py`, `search_router.py`, `export.py`, `bulk.py`).
-- `backend/app/models/`: SQLAlchemy database models (`receipt.py`, `item.py`, `category.py`, `exclusion.py`, `ocr_correction.py`, `merge_log.py`, `store.py`).
-- `backend/app/services/`: Business logic (`ocr.py`, `item_matcher.py`, `store_utils.py`, `pdf_parser.py`, `correction_service.py`, `predictions.py`, `fdc_service.py`, `external_product.py`, `nutrition_utils.py`, `category_mapper.py`, `category_cache.py`, `category_tagger.py`, `folder_watch.py`, `bulk_processor.py`, `receipt_service.py`, `model_manager.py`, `onboarding.py`).
+- `backend/app/api/`: FastAPI route handlers (`analytics.py`, `analytics_fragments.py`, `bulk.py`, `categories.py`, `export.py`, `ext_router.py`, `items.py`, `pages.py`, `predictions_router.py`, `receipts.py`, `receipts_fragments.py`, `receipts_review.py`, `search_router.py`, `settings_router.py`, `store_names_router.py`, `trends.py`, `trends_nutrition.py`, `xray.py`).
+- `backend/app/models/`: SQLAlchemy database models (`api_token.py`, `category.py`, `correction_override.py`, `correction_usage.py`, `exclusion.py`, `item.py`, `merge_log.py`, `nutrition_suggestion.py`, `ocr_correction.py`, `receipt.py`, `store.py`, `store_item_alias.py`).
+- `backend/app/services/`: Business logic (`bulk_processor.py`, `category_cache.py`, `category_mapper.py`, `category_tagger.py`, `correction_keys.py`, `correction_service.py`, `ext_matcher.py`, `ext_tokens.py`, `external_product.py`, `fdc_service.py`, `folder_watch.py`, `item_matcher.py`, `model_manager.py`, `nutrition_enricher.py`, `nutrition_utils.py`, `ocr.py`, `onboarding.py`, `pdf_parser.py`, `predictions.py`, `receipt_claim.py`, `receipt_service.py`, `spend.py`, `store_names.py`, `store_utils.py`, `volatility.py`).
 - `backend/templates/`: HTML templates (layouts and pages).
 - `backend/tests/`: Pytest test suite.
+- `extension/`: TruePriceMemory Manifest V3 browser extension for Chrome and Firefox (`src/`, `dist/`, `scripts/`, `tests/`).
 
 ## 6. Logic Explanations (Data Enrichment)
 - **Auto-merged (✨)**: Pure Python logic (using `rapidfuzz`) that matches OCR text to a "Master Item" record. It does NOT use the Gemini API.

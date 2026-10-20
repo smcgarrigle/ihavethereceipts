@@ -187,9 +187,34 @@ If `ollama ps` shows 100% CPU despite having a GPU:
 
 ---
 
+## 🧩 TruePriceMemory Browser Extension
+
+Development and bundle commands for the Manifest V3 WebExtension (`extension/`). See [EXTENSION.md](EXTENSION.md) for installation and usage.
+
+### Build Extension Bundles
+Builds unpacked Chrome (`extension/dist/chrome`) and Firefox (`extension/dist/firefox`) bundles:
+```bash
+node extension/scripts/build.mjs
+```
+
+### Run Extension Unit Tests
+Runs the zero-dependency test suite for title cleanup, token matching, and DOM extraction:
+```bash
+node --test extension/tests/common.test.mjs extension/tests/extractors.test.mjs
+```
+
+---
+
 ## 🧹 Data Maintenance Scripts
 
 All scripts live in `backend/scripts/` and use `grocery.db` directly. Run from `backend/`.
+
+### Backfill Store Printed Item Aliases
+Populates the permanent `store_item_aliases` table from historical reviewed receipts so printed store text automatically maps to the right item without consuming few-shot prompt slots:
+```bash
+uv run python scripts/backfill_store_names.py          # preview only
+uv run python scripts/backfill_store_names.py --apply  # write aliases to grocery.db
+```
 
 ### Backfill Unit Prices (Saved ReceiptItems)
 Recomputes `unit_price` (and the per-quantity `price`) in the `receipt_items`

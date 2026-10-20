@@ -8,13 +8,17 @@ This document outlines the database schema, relationships, and field definitions
 erDiagram
     stores ||--o{ receipts : "hosts"
     stores ||--o{ ocr_corrections : "scoped to"
+    stores ||--o{ store_item_aliases : "maps"
+    stores ||--o{ correction_overrides : "scopes"
     categories ||--o{ items : "categorizes"
     receipts ||--o{ receipt_items : "contains"
     receipts ||--o{ ocr_corrections : "captures"
+    receipts ||--o{ correction_usage : "logs"
     items ||--o{ receipt_items : "referenced in"
     items ||--o{ item_match_ignores : "item1"
     items ||--o{ item_match_ignores : "item2"
     items ||--o{ merge_logs : "target"
+    items ||--o{ nutrition_suggestions : "suggested for"
 
     stores {
         int id PK
@@ -120,6 +124,52 @@ erDiagram
         datetime created_at
         datetime last_used_at "Throttled activity timestamp"
         datetime revoked_at "Non-null once revoked"
+    }
+
+    store_item_aliases {
+        int id PK
+        int store_id FK
+        string text_key "Normalized model text"
+        text printed_text "Verbatim text from receipt"
+        int item_id "Referenced item"
+        string source "review | backfill"
+        datetime created_at
+        datetime updated_at
+    }
+
+    nutrition_suggestions {
+        int id PK
+        int item_id FK
+        int fdc_id "USDA FDC food ID"
+        string fdc_description
+        string fdc_brand
+        float match_score
+        json nutrients "USDA nutrition payload"
+        string status "pending | approved | rejected"
+        string batch_id
+        datetime created_at
+        datetime reviewed_at
+    }
+
+    correction_usage {
+        int id PK
+        string content_key "Durable hash of correction"
+        int correction_id "Nullable convenience ID"
+        int receipt_id FK
+        datetime used_at
+    }
+
+    correction_overrides {
+        int id PK
+        string content_key UK "Unique hash of lesson"
+        int store_id FK "Nullable"
+        string input_type "photo | pdf | text"
+        string field "name | price | quantity | etc."
+        text ai_value
+        text approved_value
+        bool suppressed "Keep out of prompts"
+        bool pinned "Always include in prompts"
+        datetime updated_at
     }
 ```
 
@@ -240,6 +290,64 @@ Bearer tokens for the TruePriceMemory browser extension (`/api/ext/*`). The raw 
 | `created_at` | DateTime | Timestamp when the token was issued. |
 | `last_used_at` | DateTime | Timestamp of recent authenticated request (writes throttled to 1 minute). |
 | `revoked_at` | DateTime | Timestamp when revoked (nullable; non-null tokens are rejected). |
+
+### 11. `store_item_aliases`
+What a store prints for an item: permanent per-store printed text recognition. Maps store printed strings directly to master `items.id`, bypassing prompt limits and ensuring renames automatically update matching.
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `id` | Integer | Primary Key |
+| `store_id` | Integer | ForeignKey to `stores`. |
+| `text_key` | String | Normalized, lowercased receipt text key (unique per store). |
+| `printed_text` | Text | Raw printed text returned by the model. |
+| `item_id` | Integer | Target master `items.id` (managed in application code during item merges). |
+| `source` | String | Origin: `review` (saved review) or `backfill` (`scripts/backfill_store_names.py`). |
+| `created_at` | DateTime | Timestamp of creation. |
+| `updated_at` | DateTime | Timestamp of latest update (latest save wins). |
+
+### 12. `nutrition_suggestions`
+Candidate USDA FoodData Central matches discovered automatically by the background `NutritionEnricher` daemon, prioritizing items with highest spend impact.
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `id` | Integer | Primary Key |
+| `item_id` | Integer | ForeignKey to `items.id`. |
+| `fdc_id` | Integer | Matched USDA FoodData Central food ID. |
+| `fdc_description` | String | FDC product description. |
+| `fdc_brand` | String | FDC brand name (nullable). |
+| `match_score` | Float | Match confidence score. |
+| `nutrients` | JSON | USDA nutrition payload. |
+| `status` | String | Review state: `pending`, `approved`, or `rejected`. |
+| `batch_id` | String | UUID grouping items from a catch-up execution batch. |
+| `created_at` | DateTime | Timestamp when suggested. |
+| `reviewed_at` | DateTime | Timestamp when approved or rejected by user (nullable). |
+
+### 13. `correction_usage`
+Audit log recording which few-shot correction lessons were injected into which OCR prompt, enabling usage tracking and effectiveness metrics.
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `id` | Integer | Primary Key |
+| `content_key` | String | Durable 40-char SHA-1 hash of the correction content. |
+| `correction_id` | Integer | ID of the source correction row at injection time (nullable). |
+| `receipt_id` | Integer | ForeignKey to `receipts.id`. |
+| `used_at` | DateTime | Timestamp of prompt assembly. |
+
+### 14. `correction_overrides`
+Persistent user decisions regarding OCR correction lessons: pinning high-value lessons so they are always injected into OCR prompts, or suppressing unwanted ones.
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `id` | Integer | Primary Key |
+| `content_key` | String | Unique 40-char SHA-1 hash of the lesson content. |
+| `store_id` | Integer | ForeignKey to `stores.id` (nullable). |
+| `input_type` | String | Input medium: `photo`, `pdf`, or `text`. |
+| `field` | String | Corrected field (`name`, `price`, `quantity`, etc.). |
+| `ai_value` | Text | What the AI extracted (nullable). |
+| `approved_value` | Text | User's preferred value (nullable). |
+| `suppressed` | Boolean | `True` to prevent this lesson from ever being sent in prompts. |
+| `pinned` | Boolean | `True` to prioritize this lesson ahead of recency limits. |
+| `updated_at` | DateTime | Timestamp of user override. |
 
 ---
 

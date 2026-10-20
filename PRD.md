@@ -65,7 +65,17 @@ Grocery prices are volatile and confusing. Consumers struggle to:
 - **Reliability**: Graceful handling of API failures (e.g., Gemini quota exceeded).
 - **Usability**: Dark mode support for low-light usage.
 
-## 6. Future Scope (Post-MVP)
-- Barcode Scanning for instant product lookup
-- USDA FDC full enrichment sweep for all 1,300+ items
-- Volatility Alerts for items with >15% price shift in 30 days
+## 6. Shipped Post-MVP Enhancements
+- **USDA FDC Full Sweep & Catch-Up Daemon**: Automated background enrichment searching FoodData Central by spend impact with human review UI (`/settings/nutrition-review`).
+- **Volatility Alerts & Matrix**: Dynamic tracking for items with >15% price shifts in 30 days and thermal price history grid.
+- **TruePriceMemory Browser Extension**: Read-only Manifest V3 Chrome and Firefox WebExtension surfacing local price history and deal verdicts on Amazon Fresh and Safeway.
+- **Data Table Modernization**: Server-side pagination and broker-style drag-to-reorder columns persisted in `localStorage`.
+- **OCR Feedback Loop**: Few-shot correction injection and permanent per-store printed name memory (`store_item_aliases`).
+
+## 7. Future Scope
+- **Barcode Scanning**: Mobile camera integration pulling GTIN product metadata from OpenFoodFacts.
+- **Interactive Chart Controllers**: Filter dropdowns across trends pages maintaining bookmarkable state via `hx-push-url`.
+- **Custom Category Lenses**: User-defined categories (e.g. "Protein-Maxxing") cutting across canonical boundaries.
+- **Mobile Slide-out Drawers**: HTMX-powered slide-up bottom sheets for Item Insights on phones.
+- **Multi-User Household Support**: Separate or shared grocery accounts.
+- **Offline-First PWA**: Progressive Web App with IndexedDB local caching and server synchronization.
