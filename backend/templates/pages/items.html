@@ -782,6 +782,7 @@
         });
 
         // Process data for Line Chart
+        const basisLabel = (data[0] && data[0].basis) ? data[0].basis : 'each';
         // 1. Get all unique dates, sorted chronologically
         const allDates = [...new Set(data.map(d => d.date))].sort();
 
@@ -853,20 +854,20 @@
                             label: function (context) {
                                 const raw = context.raw;
                                 if (raw === null) return null;
-                                return `${context.dataset.label}: {{ currency_symbol() }}${raw.toFixed(2)}`;
+                                return `${context.dataset.label}: {{ currency_symbol() }}${raw.toFixed(2)} (${basisLabel})`;
                             }
                         }
                     },
                     title: {
                         display: true,
-                        text: 'Price History Timeline',
+                        text: `Price History Timeline (${basisLabel})`,
                         color: isDark ? '#fff' : '#111'
                     }
                 },
                 scales: {
                     y: {
                         beginAtZero: true,
-                        title: { display: true, text: 'Unit Price ({{ currency_symbol() }})', color: isDark ? '#9ca3af' : '#6b7280' },
+                        title: { display: true, text: `Unit Price ({{ currency_symbol() }} ${basisLabel})`, color: isDark ? '#9ca3af' : '#6b7280' },
                         ticks: { color: isDark ? '#9ca3af' : '#6b7280' },
                         grid: { color: isDark ? '#374151' : '#e5e7eb' }
                     },

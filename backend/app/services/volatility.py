@@ -3,7 +3,8 @@ from typing import Any
 
 from sqlalchemy.orm import Session, joinedload
 
-from app.models import Receipt, ReceiptItem
+from app.api.analytics import _get_analytics_exclusions, _is_excluded
+from app.models import Item, Receipt, ReceiptItem
 from app.services.spend import comparable_price_series
 
 
@@ -16,6 +17,7 @@ def get_volatile_items(
     and compares the average price in the recent window vs the historical average.
     """
     cutoff_date = datetime.now() - timedelta(days=days)
+    exclusions = _get_analytics_exclusions(db)
 
     # Fetch all relevant receipt items in a single query to avoid N+1
     receipt_items = (
@@ -23,7 +25,8 @@ def get_volatile_items(
         .join(Receipt)
         .filter(Receipt.purchase_date.isnot(None))
         .options(
-            joinedload(ReceiptItem.item), joinedload(ReceiptItem.receipt).joinedload(Receipt.store)
+            joinedload(ReceiptItem.item).joinedload(Item.category),
+            joinedload(ReceiptItem.receipt).joinedload(Receipt.store),
         )
         .order_by(Receipt.purchase_date.desc())
         .all()
@@ -34,6 +37,13 @@ def get_volatile_items(
     item_map = defaultdict(list)
     for ri in receipt_items:
         if ri.item:
+            cat_name = (
+                ri.item.category.name
+                if ri.item.category and ri.item.category.name
+                else "Uncategorized"
+            )
+            if _is_excluded(exclusions, cat_name, ri.item.name or ""):
+                continue
             item_map[ri.item].append(ri)
 
     volatile_items = []

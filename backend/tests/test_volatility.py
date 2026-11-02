@@ -76,3 +76,53 @@ def test_get_volatile_items(db: Session):
         elif v["item_name"] == "Dropping Item":
             assert v["shift_pct"] == -25.0
             assert v["trend"] == "down"
+
+
+def test_dashboard_volatility_alert_contract(client, db: Session):
+    """Dashboard Alpine widget must match the payload returned by /api/trends/volatility."""
+    from pathlib import Path
+
+    store = Store(name="Test Store")
+    category = Category(name="Test Category")
+    db.add_all([store, category])
+    db.commit()
+
+    item = Item(name="Volatile Item", category_id=category.id, normalized_name="volatile item")
+    db.add(item)
+    db.commit()
+
+    now = datetime.now()
+    for days_ago, price in [(60, 10.0), (5, 13.0)]:
+        r = Receipt(
+            store_id=store.id,
+            purchase_date=now - timedelta(days=days_ago),
+            total_amount=price,
+        )
+        db.add(r)
+        db.commit()
+        db.add(
+            ReceiptItem(
+                receipt_id=r.id,
+                item_id=item.id,
+                quantity=1,
+                price=price,
+                unit_type="each",
+            )
+        )
+        db.commit()
+
+    resp = client.get("/api/trends/volatility")
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert isinstance(payload, list) and len(payload) == 1
+    alert = payload[0]
+
+    dashboard_html = (
+        Path(__file__).resolve().parent.parent / "templates" / "pages" / "dashboard.html"
+    ).read_text()
+
+    # The endpoint returns a top-level list of alerts with item_id, item_name, historical_avg
+    assert "Array.isArray(d)" in dashboard_html
+    for required_key in ("item_id", "item_name", "historical_avg", "recent_avg", "shift_pct"):
+        assert required_key in alert
+        assert f"alert.{required_key}" in dashboard_html

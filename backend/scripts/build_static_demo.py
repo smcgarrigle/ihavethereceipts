@@ -83,7 +83,6 @@ SEED_URLS = [
     "/settings/nutrition-review",
     "/help/api-keys",
     "/styleguide",
-    "/demo-bi",
     "/search",
     "/best-value/produce",
     "/favicon.ico",
@@ -124,11 +123,6 @@ PARAM_MATRIX: list[tuple[str, dict[str, list[str]]]] = [
             "nutrient_type": NUTRIENTS,
         },
     ),
-    (
-        "/api/trends/nutrition-trends",
-        {"time_range": TIME_RANGES, "nutrient_type": NUTRIENTS},
-    ),
-    ("/api/trends/usda-product-types", {"time_range": USDA_TIME_RANGES}),
 ]
 
 # store_id is data-dependent, so its variants are expanded from the seeded DB

@@ -734,12 +734,6 @@ def api_keys_help_page(request: Request):
     return templates.TemplateResponse(request, "pages/api_keys_help.html")
 
 
-@router.get("/demo-bi", response_class=HTMLResponse)
-def demo_bi_page(request: Request):
-    """BI demo — Tufte-style budget × nutrition intelligence dashboard with synthetic data."""
-    return templates.TemplateResponse(request, "pages/demo_bi.html")
-
-
 @router.get("/restock", response_class=HTMLResponse)
 def restock_page(request: Request):
     """Restock predictions page — items due for repurchase with store price comparisons."""

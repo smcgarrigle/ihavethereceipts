@@ -36,14 +36,14 @@ def get_trends_data(time_range: str = "year", db: Session = Depends(get_db)):
         start_date = end_date - timedelta(days=365)
     elif time_range == "6m":
         start_date = end_date - timedelta(days=180)
+    elif time_range == "3m":
+        start_date = end_date - timedelta(days=90)
     elif time_range == "ytd":
         start_date = datetime(end_date.year, 1, 1)
     else:
         start_date = None
 
     # 2. Query Data: Sum cost group by Week and Category
-    # PostgreSQL: date_trunc('week', purchase_date)
-
     # We need to join ReceiptItem -> Receipt -> Item -> Category
     # If category is None, we can label as 'Uncategorized'
 
@@ -61,7 +61,9 @@ def get_trends_data(time_range: str = "year", db: Session = Depends(get_db)):
         .filter(
             or_(
                 Category.name.is_(None),
-                Category.name.notin_(["Excluded", "Other", "Fees & Taxes", "Non-Alcoholic Beer"]),
+                Category.name.notin_(
+                    ["Excluded", "Other", "Fees & Taxes", "CRV (tax)", "Non-Alcoholic Beer"]
+                ),
             )
         )
     )
@@ -84,8 +86,14 @@ def get_trends_data(time_range: str = "year", db: Session = Depends(get_db)):
     # SQLite returns string 'YYYY-WW', simple sort works
     labels = weeks
 
-    # Initialize datasets for each category that appears in results
-    active_cat_ids = {r.category_id for r in results}
+    # Sort categories by total spend descending so top categories lead the legend
+    cat_totals: dict[int | None, float] = {}
+    for r in results:
+        if r.week:
+            cat_totals[r.category_id] = cat_totals.get(r.category_id, 0.0) + float(
+                r.total_cost or 0.0
+            )
+    active_cat_ids = sorted(cat_totals.keys(), key=lambda cid: cat_totals[cid], reverse=True)
     datasets = {}
 
     # Define colors
@@ -463,6 +471,7 @@ def get_store_top_items(
 
     from sqlalchemy import func
 
+    from app.api.analytics import _get_analytics_exclusions, _is_excluded
     from app.models import Category, Item, Receipt, ReceiptItem, Store
 
     end_date = datetime.now()
@@ -470,6 +479,8 @@ def get_store_top_items(
         start_date = end_date - timedelta(days=365)
     elif time_range == "6m":
         start_date = end_date - timedelta(days=180)
+    elif time_range == "3m":
+        start_date = end_date - timedelta(days=90)
     elif time_range == "ytd":
         start_date = datetime(end_date.year, 1, 1)
     else:
@@ -485,9 +496,15 @@ def get_store_top_items(
     if not store_obj:
         return {"labels": [], "datasets": []}
 
-    # 2. Get top 5 items
+    # 2. Get top 5 items (excluding analytics exclusions and non-food categories)
+    exclusions = _get_analytics_exclusions(db)
     top_items_query = (
-        db.query(Item.id, Item.name, func.count(ReceiptItem.id).label("count"))
+        db.query(
+            Item.id,
+            Item.name,
+            Category.name.label("cat_name"),
+            func.count(ReceiptItem.id).label("count"),
+        )
         .join(ReceiptItem, Item.id == ReceiptItem.item_id)
         .join(Receipt, ReceiptItem.receipt_id == Receipt.id)
         .outerjoin(Category, Item.category_id == Category.id)
@@ -495,7 +512,9 @@ def get_store_top_items(
         .filter(
             or_(
                 Category.name.is_(None),
-                Category.name.notin_(["Excluded", "Other", "Fees & Taxes", "Non-Alcoholic Beer"]),
+                Category.name.notin_(
+                    ["Excluded", "Other", "Fees & Taxes", "CRV (tax)", "Non-Alcoholic Beer"]
+                ),
             )
         )
     )
@@ -503,12 +522,17 @@ def get_store_top_items(
     if start_date:
         top_items_query = top_items_query.filter(Receipt.purchase_date >= start_date)
 
-    top_items = (
-        top_items_query.group_by(Item.id, Item.name)
+    candidate_items = (
+        top_items_query.group_by(Item.id, Item.name, Category.name)
         .order_by(func.count(ReceiptItem.id).desc())
-        .limit(5)
         .all()
     )
+
+    top_items = [
+        t
+        for t in candidate_items
+        if not _is_excluded(exclusions, t.cat_name or "Uncategorized", t.name)
+    ][:5]
 
     if not top_items:
         return {"labels": [], "datasets": []}
@@ -601,20 +625,32 @@ def get_basket_composition(time_range: str = "30d", db: Session = Depends(get_db
     end_date = datetime.now()
     if time_range == "30d":
         start_date = end_date - timedelta(days=30)
-    elif time_range == "90d":
+    elif time_range in ("90d", "3m"):
         start_date = end_date - timedelta(days=90)
     elif time_range == "6m":
         start_date = end_date - timedelta(days=180)
+    elif time_range == "ytd":
+        start_date = datetime(end_date.year, 1, 1)
+    elif time_range == "year":
+        start_date = end_date - timedelta(days=365)
     elif time_range == "all":
         start_date = None
     else:
-        start_date = end_date - timedelta(days=30)
+        start_date = end_date - timedelta(days=180)
 
     query = (
         db.query(Category.name, func.sum(LINE_TOTAL).label("total_spent"))
         .join(Item, ReceiptItem.item_id == Item.id)
         .join(Receipt, ReceiptItem.receipt_id == Receipt.id)
         .outerjoin(Category, Item.category_id == Category.id)
+        .filter(
+            or_(
+                Category.name.is_(None),
+                Category.name.notin_(
+                    ["Excluded", "Other", "Fees & Taxes", "CRV (tax)", "Non-Alcoholic Beer"]
+                ),
+            )
+        )
     )
 
     if start_date:
@@ -672,7 +708,10 @@ def get_store_diff(db: Session = Depends(get_db)):
     """
     from sqlalchemy import func
 
-    from app.models import Item, Receipt, ReceiptItem, Store
+    from app.api.analytics import _get_analytics_exclusions, _is_excluded
+    from app.models import Category, Item, Receipt, ReceiptItem, Store
+
+    exclusions = _get_analytics_exclusions(db)
 
     # Find items purchased at >1 store
     multi_store_items = (
@@ -683,16 +722,35 @@ def get_store_diff(db: Session = Depends(get_db)):
         .scalar_subquery()
     )
 
-    # Get top 5 most frequently purchased items from that list
-    top_items = (
-        db.query(Item.id, Item.name, func.count(ReceiptItem.id).label("freq"))
+    # Get top 5 most frequently purchased items from that list (excluding excluded items)
+    candidate_items = (
+        db.query(
+            Item.id,
+            Item.name,
+            Category.name.label("cat_name"),
+            func.count(ReceiptItem.id).label("freq"),
+        )
         .join(ReceiptItem, Item.id == ReceiptItem.item_id)
+        .outerjoin(Category, Item.category_id == Category.id)
         .filter(Item.id.in_(multi_store_items))
-        .group_by(Item.id, Item.name)
+        .filter(
+            or_(
+                Category.name.is_(None),
+                Category.name.notin_(
+                    ["Excluded", "Other", "Fees & Taxes", "CRV (tax)", "Non-Alcoholic Beer"]
+                ),
+            )
+        )
+        .group_by(Item.id, Item.name, Category.name)
         .order_by(func.count(ReceiptItem.id).desc())
-        .limit(5)
         .all()
     )
+
+    top_items = [
+        ti
+        for ti in candidate_items
+        if not _is_excluded(exclusions, ti.cat_name or "Uncategorized", ti.name or "")
+    ][:5]
 
     if not top_items:
         return {"labels": [], "datasets": []}
@@ -780,19 +838,24 @@ def get_thermal_grid_data(
     from sqlalchemy import func
     from sqlalchemy.orm import joinedload
 
-    from app.models import Item, Receipt, ReceiptItem, Store
+    from app.api.analytics import _get_analytics_exclusions, _is_excluded
+    from app.models import Category, Item, Receipt, ReceiptItem, Store
 
     end_date = datetime.now()
     if time_range == "3m":
         start_date = end_date - timedelta(days=90)
     elif time_range == "6m":
         start_date = end_date - timedelta(days=180)
+    elif time_range == "ytd":
+        start_date = datetime(end_date.year, 1, 1)
     elif time_range == "year":
         start_date = end_date - timedelta(days=365)
     elif time_range == "all":
         start_date = None
     else:
         start_date = end_date - timedelta(days=180)
+
+    exclusions = _get_analytics_exclusions(db)
 
     # Find top 20 items purchased at >= 2 stores
     multi_store_query = db.query(ReceiptItem.item_id).join(
@@ -808,21 +871,40 @@ def get_thermal_grid_data(
     )
 
     top_items_query = (
-        db.query(Item.id, Item.name, func.count(ReceiptItem.id).label("freq"))
+        db.query(
+            Item.id,
+            Item.name,
+            Category.name.label("cat_name"),
+            func.count(ReceiptItem.id).label("freq"),
+        )
         .join(ReceiptItem, Item.id == ReceiptItem.item_id)
+        .outerjoin(Category, Item.category_id == Category.id)
         .filter(Item.id.in_(multi_store_items))
+        .filter(
+            or_(
+                Category.name.is_(None),
+                Category.name.notin_(
+                    ["Excluded", "Other", "Fees & Taxes", "CRV (tax)", "Non-Alcoholic Beer"]
+                ),
+            )
+        )
     )
     if start_date:
         top_items_query = top_items_query.join(
             Receipt, ReceiptItem.receipt_id == Receipt.id
         ).filter(Receipt.purchase_date >= start_date)
 
-    top_items = (
-        top_items_query.group_by(Item.id, Item.name)
+    candidate_items = (
+        top_items_query.group_by(Item.id, Item.name, Category.name)
         .order_by(func.count(ReceiptItem.id).desc())
-        .limit(20)
         .all()
     )
+
+    top_items = [
+        ti
+        for ti in candidate_items
+        if not _is_excluded(exclusions, ti.cat_name or "Uncategorized", ti.name)
+    ][:20]
 
     if not top_items:
         return {"stores": [], "items": []}
@@ -1001,10 +1083,8 @@ def get_all_charts_fragment(
         for s in get_top_stores(db)
     }
 
-    # 5. Low-data
+    # 5. Category spend composition
     basket = get_basket_composition(time_range, db)
-    store_diff = get_store_diff(db)
-    weekly_traj = get_weekly_trajectory(time_range, db)
 
     # 6. Tufte nutrition analysis
     calorie_profile = get_macronutrient_calories_data(time_range, db)
@@ -1022,8 +1102,6 @@ def get_all_charts_fragment(
                 usda: {json.dumps(usda)},
                 stores: {json.dumps(stores)},
                 basket: {json.dumps(basket)},
-                store_diff: {json.dumps(store_diff)},
-                weekly_traj: {json.dumps(weekly_traj)},
                 calorie_profile: {json.dumps(calorie_profile)},
                 nutrition_multiples: {json.dumps(nutrition_multiples)},
                 nutrition_density: {json.dumps(nutrition_density)},

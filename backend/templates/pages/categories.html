@@ -155,43 +155,43 @@
             }
         });
 
-        // Create chart
-        const ctx = document.getElementById('priceHistoryChart');
-
-        // Process data for Stacked Bar Chart
+        // Process data for Line Chart
+        const basisLabel = (data[0] && data[0].basis) ? data[0].basis : 'each';
+        const allDates = [...new Set(data.map(d => d.date))].sort();
         const stores = [...new Set(data.map(d => d.store))];
-
-        const purchasesByStore = {};
-        stores.forEach(store => {
-            purchasesByStore[store] = data.filter(d => d.store === store);
-        });
-
-        const maxPurchases = Math.max(...Object.values(purchasesByStore).map(p => p.length));
 
         const datasets = [];
         const colors = [
             '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#6366f1', '#14b8a6'
         ];
 
-        for (let i = 0; i < maxPurchases; i++) {
-            const datasetData = stores.map(store => {
-                const purchase = purchasesByStore[store][i];
-                return purchase ? purchase.price : 0;
+        stores.forEach((store, i) => {
+            const storeData = data.filter(d => d.store === store);
+            const datasetData = allDates.map(date => {
+                const purchase = storeData.find(d => d.date === date);
+                return purchase ? purchase.price : null;
             });
+            const metaData = allDates.map(date => storeData.find(d => d.date === date) || null);
 
             datasets.push({
-                label: `Purchase ${i + 1}`,
+                label: store,
                 data: datasetData,
+                borderColor: colors[i % colors.length],
                 backgroundColor: colors[i % colors.length],
-                stack: 'Stack 0',
-                meta: stores.map(store => purchasesByStore[store][i]),
+                borderWidth: 2,
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                tension: 0.2,
+                spanGaps: true,
+                meta: metaData,
             });
-        }
+        });
 
+        const ctx = document.getElementById('priceHistoryChart');
         new Chart(ctx, {
-            type: 'bar',
+            type: 'line',
             data: {
-                labels: stores,
+                labels: allDates,
                 datasets: datasets
             },
             options: {
@@ -199,35 +199,31 @@
                 maintainAspectRatio: false,
                 plugins: {
                     legend: {
-                        display: false
+                        display: true,
+                        position: 'top',
+                        labels: { color: isDark ? '#e5e7eb' : '#374151', usePointStyle: true }
                     },
                     tooltip: {
                         callbacks: {
                             label: function (context) {
                                 const raw = context.raw;
-                                if (raw === 0) return null;
-
-                                const meta = context.dataset.meta[context.dataIndex];
-                                if (meta) {
-                                    return `{{ currency_symbol() }}${raw.toFixed(2)} (${meta.date})`;
-                                }
-                                return `{{ currency_symbol() }}${raw.toFixed(2)}`;
+                                if (raw === null) return null;
+                                return `${context.dataset.label}: {{ currency_symbol() }}${raw.toFixed(2)} (${basisLabel})`;
                             }
                         }
                     },
                     title: {
                         display: true,
-                        text: 'Price History by Store (Oldest at Bottom)',
+                        text: `Price History Timeline (${basisLabel})`,
                         color: isDark ? '#fff' : '#111'
                     }
                 },
                 scales: {
                     y: {
-                        stacked: true,
                         beginAtZero: true,
                         title: {
                             display: true,
-                            text: 'Unit Price ({{ currency_symbol() }})',
+                            text: `Unit Price ({{ currency_symbol() }} ${basisLabel})`,
                             color: isDark ? '#9ca3af' : '#6b7280'
                         },
                         ticks: {
@@ -238,12 +234,16 @@
                         }
                     },
                     x: {
-                        stacked: true,
+                        title: {
+                            display: true,
+                            text: 'Date',
+                            color: isDark ? '#9ca3af' : '#6b7280'
+                        },
                         ticks: {
                             color: isDark ? '#9ca3af' : '#6b7280'
                         },
                         grid: {
-                            display: false
+                            color: isDark ? '#374151' : '#e5e7eb'
                         }
                     }
                 }

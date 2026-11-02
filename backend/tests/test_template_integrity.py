@@ -44,9 +44,8 @@ def test_dashboard_integrity(client):
         "category-store-modal",
         "drilldown-modal-title",
         "drilldown-modal-content",
-        "categoryTrendsChart",
-        "trendsLoadingIndicator",
-        "trends-legend",
+        "weeklySpendingChart",
+        "monthlySpendingChart",
     ]
     for element_id in expected_ids:
         assert soup.find(id=element_id) is not None, f"Missing {element_id} on Dashboard"

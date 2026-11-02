@@ -233,8 +233,11 @@ def get_category_breakdown_widget(db: Session = Depends(get_db)):
 @router.get("/tables/top-items", response_class=HTMLResponse)
 def get_top_items_html(limit: int = 8, db: Session = Depends(get_db)):
     """Get HTML table for top items"""
-    results = (
-        db.query(Item.id, Item.name, func.sum(LINE_TOTAL).label("total"))
+    exclusions = _get_analytics_exclusions(db)
+    candidates = (
+        db.query(
+            Item.id, Item.name, Category.name.label("cat_name"), func.sum(LINE_TOTAL).label("total")
+        )
         .join(ReceiptItem, Item.id == ReceiptItem.item_id)
         .outerjoin(Category, Item.category_id == Category.id)
         .filter(
@@ -245,11 +248,15 @@ def get_top_items_html(limit: int = 8, db: Session = Depends(get_db)):
                 ),
             )
         )
-        .group_by(Item.id, Item.name)
+        .group_by(Item.id, Item.name, Category.name)
         .order_by(func.sum(LINE_TOTAL).desc())
-        .limit(limit)
         .all()
     )
+    results = [
+        (r.id, r.name, r.total)
+        for r in candidates
+        if not _is_excluded(exclusions, r.cat_name or "Other", r.name or "")
+    ][:limit]
 
     html = """
     <div class="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
@@ -436,9 +443,11 @@ def _get_category_price_data(
     Unified helper for best-value widgets.
     Filters items by category and calculates unit prices using the specified cat_type logic.
     """
+    exclusions = _get_analytics_exclusions(db)
     results = (
         db.query(
             Item.name,
+            Category.name.label("cat_name"),
             ReceiptItem.price,
             ReceiptItem.quantity,
             ReceiptItem.weight,
@@ -456,7 +465,9 @@ def _get_category_price_data(
     )
 
     item_best_prices = {}
-    for name, price, qty, weight, unit, date, store_name, receipt_id in results:
+    for name, cat_name, price, qty, weight, unit, date, store_name, receipt_id in results:
+        if _is_excluded(exclusions, cat_name or "", name or ""):
+            continue
         price_per_unit, _, secondary = _calculate_unit_price(price, qty, weight, unit, cat_type)
 
         if name not in item_best_prices:
@@ -807,6 +818,7 @@ def get_category_store_stack_widget(db: Session = Depends(get_db)):
         db.query(
             Category.id,
             Category.name,
+            Item.name,
             Store.id,
             Store.name,
             ReceiptItem.price,
@@ -819,6 +831,11 @@ def get_category_store_stack_widget(db: Session = Depends(get_db)):
         .join(ReceiptItem, Item.id == ReceiptItem.item_id)
         .join(Receipt, ReceiptItem.receipt_id == Receipt.id)
         .join(Store, Receipt.store_id == Store.id)
+        .filter(
+            Category.name.notin_(
+                ["Excluded", "Other", "Fees & Taxes", "CRV (tax)", "Non-Alcoholic Beer"]
+            )
+        )
         .all()
     )
 
@@ -832,8 +849,19 @@ def get_category_store_stack_widget(db: Session = Depends(get_db)):
     categories = {}
     exclude_list = _get_analytics_exclusions(db)
 
-    for cat_id, cat_name, store_id, store_name, price, qty, weight, unit, _receipt_id in results:
-        if _is_excluded(exclude_list, cat_name):
+    for (
+        cat_id,
+        cat_name,
+        item_name,
+        store_id,
+        store_name,
+        price,
+        qty,
+        weight,
+        unit,
+        _receipt_id,
+    ) in results:
+        if _is_excluded(exclude_list, cat_name or "", item_name or ""):
             continue
 
         if cat_id not in categories:

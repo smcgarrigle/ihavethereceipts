@@ -376,26 +376,18 @@
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <!-- Basket Composition -->
-            <div class="bg-bgCard rounded-3xl shadow-xl p-6 border border-borderDefault">
+            <div class="bg-bgCard rounded-3xl shadow-xl p-6 border border-borderDefault lg:col-span-1">
                 <h3 class="text-lg font-bold text-textBase mb-4">Basket Spend Composition</h3>
                 <div class="h-[250px] w-full relative">
                     <canvas id="chart-basket" role="img" aria-label="Basket spend composition donut chart"></canvas>
                 </div>
             </div>
 
-            <!-- Store-to-Store Diff -->
-            <div class="bg-bgCard rounded-3xl shadow-xl p-6 border border-borderDefault">
-                <h3 class="text-lg font-bold text-textBase mb-4">Identical Item Store Diff</h3>
+            <!-- Category Spend Over Time -->
+            <div class="bg-bgCard rounded-3xl shadow-xl p-6 border border-borderDefault lg:col-span-2">
+                <h3 class="text-lg font-bold text-textBase mb-4">Category Spend Over Time</h3>
                 <div class="h-[250px] w-full relative">
-                    <canvas id="chart-store-diff" role="img" aria-label="Identical item store price comparison bar chart"></canvas>
-                </div>
-            </div>
-
-            <!-- Weekly Spend Trajectory -->
-            <div class="bg-bgCard rounded-3xl shadow-xl p-6 border border-borderDefault">
-                <h3 class="text-lg font-bold text-textBase mb-4">Weekly Spend Trajectory</h3>
-                <div class="h-[250px] w-full relative">
-                    <canvas id="chart-weekly-traj" role="img" aria-label="Weekly spend trajectory line chart"></canvas>
+                    <canvas id="chart-category-spend" role="img" aria-label="Weekly category spend stacked bar chart"></canvas>
                 </div>
             </div>
         </div>
@@ -448,8 +440,7 @@
     let isPercentMode = false;
 
     let basketChartInstance = null;
-    let storeDiffChartInstance = null;
-    let weeklyTrajChartInstance = null;
+    let categorySpendChartInstance = null;
 
     function initBasketChart() {
         const ctx = document.getElementById('chart-basket').getContext('2d');
@@ -465,36 +456,32 @@
         });
     }
 
-    function initStoreDiffChart() {
-        const ctx = document.getElementById('chart-store-diff').getContext('2d');
-        storeDiffChartInstance = new Chart(ctx, {
+    function initCategorySpendChart() {
+        const ctx = document.getElementById('chart-category-spend').getContext('2d');
+        const isDark = document.documentElement.classList.contains('dark');
+        categorySpendChartInstance = new Chart(ctx, {
             type: 'bar',
             data: { labels: [], datasets: [] },
             options: {
                 responsive: true, maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
                 scales: {
-                    x: { ticks: { color: '#9ca3af', font: { size: 10 } }, grid: { display: false } },
-                    y: { title: { display: true, text: 'Unit Price ($)', color: '#9ca3af' }, ticks: { color: '#9ca3af' }, grid: { color: document.documentElement.classList.contains('dark') ? '#374151' : '#e5e7eb' } }
+                    x: { stacked: true, ticks: { color: '#9ca3af', font: { size: 10 } }, grid: { display: false } },
+                    y: { stacked: true, beginAtZero: true, title: { display: true, text: 'Spend ($)', color: '#9ca3af' }, ticks: { color: '#9ca3af', callback: function(v) { return '$' + v; } }, grid: { color: isDark ? '#374151' : '#e5e7eb' } }
                 },
                 plugins: {
-                    legend: { position: 'bottom', labels: { color: document.documentElement.classList.contains('dark') ? '#e5e7eb' : '#374151', font: { size: 10 }, usePointStyle: true } }
+                    legend: { position: 'bottom', labels: { color: isDark ? '#e5e7eb' : '#374151', font: { size: 10 }, usePointStyle: true, boxWidth: 8 } },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        callbacks: {
+                            label: function(context) {
+                                if (!context.parsed.y) return null;
+                                return context.dataset.label + ': $' + context.parsed.y.toFixed(2);
+                            }
+                        }
+                    }
                 }
-            }
-        });
-    }
-
-    function initWeeklyTrajChart() {
-        const ctx = document.getElementById('chart-weekly-traj').getContext('2d');
-        weeklyTrajChartInstance = new Chart(ctx, {
-            type: 'line',
-            data: { labels: [], datasets: [] },
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                scales: {
-                    x: { ticks: { color: '#9ca3af', font: { size: 10 } }, grid: { display: false } },
-                    y: { title: { display: true, text: 'Total ($)', color: '#9ca3af' }, ticks: { color: '#9ca3af' }, grid: { color: document.documentElement.classList.contains('dark') ? '#374151' : '#e5e7eb' } }
-                },
-                plugins: { legend: { display: false } }
             }
         });
     }
@@ -605,8 +592,11 @@
         }
 
         if (data.basket) { basketChartInstance.data.labels = data.basket.labels; basketChartInstance.data.datasets = data.basket.datasets; basketChartInstance.update(); }
-        if (data.store_diff) { storeDiffChartInstance.data.labels = data.store_diff.labels; storeDiffChartInstance.data.datasets = data.store_diff.datasets; storeDiffChartInstance.update(); }
-        if (data.weekly_traj) { weeklyTrajChartInstance.data.labels = data.weekly_traj.labels; weeklyTrajChartInstance.data.datasets = data.weekly_traj.datasets; weeklyTrajChartInstance.update(); }
+        if (data.weekly && categorySpendChartInstance) {
+            categorySpendChartInstance.data.labels = data.weekly.labels;
+            categorySpendChartInstance.data.datasets = data.weekly.datasets;
+            categorySpendChartInstance.update();
+        }
 
         if (data.calorie_profile) {
             calorieProfileChartInstance.data.labels = data.calorie_profile.labels;
@@ -704,8 +694,7 @@
         initStoreCharts();
         initUsdaChart();
         initBasketChart();
-        initStoreDiffChart();
-        initWeeklyTrajChart();
+        initCategorySpendChart();
         htmx.ajax("GET", "/api/trends/fragment/all-charts", {target: "#htmx-scripts"});
     });
 
@@ -953,75 +942,6 @@
         msg.classList.toggle('hidden', hasData);
         msg.classList.toggle('flex', !hasData);
         canvas.style.visibility = hasData ? '' : 'hidden';
-    }
-
-    async function loadStoreData(storeId, canvasId) {
-        try {
-            const response = await fetch(`/api/trends/store-top-items?store_id=${encodeURIComponent(storeId)}&time_range=${currentTimeRange}`);
-            const data = await response.json();
-
-            if (data && data.labels && data.datasets) {
-                const chart = storeChartInstances[canvasId];
-                chart.data.labels = data.labels;
-                chart.data.datasets = data.datasets;
-                chart.update();
-            }
-        } catch (error) {
-            console.error(`Error loading store ${storeId}:`, error);
-        } finally {
-            toggleStoreEmptyState(canvasId);
-        }
-    }
-
-    async function loadUsdaData() {
-        try {
-            const response = await fetch(`/api/trends/usda-product-types?time_range=${currentUsdaTimeRange}`);
-            const data = await response.json();
-
-            if (data && data.labels && data.datasets) {
-                usdaChartInstance.data.labels = data.labels;
-                usdaChartInstance.data.datasets = data.datasets;
-                usdaChartInstance.update();
-            }
-        } catch (error) {
-            console.error('Error loading USDA product types data:', error);
-        }
-    }
-
-    async function loadNutritionData() {
-        try {
-            const response = await fetch(`/api/trends/nutrition-trends?time_range=${currentTimeRange}&nutrient_type=${currentNutrient}`);
-            const data = await response.json();
-
-            if (data && data.labels && data.datasets) {
-                nutritionChartInstance.data.labels = data.labels;
-                nutritionChartInstance.data.datasets = data.datasets;
-
-                // Update axis title
-                nutritionChartInstance.options.scales.y.title.text = data.unit === 'mg' ? 'Sodium (mg)' : `Mass (${data.unit})`;
-
-                // Handle 100% mode if active
-                if (isPercentMode) {
-                    nutritionChartInstance.options.scales.y.max = 100;
-                } else {
-                    delete nutritionChartInstance.options.scales.y.max;
-                }
-
-                nutritionChartInstance.update();
-            }
-        } catch (error) {
-            console.error('Error loading nutrition trends data:', error);
-        }
-    }
-
-    async function loadAllTrendData() {
-        // Fetch Store Charts
-        await Promise.all([
-            ...storeCanvases().map(function (c) { return loadStoreData(c.dataset.storeId, c.id); }),
-            loadNutritionData()
-        ]);
-
-
     }
 </script>
 {% endblock %}

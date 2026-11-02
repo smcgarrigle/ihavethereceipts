@@ -48,11 +48,19 @@ _CACHE_TTL_SECONDS = 30
 
 
 def _get_excluded_categories(db: Session) -> set[str]:
-    """Fetch prediction-scoped exclusion patterns from the DB."""
+    """Fetch prediction-scoped exclusion patterns from the DB, always retaining defaults."""
     rules = db.query(ExclusionRule).filter(ExclusionRule.scope == "predictions").all()
     if rules:
-        return {r.pattern for r in rules}
+        return _DEFAULT_EXCLUDED_CATEGORIES | {r.pattern for r in rules}
     return _DEFAULT_EXCLUDED_CATEGORIES
+
+
+def _is_prediction_excluded(
+    excluded_patterns: list[str], category_name: str, item_name: str = ""
+) -> bool:
+    cat_lower = category_name.lower()
+    item_lower = item_name.lower()
+    return any(pat in cat_lower or (item_lower and pat in item_lower) for pat in excluded_patterns)
 
 
 def get_item_cadences(db: Session) -> list[dict[str, Any]]:
@@ -116,11 +124,20 @@ def get_item_cadences(db: Session) -> list[dict[str, Any]]:
         item_data[item_id]["store_prices"][store_name].append((effective_price, purchase_date))
 
     results = []
+    excluded_cats = _get_excluded_categories(db)
+    all_rules = (
+        db.query(ExclusionRule).filter(ExclusionRule.scope.in_(("predictions", "analytics"))).all()
+    )
+    excluded_patterns = [c.lower() for c in excluded_cats] + [
+        r.pattern.lower() for r in all_rules if r.pattern
+    ]
     for item_id, data in item_data.items():
         item = data["item"]
         category_name = item.category.name if item.category else "Uncategorized"
 
-        if category_name in _get_excluded_categories(db):
+        if category_name in excluded_cats or _is_prediction_excluded(
+            excluded_patterns, category_name, item.name or ""
+        ):
             continue
 
         sorted_dates = sorted(data["dates"])

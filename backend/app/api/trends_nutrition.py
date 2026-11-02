@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Item, Receipt, ReceiptItem
-from app.services.spend import LINE_TOTAL
 
 router = APIRouter()
 
@@ -114,6 +113,11 @@ def _get_raw_nutrition_data(time_range: str, db: Session):
     import json
     from datetime import datetime, timedelta
 
+    from app.api.analytics import _get_analytics_exclusions, _is_excluded
+    from app.models import Category
+
+    exclusions = _get_analytics_exclusions(db)
+
     now = datetime.now()
     if time_range == "3m":
         start_date = now - timedelta(days=90)
@@ -130,6 +134,7 @@ def _get_raw_nutrition_data(time_range: str, db: Session):
         db.query(
             func.strftime("%Y-%W", Receipt.purchase_date).label("week"),
             Item.name,
+            Category.name.label("cat_name"),
             Item.nutrients,
             Item.custom_nutrients,
             ReceiptItem.weight,
@@ -138,13 +143,26 @@ def _get_raw_nutrition_data(time_range: str, db: Session):
         )
         .join(Receipt, ReceiptItem.receipt_id == Receipt.id)
         .join(Item, ReceiptItem.item_id == Item.id)
+        .outerjoin(Category, Item.category_id == Category.id)
         .filter(or_(_json_present(Item.nutrients), _json_present(Item.custom_nutrients)))
+        .filter(
+            or_(
+                Category.name.is_(None),
+                Category.name.notin_(
+                    ["Excluded", "Other", "Fees & Taxes", "CRV (tax)", "Non-Alcoholic Beer"]
+                ),
+            )
+        )
     )
 
     if start_date and time_range != "all":
         query = query.filter(Receipt.purchase_date >= start_date)
 
-    results = query.all()
+    results = [
+        r
+        for r in query.all()
+        if not _is_excluded(exclusions, r.cat_name or "Uncategorized", r.name or "")
+    ]
 
     conv = {"lb": 453.592, "oz": 28.3495, "g": 1.0, "kg": 1000.0}
 
@@ -273,6 +291,12 @@ def get_nutrition_coverage(time_range: str, db: Session) -> dict:
     """
     from datetime import datetime, timedelta
 
+    from app.api.analytics import _get_analytics_exclusions, _is_excluded
+    from app.models import Category
+    from app.services.spend import line_total
+
+    exclusions = _get_analytics_exclusions(db)
+
     now = datetime.now()
     if time_range == "3m":
         start_date = now - timedelta(days=90)
@@ -289,30 +313,48 @@ def get_nutrition_coverage(time_range: str, db: Session) -> dict:
 
     query = (
         db.query(
-            func.coalesce(func.sum(LINE_TOTAL), 0.0).label("total_spend"),
-            func.coalesce(func.sum(case((has_nutrients, LINE_TOTAL), else_=0.0)), 0.0).label(
-                "covered_spend"
-            ),
-            func.count(func.distinct(ReceiptItem.item_id)).label("total_items"),
-            func.count(func.distinct(case((has_nutrients, ReceiptItem.item_id)))).label(
-                "covered_items"
-            ),
+            ReceiptItem,
+            Item.id.label("item_id"),
+            Item.name.label("item_name"),
+            Category.name.label("cat_name"),
+            case((has_nutrients, 1), else_=0).label("covered"),
         )
         .join(Receipt, ReceiptItem.receipt_id == Receipt.id)
         .join(Item, ReceiptItem.item_id == Item.id)
+        .outerjoin(Category, Item.category_id == Category.id)
+        .filter(
+            or_(
+                Category.name.is_(None),
+                Category.name.notin_(
+                    ["Excluded", "Other", "Fees & Taxes", "CRV (tax)", "Non-Alcoholic Beer"]
+                ),
+            )
+        )
     )
     if start_date and time_range != "all":
         query = query.filter(Receipt.purchase_date >= start_date)
 
-    row = query.one()
-    total_spend = float(row.total_spend or 0)
-    covered_spend = float(row.covered_spend or 0)
+    total_spend = 0.0
+    covered_spend = 0.0
+    total_items_set: set[int] = set()
+    covered_items_set: set[int] = set()
+
+    for ri, item_id, item_name, cat_name, covered in query.all():
+        if _is_excluded(exclusions, cat_name or "Uncategorized", item_name or ""):
+            continue
+        lt = line_total(ri)
+        total_spend += lt
+        total_items_set.add(item_id)
+        if covered:
+            covered_spend += lt
+            covered_items_set.add(item_id)
+
     return {
         "spend_pct": round(covered_spend / total_spend * 100, 1) if total_spend else 0.0,
         "covered_spend": round(covered_spend, 2),
         "total_spend": round(total_spend, 2),
-        "covered_items": row.covered_items or 0,
-        "total_items": row.total_items or 0,
+        "covered_items": len(covered_items_set),
+        "total_items": len(total_items_set),
     }
 
 

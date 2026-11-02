@@ -18,7 +18,13 @@ import datetime
 
 import pytest
 
-from app.api.trends import get_inflation_data, get_store_diff, get_store_top_items
+from app.api.analytics import price_trends
+from app.api.trends import (
+    get_basket_composition,
+    get_inflation_data,
+    get_store_diff,
+    get_store_top_items,
+)
 from app.models import Category, Item, Receipt, ReceiptItem, Store
 
 
@@ -267,3 +273,40 @@ class TestTheStoreToStoreDiff:
         assert amazon is None or amazon["data"][column] == 0, (
             "a per-each price is standing next to per-lb prices"
         )
+
+
+class TestItemPriceTrendsModal:
+    def test_price_trends_returns_comparable_unit_price_and_basis(self, db, pantry):
+        store = _store(db, "Rainbow Grocery")
+        flour = _item(db, pantry, "00 PIZZA FLOUR")
+        # 5 lb bag for $5.00 -> $1.00/lb
+        _buy(db, store, flour, quantity=1.0, price=5.00, weight=5.0, unit="lb", day=1)
+        # 2 lb bag for $3.00 -> $1.50/lb
+        _buy(db, store, flour, quantity=1.0, price=3.00, weight=2.0, unit="lb", day=8)
+
+        series = price_trends(item_id=flour.id, db=db)
+
+        assert len(series) == 2
+        assert [row["price"] for row in series] == [pytest.approx(1.00), pytest.approx(1.50)]
+        assert all(row["basis"] == "per lb" for row in series)
+
+
+class TestBasketCompositionExclusions:
+    def test_basket_composition_excludes_non_food_categories_and_supports_all_ranges(
+        self, db, pantry
+    ):
+        store = _store(db, "Safeway")
+        flour = _item(db, pantry, "00 PIZZA FLOUR")
+        _buy(db, store, flour, quantity=1.0, price=10.00, day=1)
+
+        excluded_cat = Category(name="Excluded")
+        db.add(excluded_cat)
+        db.commit()
+        fee_item = Item(name="BAG FEE", normalized_name="bag fee", category_id=excluded_cat.id)
+        db.add(fee_item)
+        db.commit()
+        _buy(db, store, fee_item, quantity=1.0, price=50.00, day=1)
+
+        data = get_basket_composition(time_range="all", db=db)
+        assert data["labels"] == ["Pantry"]
+        assert data["datasets"][0]["data"] == [pytest.approx(10.00)]

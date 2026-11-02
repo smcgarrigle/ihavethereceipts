@@ -188,55 +188,8 @@
         </a>
     </div>
 
-    <!-- Summary Tables Grid (Moved Below) -->
-    <div class="bg-bgCard rounded-xl shadow-lg border border-borderDefault p-6 mb-10">
-        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-            <h2 class="text-xl font-bold text-textBase flex items-center">
-                <span class="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 p-2 rounded-lg mr-3">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path>
-                    </svg>
-                </span>
-                Category Spending Trends
-            </h2>
-            <div class="flex items-center space-x-2 text-xs font-bold text-textSubtle uppercase tracking-widest bg-bgMain/40 px-3 py-1.5 rounded-full">
-                <span class="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
-                <span>Sub-category Performance</span>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-1 xl:grid-cols-4 gap-6">
-            <!-- Trend Chart -->
-            <div class="xl:col-span-3 h-[350px] relative">
-                <div id="trendsLoadingIndicator" class="absolute inset-0 flex items-center justify-center bg-bgCard/80 z-10 transition-opacity">
-                    <div class="animate-pulse flex flex-col items-center">
-                        <div class="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                        <span class="mt-2 text-sm text-textSubtle font-medium">Analyzing trends...</span>
-                    </div>
-                </div>
-                <canvas id="categoryTrendsChart" role="img" aria-label="Category spending trends line chart"></canvas>
-            </div>
-
-            <!-- Quick Insights / Legend Area -->
-            <div class="xl:col-span-1 space-y-4">
-                <div class="bg-bgMain/50 rounded-xl p-4 border border-borderDefault/50">
-                    <h3 class="text-xs font-black text-textSubtle uppercase tracking-widest mb-3">Total Spent (Historical)</h3>
-                    <div id="trends-legend" class="space-y-2">
-                        <!-- Legend items injected via JS -->
-                    </div>
-                </div>
-                <div class="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border border-indigo-100 dark:border-indigo-900/50">
-                    <p class="text-xs text-indigo-700 dark:text-indigo-400 font-medium leading-relaxed">
-                        <svg class="w-4 h-4 inline mr-1 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        These trends are calculated by filtering item names for specific protein and produce keywords.
-                    </p>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- Volatility Alerts -->
-    <div x-data="{ alerts: [], loading: true }" x-init="fetch('/api/trends/volatility').then(r => r.json()).then(d => { alerts = d.alerts || []; loading = false; })" class="bg-bgCard rounded-xl shadow-lg border border-borderDefault p-6 mb-10">
+    <div x-data="{ alerts: [], loading: true }" x-init="fetch('/api/trends/volatility').then(r => r.json()).then(d => { alerts = Array.isArray(d) ? d : (d.alerts || []); loading = false; }).catch(() => { loading = false; })" class="bg-bgCard rounded-xl shadow-lg border border-borderDefault p-6 mb-10">
         <div class="flex justify-between items-center mb-6">
             <h2 class="text-xl font-bold text-textBase flex items-center">
                 <span class="bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 p-2 rounded-lg mr-3">
@@ -259,21 +212,21 @@
         </div>
 
         <div x-show="!loading && alerts.length > 0" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            <template x-for="alert in alerts.slice(0, 6)" :key="alert.id">
+            <template x-for="alert in alerts.slice(0, 6)" :key="alert.item_id">
                 <div class="flex items-center justify-between p-4 rounded-xl border border-borderDefault hover:shadow-md transition-shadow bg-bgMain/20">
                     <div class="flex flex-col overflow-hidden mr-4">
-                        <a :href="'/items/' + alert.id + '/insights'" class="text-sm font-bold text-textBase hover:underline truncate" :title="alert.name" x-text="alert.name"></a>
-                        <span class="text-[10px] text-textSubtle mt-1" x-text="'Baseline: $' + alert.baseline_avg.toFixed(2) + ' ' + alert.basis"></span>
+                        <a :href="'/items/' + alert.item_id + '/insights'" class="text-sm font-bold text-textBase hover:underline truncate" :title="alert.item_name" x-text="alert.item_name"></a>
+                        <span class="text-[10px] text-textSubtle mt-1" x-text="'Baseline: $' + alert.historical_avg.toFixed(2) + ' / ' + alert.basis"></span>
                     </div>
                     <div class="flex flex-col items-end flex-shrink-0">
                         <span class="text-lg font-black" :class="alert.shift_pct > 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'" x-text="(alert.shift_pct > 0 ? '+' : '') + alert.shift_pct.toFixed(1) + '%'"></span>
-                        <span class="text-xs text-textBase font-mono mt-0.5" x-text="'$' + alert.recent_avg.toFixed(2)"></span>
+                        <span class="text-xs text-textBase font-mono mt-0.5" x-text="'$' + alert.recent_avg.toFixed(2) + ' / ' + alert.basis"></span>
                     </div>
                 </div>
             </template>
         </div>
         <div x-show="!loading && alerts.length > 6" class="mt-4 text-center">
-            <a href="/trends" class="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline">View all alerts on Trends page &rarr;</a>
+            <a href="/xray" class="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline">View Price Volatility Radar on Receipt X-Ray &rarr;</a>
         </div>
     </div>
 
@@ -372,39 +325,6 @@
     </div>
 
 
-
-    <!-- Randomized Category Item Trends (New Dynamic Section) -->
-    <div class="mb-10">
-        <div class="flex justify-between items-center mb-6">
-            <h2 class="text-xl font-bold text-textBase flex items-center">
-                <span class="bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 p-2 rounded-lg mr-3">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-                    </svg>
-                </span>
-                Dynamic Item Price Trends
-            </h2>
-            <div class="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest bg-amber-50 dark:bg-amber-900/30 px-3 py-1.5 rounded-full flex items-center gap-2">
-                <svg class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                Rotating Categories
-            </div>
-        </div>
-
-        <div id="random-charts-grid" class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- 4 Chart Slots -->
-            <template x-for="i in [0,1,2,3]">
-                <div class="bg-bgCard rounded-xl shadow-lg border border-borderDefault p-5 flex flex-col h-[320px]">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-sm font-black text-textSubtle uppercase tracking-widest" :id="'random-title-' + i">Loading...</h3>
-                        <span class="text-[10px] font-bold text-textSubtle">Unit Price ($)</span>
-                    </div>
-                    <div class="flex-grow relative">
-                        <canvas :id="'randomChart-' + i" role="img"></canvas>
-                    </div>
-                </div>
-            </template>
-        </div>
-    </div>
 
     <!-- Store Grid Container -->
     <div x-data="{ showAll: false }">
@@ -757,136 +677,6 @@
         });
 
 
-        // --- Category Trends Chart ---
-        function initTrendsChart() {
-            fetch('/api/analytics/sub-category-trends')
-                .then(response => response.json())
-                .then(data => {
-                    const loader = document.getElementById('trendsLoadingIndicator');
-                    if (loader) loader.style.display = 'none';
-
-                    if (!data.labels || data.labels.length === 0) return;
-
-                    const ctx = document.getElementById('categoryTrendsChart').getContext('2d');
-                    const colors = [
-                        '#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899'
-                    ];
-
-                    const datasets = data.datasets.map((ds, idx) => ({
-                        ...ds,
-                        borderColor: colors[idx % colors.length],
-                        backgroundColor: 'transparent',
-                        tension: 0.3,
-                        pointRadius: 0,
-                        pointHoverRadius: 3,
-                        borderWidth: 1.5,
-                        fill: false
-                    }));
-
-                    const opts = getTufteDefaults();
-                    opts.scales.y.beginAtZero = true;
-                    opts.plugins.tooltip = {
-                        ...opts.plugins.tooltip,
-                        mode: 'index',
-                        intersect: false,
-                        displayColors: true,
-                        callbacks: { label: ctx => ' $' + ctx.parsed.y.toFixed(2) }
-                    };
-                    opts.plugins.legend.display = false;
-
-                    new Chart(ctx, {
-                        type: 'line',
-                        data: { labels: data.labels, datasets: datasets },
-                        options: opts
-                    });
-
-                    // Build Custom Legend
-                    const legendEl = document.getElementById('trends-legend');
-                    if (legendEl) {
-                        legendEl.innerHTML = datasets.map(ds => {
-                            const total = ds.data.reduce((a, b) => a + b, 0);
-                            return `
-                                <div class="flex items-center justify-between text-sm">
-                                    <div class="flex items-center">
-                                        <span class="w-2 h-2 rounded-full mr-2 flex-shrink-0" style="background-color: ${ds.borderColor}"></span>
-                                        <span class="font-medium text-textMuted text-xs">${ds.label}</span>
-                                    </div>
-                                    <span class="text-xs font-mono text-textSubtle">$${total.toFixed(2)}</span>
-                                </div>
-                            `;
-                        }).join('');
-                    }
-                })
-                .catch(err => {
-                    console.error('Trends Error:', err);
-                    const loader = document.getElementById('trendsLoadingIndicator');
-                    if (loader) loader.innerHTML = '<span class="text-red-500 text-xs font-bold">Failed to load trends</span>';
-                });
-        }
-
-        // --- Randomized Category Charts ---
-        function initRandomCategoryCharts() {
-            fetch('/api/analytics/random-category-item-trends')
-                .then(response => response.json())
-                .then(chartsData => {
-                    if (!chartsData || chartsData.length === 0) return;
-
-                    const colors = [
-                        '#6366f1', '#10b981', '#f59e0b', '#ef4444',
-                        '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16'
-                    ];
-
-                    chartsData.forEach((chart, chartIdx) => {
-                        const titleEl = document.getElementById(`random-title-${chartIdx}`);
-                        if (titleEl) titleEl.textContent = chart.category_name;
-
-                        const canvasEl = document.getElementById(`randomChart-${chartIdx}`);
-                        canvasEl.setAttribute('aria-label', chart.category_name + ' item price trends line chart');
-                        const ctx = canvasEl.getContext('2d');
-
-                        const datasets = chart.datasets.map((ds, dsIdx) => ({
-                            ...ds,
-                            borderColor: colors[dsIdx % colors.length],
-                            backgroundColor: 'transparent',
-                            tension: 0.3,
-                            pointRadius: 0,
-                            pointHoverRadius: 3,
-                            borderWidth: 1.5,
-                            fill: false,
-                            spanGaps: true
-                        }));
-
-                        const rOpts = getTufteDefaults();
-                        rOpts.scales.y.ticks.callback = v => '$' + v.toFixed(2);
-                        rOpts.plugins.tooltip = {
-                            ...rOpts.plugins.tooltip,
-                            mode: 'index',
-                            intersect: false,
-                            displayColors: true,
-                            callbacks: {
-                                label: ctx => {
-                                    const lbl = ctx.dataset.label ? ctx.dataset.label + ': ' : '';
-                                    return lbl + '$' + ctx.parsed.y.toFixed(2);
-                                }
-                            }
-                        };
-
-                        new Chart(ctx, {
-                            type: 'line',
-                            data: {
-                                labels: chart.labels.map(d => {
-                                    const date = new Date(d);
-                                    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                                }),
-                                datasets: datasets
-                            },
-                            options: rOpts
-                        });
-                    });
-                })
-                .catch(err => console.error('Random Charts Error:', err));
-        }
-
         // --- Tufte Weekly Spending Chart ---
         function initWeeklySpendingChart() {
             fetch('/api/analytics/weekly-spending')
@@ -1014,8 +804,6 @@
         // Initialize when DOM is ready
 
         document.addEventListener('DOMContentLoaded', () => {
-             initTrendsChart();
-             initRandomCategoryCharts();
              initWeeklySpendingChart();
              initMonthlySpendingChart();
         });

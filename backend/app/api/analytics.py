@@ -216,28 +216,35 @@ def weekly_spending(weeks: int = 12, db: Session = Depends(get_db)):
 
 @router.get("/price-trends/{item_id}")
 def price_trends(item_id: int, db: Session = Depends(get_db)):
-    """Get detailed purchase history for a specific item"""
+    """Get detailed purchase history for a specific item on a comparable unit basis."""
+    from sqlalchemy.orm import joinedload
 
-    results = (
-        db.query(Receipt.purchase_date, ReceiptItem.price, Store.name, Receipt.id)
-        .join(ReceiptItem, Receipt.id == ReceiptItem.receipt_id)
+    from app.services.spend import comparable_price_series, price_basis_label
+
+    lines = (
+        db.query(ReceiptItem)
+        .join(Receipt, ReceiptItem.receipt_id == Receipt.id)
         .join(Store, Receipt.store_id == Store.id)
         .filter(ReceiptItem.item_id == item_id)
+        .filter(Receipt.purchase_date.isnot(None))
+        .options(joinedload(ReceiptItem.receipt).joinedload(Receipt.store))
         .order_by(Receipt.purchase_date.asc())
-        .distinct()
         .all()
     )
 
-    # Return structured list for stacked bar chart, filtering out missing dates
+    basis, series = comparable_price_series(lines)
+    basis_lbl = price_basis_label(basis) if basis else "each"
+
     return [
         {
-            "date": r[0].strftime("%Y-%m-%d"),
-            "price": float(r[1]),
-            "store": r[2],
-            "receipt_id": r[3],
+            "date": line.receipt.purchase_date.strftime("%Y-%m-%d"),
+            "price": round(float(price), 2),
+            "store": line.receipt.store.name if line.receipt and line.receipt.store else "Unknown",
+            "receipt_id": line.receipt_id,
+            "basis": basis_lbl,
         }
-        for r in results
-        if r[0] is not None
+        for line, price in series
+        if line.receipt and line.receipt.purchase_date is not None
     ]
 
 
@@ -291,12 +298,21 @@ def store_comparison(
 @router.get("/price-alerts")
 def price_alerts(threshold: float = 10.0, db: Session = Depends(get_db)):
     """Find items with significant price increases"""
+    exclusions = _get_analytics_exclusions(db)
 
     # Get items with at least 2 purchases
     items_with_history = (
         db.query(Item.id, Item.name, Category.name.label("category_name"))
         .join(ReceiptItem, Item.id == ReceiptItem.item_id)
         .outerjoin(Category, Item.category_id == Category.id)
+        .filter(
+            or_(
+                Category.name.is_(None),
+                Category.name.notin_(
+                    ["Excluded", "Other", "Fees & Taxes", "CRV (tax)", "Non-Alcoholic Beer"]
+                ),
+            )
+        )
         .group_by(Item.id, Item.name, Category.name)
         .having(func.count(ReceiptItem.id) >= 2)
         .all()
@@ -305,6 +321,8 @@ def price_alerts(threshold: float = 10.0, db: Session = Depends(get_db)):
     alerts = []
 
     for item_id, item_name, category_name in items_with_history:
+        if _is_excluded(exclusions, category_name or "Other", item_name or ""):
+            continue
         # Get price history
         prices = (
             db.query(Receipt.purchase_date, ReceiptItem.price)
@@ -347,6 +365,7 @@ def price_alerts(threshold: float = 10.0, db: Session = Depends(get_db)):
 @router.get("/top-items")
 def top_items(limit: int = 10, db: Session = Depends(get_db)):
     """Get top items by total spending"""
+    exclusions = _get_analytics_exclusions(db)
 
     results = (
         db.query(
@@ -367,9 +386,12 @@ def top_items(limit: int = 10, db: Session = Depends(get_db)):
         )
         .group_by(Item.id, Item.name, Category.name)
         .order_by(func.sum(LINE_TOTAL).desc())
-        .limit(limit)
         .all()
     )
+
+    filtered = [r for r in results if not _is_excluded(exclusions, r[1] or "Other", r[0] or "")][
+        :limit
+    ]
 
     return [
         {
@@ -378,7 +400,7 @@ def top_items(limit: int = 10, db: Session = Depends(get_db)):
             "total_spent": float(r[2] or 0),
             "purchase_count": int(r[3]),
         }
-        for r in results
+        for r in filtered
     ]
 
 
@@ -481,16 +503,27 @@ def store_spending_history(store_id: int, db: Session = Depends(get_db)):
 
 
 def _get_top_items(db: Session, limit: int = 10):
-    """Helper: Get the IDs of the top N most frequently purchased items."""
+    """Helper: Get the IDs of the top N most frequently purchased items (excluding excluded items)."""
+    exclusions = _get_analytics_exclusions(db)
     results = (
-        db.query(Item.id)
+        db.query(Item.id, Item.name, Category.name.label("category_name"))
         .join(ReceiptItem, Item.id == ReceiptItem.item_id)
-        .group_by(Item.id)
+        .outerjoin(Category, Item.category_id == Category.id)
+        .filter(
+            or_(
+                Category.name.is_(None),
+                Category.name.notin_(
+                    ["Excluded", "Other", "Fees & Taxes", "CRV (tax)", "Non-Alcoholic Beer"]
+                ),
+            )
+        )
+        .group_by(Item.id, Item.name, Category.name)
         .order_by(func.count(ReceiptItem.id).desc())
-        .limit(limit)
         .all()
     )
-    return [r[0] for r in results]
+    return [r[0] for r in results if not _is_excluded(exclusions, r[2] or "Other", r[1] or "")][
+        :limit
+    ]
 
 
 @router.get("/basket-over-time")
@@ -593,226 +626,6 @@ def basket_over_time(limit: int = 10, db: Session = Depends(get_db)):
             top_item_names.append(truncated)
 
     return {"labels": labels, "data": basket_totals, "items": top_item_names}
-
-
-@router.get("/sub-category-trends")
-def get_sub_category_trends(db: Session = Depends(get_db)):
-    """
-    Get spending over time for specific keywords:
-    Beef, Chicken, Fish, Lamb, Milk, Fruit, Vegetables
-    """
-    keywords = ["Beef", "Chicken", "Fish", "Lamb", "Milk", "Fruit", "Vegetables"]
-
-    # Get all receipts with items
-    results = (
-        db.query(
-            Item.name,
-            ReceiptItem.price,
-            ReceiptItem.quantity,
-            extract("year", Receipt.purchase_date).label("year"),
-            extract("month", Receipt.purchase_date).label("month"),
-        )
-        .join(ReceiptItem, Item.id == ReceiptItem.item_id)
-        .join(Receipt, ReceiptItem.receipt_id == Receipt.id)
-        .outerjoin(Category, Item.category_id == Category.id)
-        .filter(
-            or_(
-                Category.name.is_(None),
-                Category.name.notin_(
-                    ["Excluded", "Other", "Fees & Taxes", "CRV (tax)", "Non-Alcoholic Beer"]
-                ),
-            )
-        )
-        .order_by(Receipt.purchase_date.asc())
-        .all()
-    )
-
-    # Process into trends
-    # trends: keyword -> {(year, month): total_spent}
-    trends = {k: {} for k in keywords}
-    all_months = set()
-
-    for name, price, qty, year, month in results:
-        if year is None or month is None:
-            continue
-        year, month = int(year), int(month)
-        all_months.add((year, month))
-
-        name_lower = name.lower()
-        spent = (price * qty) if price and qty else 0
-
-        for k in keywords:
-            if k.lower() in name_lower:
-                month_key = (year, month)
-                trends[k][month_key] = trends[k].get(month_key, 0) + float(spent)
-
-    sorted_months = sorted(all_months)
-    labels = [datetime(y, m, 1).strftime("%b %Y") for y, m in sorted_months]
-
-    datasets = []
-    for k in keywords:
-        data = [round(trends[k].get(m, 0), 2) for m in sorted_months]
-        datasets.append({"label": k, "data": data})
-
-    return {"labels": labels, "datasets": datasets}
-
-
-@router.get("/widgets/top-combo-timeseries")
-def get_top_combo_timeseries(db: Session = Depends(get_db)):
-    """
-    Find the top 8 (Category, Store) pairs by receipt count, and return
-    the total spent for that category per receipt over time for each.
-    """
-    from sqlalchemy import func
-
-    # 1. Find the top 8 (Category, Store) pairs by receipt count
-    # We look for the most recurring shopping habits
-    top_pairs = (
-        db.query(
-            Category.id,
-            Category.name,
-            Store.id,
-            Store.name,
-            func.count(func.distinct(Receipt.id)).label("r_count"),
-        )
-        .join(Item, Category.id == Item.category_id)
-        .join(ReceiptItem, Item.id == ReceiptItem.item_id)
-        .join(Receipt, ReceiptItem.receipt_id == Receipt.id)
-        .join(Store, Receipt.store_id == Store.id)
-        .group_by(Category.id, Store.id)
-        .order_by(func.count(func.distinct(Receipt.id)).desc())
-        .limit(8)
-        .all()
-    )
-
-    if not top_pairs:
-        return []
-
-    all_combos_data = []
-
-    for cat_id, cat_name, store_id, store_name, _ in top_pairs:
-        # 2. Fetch history for this pair
-        # Summing up all items in that category for each receipt
-        history = (
-            db.query(
-                Receipt.purchase_date,
-                func.sum(LINE_TOTAL).label("spent"),
-            )
-            .join(ReceiptItem, Receipt.id == ReceiptItem.receipt_id)
-            .join(Item, ReceiptItem.item_id == Item.id)
-            .filter(Item.category_id == cat_id)
-            .filter(Receipt.store_id == store_id)
-            .group_by(Receipt.id)
-            .order_by(Receipt.purchase_date.asc())
-            .all()
-        )
-
-        labels = [h[0].strftime("%b %d, %Y") if h[0] else "Unknown Date" for h in history]
-        data = [float(h[1]) for h in history]
-
-        all_combos_data.append(
-            {"category_name": cat_name, "store_name": store_name, "labels": labels, "data": data}
-        )
-
-    return all_combos_data
-
-
-@router.get("/random-category-item-trends")
-def get_random_category_item_trends(db: Session = Depends(get_db)):
-    """
-    Randomly select 4 categories and their top items for dashboard visualization.
-    """
-    import random
-
-    # 1. Get categories that have at least 8 items with at least 2 purchases
-    # We use a subquery to find suitable items first
-    suitable_items_query = (
-        db.query(Item.id)
-        .join(ReceiptItem, Item.id == ReceiptItem.item_id)
-        .group_by(Item.id)
-        .having(func.count(ReceiptItem.id) >= 2)
-    )
-
-    categories_with_data = (
-        db.query(Category.id, Category.name)
-        .join(Item, Category.id == Item.category_id)
-        .filter(Item.id.in_(suitable_items_query))
-        .filter(
-            Category.name.notin_(
-                ["Excluded", "Other", "Fees & Taxes", "CRV (tax)", "Non-Alcoholic Beer"]
-            )
-        )
-        .group_by(Category.id, Category.name)
-        .having(func.count(Item.id) >= 5)
-        .all()
-    )
-
-    if not categories_with_data:
-        return []
-
-    # Pick 4 random categories (or all if less than 4)
-    selected_categories = random.sample(categories_with_data, min(len(categories_with_data), 4))
-
-    all_charts_data = []
-
-    for cat_id, cat_name in selected_categories:
-        # 2. Get top 6 items for this category (by purchase count)
-        top_items = (
-            db.query(Item.id, Item.name)
-            .join(ReceiptItem, Item.id == ReceiptItem.item_id)
-            .filter(Item.category_id == cat_id)
-            .filter(Item.id.in_(suitable_items_query))
-            .group_by(Item.id, Item.name)
-            .order_by(func.count(ReceiptItem.id).desc())
-            .limit(6)
-            .all()
-        )
-
-        item_datasets = []
-        # We need to collect all dates to create a unified X-axis for the chart
-        all_dates = set()
-        item_histories = {}
-
-        for item_id, item_name in top_items:
-            # Fetch price history for this item
-            history = (
-                db.query(Receipt.purchase_date, ReceiptItem.price, ReceiptItem.quantity)
-                .join(ReceiptItem, Receipt.id == ReceiptItem.receipt_id)
-                .filter(ReceiptItem.item_id == item_id)
-                .order_by(Receipt.purchase_date.asc())
-                .all()
-            )
-
-            prices_by_date = {}
-            for date, price, qty in history:
-                if not date:
-                    continue
-                date_str = date.strftime("%Y-%m-%d")
-                all_dates.add(date_str)
-                unit_price = unit_price_of(price, qty)
-                prices_by_date[date_str] = unit_price
-
-            item_histories[item_name] = prices_by_date
-
-        # Sort dates for the X-axis
-        sorted_dates = sorted(all_dates)
-
-        # Build datasets (carrying forward last price for missing dates to avoid gaps)
-        for item_name, history in item_histories.items():
-            data_points = []
-            last_price = None
-            for d in sorted_dates:
-                if d in history:
-                    last_price = history[d]
-                data_points.append(last_price)
-
-            item_datasets.append({"label": item_name, "data": data_points})
-
-        all_charts_data.append(
-            {"category_name": cat_name, "labels": sorted_dates, "datasets": item_datasets}
-        )
-
-    return all_charts_data
 
 
 @router.get("/ocr-accuracy")
