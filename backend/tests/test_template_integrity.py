@@ -90,9 +90,20 @@ def test_receipt_review_integrity(client, dummy_receipt):
     assert response.status_code == 200
     soup = BeautifulSoup(response.text, "html.parser")
 
-    expected_ids = ["ocr-data", "detection-alert", "modal-title"]
+    expected_ids = ["ocr-data", "detection-alert", "modal-title", "review-total-discounts"]
     for element_id in expected_ids:
         assert soup.find(id=element_id) is not None, f"Missing {element_id} on Review page"
+
+    discounts_el = soup.find(id="review-total-discounts")
+    assert "totalDiscounts.toFixed(2)" in response.text
+    assert "discountPctPreTax.toFixed(1)" in response.text
+    assert discounts_el is not None
+
+    js_resp = client.get("/static/js/receipt_review.js")
+    assert js_resp.status_code == 200
+    assert "get totalDiscounts()" in js_resp.text
+    assert "get preTaxSubtotal()" in js_resp.text
+    assert "get discountPctPreTax()" in js_resp.text
 
 
 def test_corrections_page_integrity(client):
