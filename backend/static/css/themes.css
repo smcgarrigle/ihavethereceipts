@@ -150,3 +150,34 @@ html.sunset .shadow-sm,
 html.sunset .shadow {
     box-shadow: var(--shadow-card) !important;
 }
+
+/* ── Custom Scrollbars (Horizontal Timelines, Sparklines, Drawers & Grids) ───
+   Note: Do NOT set `scrollbar-width` or `scrollbar-color` unconditionally here.
+   In Chromium 121+, standard scrollbar properties override and disable
+   `::-webkit-scrollbar`, causing the browser to use OS overlay scrollbars
+   that fade out / disappear ~1 second after page load. */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: var(--bg-skeleton, rgba(0, 0, 0, 0.05));
+    border-radius: 0.75rem;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(156, 163, 175, 0.5);
+    border-radius: 0.75rem;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(156, 163, 175, 0.8);
+}
+
+@supports not selector(::-webkit-scrollbar) {
+    .custom-scrollbar {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(156, 163, 175, 0.5) var(--bg-skeleton, rgba(0, 0, 0, 0.05));
+    }
+}

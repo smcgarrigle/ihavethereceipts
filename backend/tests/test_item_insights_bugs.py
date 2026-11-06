@@ -70,3 +70,66 @@ class TestStringNutrientsPageLoad:
         # Before fix: crashes in Jinja2 with TypeError on |round filter for string '70'
         assert resp.status_code == 200
         assert b"Nutrition Facts" in resp.content or b"No Nutrition Data Found" in resp.content
+
+
+class TestPurchaseHistoryHorizontalScrollbar:
+    """Bug 3: .custom-scrollbar used on item_insights.html had no global CSS rules in themes.css."""
+
+    def test_custom_scrollbar_defined_in_themes_css(self, client):
+        """Global themes.css must define .custom-scrollbar::-webkit-scrollbar so
+        the horizontal timeline scrollbar is visible on /items/{id}/insights.
+
+        Critically, bare `scrollbar-width` / `scrollbar-color` must NOT be set
+        unconditionally on `.custom-scrollbar`, because in Chromium 121+ standard
+        scrollbar properties deactivate `::-webkit-scrollbar` and revert to
+        auto-hiding overlay scrollbars that disappear ~1s after page load.
+        """
+        resp = client.get("/static/css/themes.css")
+        assert resp.status_code == 200
+        css = resp.text
+        assert ".custom-scrollbar::-webkit-scrollbar" in css
+        assert ".custom-scrollbar::-webkit-scrollbar-thumb" in css
+        assert ".custom-scrollbar::-webkit-scrollbar-track" in css
+        # If scrollbar-width is present at all, it must be guarded for non-webkit browsers
+        if "scrollbar-width" in css:
+            assert "@supports not selector(::-webkit-scrollbar)" in css
+
+    def test_insights_timeline_renders_scroll_hint_when_overflowing(self, db, client):
+        """When an item has >4 purchases (overflowing the 4-card row), the horizontal
+        scroll hint and .custom-scrollbar timeline container should render."""
+        from datetime import datetime, timedelta
+
+        from app.models.receipt import Receipt, ReceiptItem
+        from app.models.store import Store
+
+        item = _make_item_with_string_nutrients(db)
+        store = Store(name="Amazon Fresh")
+        db.add(store)
+        db.flush()
+
+        now = datetime.now()
+        for i in range(5):
+            r = Receipt(
+                store_id=store.id,
+                purchase_date=now - timedelta(days=i * 7),
+                total_amount=5.00,
+                status="completed",
+            )
+            db.add(r)
+            db.flush()
+            db.add(
+                ReceiptItem(
+                    receipt_id=r.id,
+                    item_id=item.id,
+                    quantity=1.0,
+                    price=5.00,
+                    weight=5.0,
+                    unit_type="lb",
+                )
+            )
+        db.commit()
+
+        resp = client.get(f"/items/{item.id}/insights")
+        assert resp.status_code == 200
+        assert "Scroll horizontally for more" in resp.text
+        assert "overflow-x-auto gap-3 pb-4 pt-2 px-1 custom-scrollbar snap-x" in resp.text
