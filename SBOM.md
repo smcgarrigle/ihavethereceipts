@@ -49,7 +49,7 @@ These are the packages explicitly declared in `backend/pyproject.toml`.
 | :--- | :--- | :--- | :--- |
 | [google-genai](https://ai.google.dev/) | 2.17.0 | Apache-2.0 | Google Gemini API (primary OCR/AI) |
 | [openai](https://github.com/openai/openai-python) | 2.53.0 | Apache-2.0 | OpenAI-compatible API client (local LM Studio / Ollama) |
-| [pillow](https://python-pillow.org/) | 12.3.0 | HPND | Image manipulation for OCR pre-processing |
+| [pillow](https://python-pillow.org/) | 13.0.0 | HPND | Image manipulation for OCR pre-processing |
 | [pdf2image](https://github.com/Belval/pdf2image) | 1.17.0 | MIT | PDF → image conversion for OCR |
 | [pdfplumber](https://github.com/jsvine/pdfplumber) | 0.11.10 | MIT | PDF text extraction (digital receipts) |
 

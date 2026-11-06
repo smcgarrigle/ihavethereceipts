@@ -124,6 +124,39 @@ function receiptReview(config) {
             return this.crv_items.reduce((sum, item) => sum + (parseFloat(item.final_price) || 0), 0);
         },
 
+        get totalDiscounts() {
+            return this.items.reduce((sum, item) => {
+                const discListSum = this.calculateDiscounts(item);
+                if (discListSum > 0) {
+                    return sum + discListSum;
+                }
+                const storedDisc = parseFloat(item.total_discount) || 0;
+                if (storedDisc > 0) {
+                    return sum + storedDisc;
+                }
+                const finalPrice = parseFloat(item.final_price) || 0;
+                if (finalPrice < 0) {
+                    return sum + Math.abs(finalPrice);
+                }
+                return sum;
+            }, 0);
+        },
+
+        get preTaxSubtotal() {
+            const itemSum = this.items.reduce((sum, item) => {
+                if (item.category === 'Fees & Taxes') return sum;
+                return sum + (parseFloat(item.final_price) || 0);
+            }, 0);
+            if (itemSum > 0) return itemSum;
+            return parseFloat(this.ocrTotal) || 0;
+        },
+
+        get discountPctPreTax() {
+            const subtotal = this.preTaxSubtotal;
+            if (subtotal <= 0) return 0;
+            return (this.totalDiscounts / subtotal) * 100;
+        },
+
         updateCrvTotal() {
             // Getter automatically updates, this is just to trigger re-eval if needed
         },

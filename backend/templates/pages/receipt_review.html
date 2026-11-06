@@ -208,7 +208,7 @@
 
     <!-- Receipt Info -->
     <div class="bg-bgCard rounded-lg shadow dark:shadow-gray-900/50 p-6">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             <!-- Edit Store Name -->
             <div>
                 <label for="review-store-name" class="block text-sm font-medium text-textMuted mb-1">Store Name</label>
@@ -224,6 +224,21 @@
                 <div class="flex space-x-2">
                     <input id="review-purchase-date" type="date" x-model="purchaseDate"
                         class="w-full h-10 rounded-md border-borderInput bg-bgInput text-textBase shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                </div>
+            </div>
+
+            <!-- Total Discounts ($ and % of Net Pre-Tax Subtotal) -->
+            <div>
+                <span class="block text-sm font-medium text-textMuted mb-1">Total Discounts</span>
+                <div id="review-total-discounts"
+                    class="w-full h-10 px-3 rounded-md border flex items-center justify-between transition-colors"
+                    :class="totalDiscounts > 0 ? 'border-emerald-500/40 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300' : 'border-borderInput bg-bgInput text-textMuted'"
+                    :title="'{{ currency_symbol() }}' + totalDiscounts.toFixed(2) + ' saved (' + discountPctPreTax.toFixed(1) + '% of {{ currency_symbol() }}' + preTaxSubtotal.toFixed(2) + ' pre-tax subtotal)'">
+                    <span class="flex items-center gap-1.5">
+                        <span class="text-xs" aria-hidden="true">🏷️</span>
+                        <span class="text-base font-extrabold" x-text="'{{ currency_symbol() }}' + totalDiscounts.toFixed(2)"></span>
+                    </span>
+                    <span class="text-xs font-semibold opacity-90" x-text="discountPctPreTax.toFixed(1) + '% saved'"></span>
                 </div>
             </div>
 
