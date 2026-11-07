@@ -47,6 +47,12 @@ _cadence_cache: dict[str, Any] = {"data": None, "expires_at": 0.0}
 _CACHE_TTL_SECONDS = 30
 
 
+def invalidate_cadence_cache() -> None:
+    """Clear the cached cadence computation after item merges or receipt saves."""
+    _cadence_cache["data"] = None
+    _cadence_cache["expires_at"] = 0.0
+
+
 def _get_excluded_categories(db: Session) -> set[str]:
     """Fetch prediction-scoped exclusion patterns from the DB, always retaining defaults."""
     rules = db.query(ExclusionRule).filter(ExclusionRule.scope == "predictions").all()
@@ -131,16 +137,94 @@ def get_item_cadences(db: Session) -> list[dict[str, Any]]:
     excluded_patterns = [c.lower() for c in excluded_cats] + [
         r.pattern.lower() for r in all_rules if r.pattern
     ]
+
+    # Respect user-dismissed duplicate pairs so ignored items are never pooled
+    from app.models.item import ItemMatchIgnore
+    from app.services.item_matcher import canonical_item_key
+
+    ignored_pairs = {
+        tuple(sorted([r.item_id_1, r.item_id_2])) for r in db.query(ItemMatchIgnore).all()
+    }
+
+    # Filter out excluded items first, then group unmerged canonical variants
+    eligible_entries: list[tuple[int, dict[str, Any], str, str]] = []
     for item_id, data in item_data.items():
         item = data["item"]
         category_name = item.category.name if item.category else "Uncategorized"
-
         if category_name in excluded_cats or _is_prediction_excluded(
             excluded_patterns, category_name, item.name or ""
         ):
             continue
+        canon_key = canonical_item_key(item.name or "")
+        eligible_entries.append((item_id, data, category_name, canon_key))
 
-        sorted_dates = sorted(data["dates"])
+    grouped_entries: list[dict[str, Any]] = []
+    consumed_ids: set[int] = set()
+
+    # Sort so items with the most purchases (then most recent purchase, then lowest id) lead groups
+    eligible_entries.sort(
+        key=lambda e: (
+            len(e[1]["dates"]),
+            max(e[1]["dates"]) if e[1]["dates"] else date.min,
+            -e[0],
+        ),
+        reverse=True,
+    )
+
+    for item_id, data, category_name, canon_key in eligible_entries:
+        if item_id in consumed_ids:
+            continue
+        consumed_ids.add(item_id)
+
+        pooled_dates = set(data["dates"])
+        pooled_store_prices: dict[str, list[tuple[float, date]]] = {
+            s: list(plist) for s, plist in data["store_prices"].items()
+        }
+        variant_items: list[dict[str, Any]] = []
+
+        if len(canon_key) >= 4:
+            for other_id, other_data, other_cat, other_key in eligible_entries:
+                if other_id in consumed_ids or other_key != canon_key:
+                    continue
+                if (
+                    category_name != other_cat
+                    and category_name != "Uncategorized"
+                    and other_cat != "Uncategorized"
+                ):
+                    continue
+                pair = tuple(sorted([item_id, other_id]))
+                if pair in ignored_pairs:
+                    continue
+
+                consumed_ids.add(other_id)
+                pooled_dates.update(other_data["dates"])
+                for s_name, plist in other_data["store_prices"].items():
+                    pooled_store_prices.setdefault(s_name, []).extend(plist)
+                other_item = other_data["item"]
+                variant_items.append(
+                    {
+                        "item_id": other_id,
+                        "item_name": other_item.name,
+                        "purchase_count": len(other_data["dates"]),
+                    }
+                )
+
+        grouped_entries.append(
+            {
+                "item_id": item_id,
+                "item": data["item"],
+                "category_name": category_name,
+                "dates": pooled_dates,
+                "store_prices": pooled_store_prices,
+                "variant_items": variant_items,
+            }
+        )
+
+    for group in grouped_entries:
+        item_id = group["item_id"]
+        item = group["item"]
+        category_name = group["category_name"]
+        sorted_dates = sorted(group["dates"])
         if len(sorted_dates) < MIN_PURCHASES:
             continue
 
@@ -193,7 +277,7 @@ def get_item_cadences(db: Session) -> list[dict[str, Any]]:
 
         # Build store price summary (most recent price per store, sorted best first)
         store_prices = []
-        for store_name, price_list in data["store_prices"].items():
+        for store_name, price_list in group["store_prices"].items():
             # Use most recent price for this store
             most_recent = max(price_list, key=lambda x: x[1])
             store_prices.append(
@@ -205,7 +289,6 @@ def get_item_cadences(db: Session) -> list[dict[str, Any]]:
             )
         store_prices.sort(key=lambda x: x["price"])
 
-        item = data["item"]
         results.append(
             {
                 "item_id": item_id,
@@ -223,6 +306,7 @@ def get_item_cadences(db: Session) -> list[dict[str, Any]]:
                 "urgency": urgency,
                 "stale": is_stale,
                 "store_prices": store_prices[:3],  # Top 3 stores by best price
+                "variant_items": group["variant_items"],
             }
         )
 

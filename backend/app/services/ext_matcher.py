@@ -35,10 +35,16 @@ _STORE_BRAND_PREFIXES = (
     r"amazon\s+brand\s*[-–—]?\s*happy\s+belly",
     r"amazon\s+brand\s*[-–—]?\s*solimo",
     r"amazon\s+fresh",
+    r"amazon\s+grocery",
+    r"amazon\s+kitchen",
+    r"amazon\s+saver",
     r"happy\s+belly",
-    r"signature\s+select",
+    r"signature\s+select(?:/farms)?",
     r"signature\s+farms",
     r"signature\s+care",
+    r"kirkland\s+signature",
+    r"good\s*&\s*gather",
+    r"trader\s+joe'?s",
     r"o\s+organics",
     r"open\s+nature",
 )
@@ -58,9 +64,11 @@ _PAREN_PACK_RE = re.compile(
 _SIZE_TOKEN_RE = re.compile(
     r"\b(?:"
     r"pack\s+of\s+\d+"
-    r"|\d+\s*[-–]?\s*(?:pack|pk|count|ct|cnt)\b"
+    r"|half\s+gallons?\b"
+    r"|(?:1|one)\s+(?:head|bunch|each|ea)\b"
+    r"|\d+\s*[-–]?\s*(?:pack|pk|count|ct|cnt|each|ea)\b"
     r"|\d+(?:\.\d+)?\s*(?:x\s*\d+(?:\.\d+)?)?\s*"
-    r"(?:fl\.?\s*oz\.?|fluid\s+ounces?|ounces?|oz\.?|pounds?|lbs?\.?|grams?|g|kilograms?|kg"
+    r"(?:fl\.?\s*oz\.?|fz\.?|fluid\s+ounces?|ounces?|oz\.?|pounds?|lbs?\.?|grams?|g|kilograms?|kg"
     r"|milliliters?|ml|liters?|litres?|l|gallons?|gal|quarts?|qt|pints?|pt)\b"
     r")",
     re.IGNORECASE,

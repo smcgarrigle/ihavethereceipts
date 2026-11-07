@@ -37,6 +37,15 @@ def normalize_item_name(name: str) -> str:
     return name.lower().strip()
 
 
+def canonical_item_key(name: str) -> str:
+    """Canonical core product name with house-brand prefixes and size/pack tokens stripped."""
+    if not name:
+        return ""
+    from app.services.ext_matcher import clean_retail_title
+
+    return clean_retail_title(name)
+
+
 def find_similar_items(
     item_name: str,
     db: Session,
@@ -62,6 +71,7 @@ def find_similar_items(
         List of dicts with: {item: Item, score: int}
     """
     normalized_search = normalize_item_name(item_name)
+    canon_search = canonical_item_key(item_name)
 
     # Use provided items or fetch all if not provided
     if existing_items is not None:
@@ -74,7 +84,14 @@ def find_similar_items(
     for item in all_items:
         # Using token_sort_ratio as it handles word reordering well
         # (e.g. "Green Onions" vs "Onions Green")
-        score = fuzz.token_sort_ratio(normalized_search, str(item.normalized_name))
+        raw_score = fuzz.token_sort_ratio(normalized_search, str(item.normalized_name))
+        canon_item = canonical_item_key(item.name or "")
+        canon_score = (
+            fuzz.token_sort_ratio(canon_search, canon_item)
+            if len(canon_search) >= 4 and len(canon_item) >= 4
+            else 0.0
+        )
+        score = max(raw_score, canon_score if canon_score >= 92 else 0.0)
 
         if score >= threshold:
             matches.append({"item": item, "score": score})
@@ -124,11 +141,20 @@ def find_duplicate_items(db: Session, threshold: int = 85) -> list[dict[str, Any
     """
     all_items = db.query(Item).all()
     duplicates: list[dict[str, Any]] = []
+    canonical_keys = {item.id: canonical_item_key(item.name or "") for item in all_items}
 
     # Compare each item with every other item
     for i, item1 in enumerate(all_items):
+        key1 = canonical_keys.get(item1.id, "")
         for item2 in all_items[i + 1 :]:
-            score = fuzz.token_sort_ratio(str(item1.normalized_name), str(item2.normalized_name))
+            raw_score = fuzz.token_sort_ratio(
+                str(item1.normalized_name), str(item2.normalized_name)
+            )
+            key2 = canonical_keys.get(item2.id, "")
+            canon_score = (
+                fuzz.token_sort_ratio(key1, key2) if len(key1) >= 4 and len(key2) >= 4 else 0.0
+            )
+            score = max(raw_score, canon_score if canon_score >= 90 else 0.0)
 
             if score >= threshold:
                 duplicates.append({"item1": item1, "item2": item2, "score": score})
@@ -156,10 +182,18 @@ def find_merge_candidates(
 
     candidates: list[dict[str, Any]] = []
     normalized_search = normalize_item_name(item_name)
+    canon_search = canonical_item_key(item_name)
 
     for existing_item in all_items:
         # Calculate similarity using rapidfuzz token_sort_ratio
-        score = fuzz.token_sort_ratio(normalized_search, str(existing_item.normalized_name))
+        raw_score = fuzz.token_sort_ratio(normalized_search, str(existing_item.normalized_name))
+        canon_existing = canonical_item_key(existing_item.name or "")
+        canon_score = (
+            fuzz.token_sort_ratio(canon_search, canon_existing)
+            if len(canon_search) >= 4 and len(canon_existing) >= 4
+            else 0.0
+        )
+        score = max(raw_score, canon_score if canon_score >= 90 else 0.0)
 
         # If 80%+ similar (score is 0-100)
         if score >= 80:
