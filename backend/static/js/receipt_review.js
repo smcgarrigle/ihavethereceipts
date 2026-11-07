@@ -118,6 +118,13 @@ function receiptReview(config) {
                 ...processedItems.filter(item => item.name && item.name.toUpperCase().includes('CRV'))
             ];
             this.items = processedItems.filter(item => !(item.name && item.name.toUpperCase().includes('CRV')));
+            this.updateDocumentTitle();
+        },
+
+        updateDocumentTitle() {
+            const store = (this.storeName || 'Unknown Store').trim() || 'Unknown Store';
+            const totalNum = parseFloat(this.ocrTotal) || 0;
+            document.title = `Receipts > ${store} · Receipt #${this.receiptId} · $${totalNum.toFixed(2)} — Review Receipt`;
         },
 
         get crvTotal() {
