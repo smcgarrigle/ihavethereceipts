@@ -385,72 +385,78 @@ def search_items(q: str = "", db: Session = Depends(get_db)):
     from app.models import ReceiptItem
 
     html = """
-    <div x-data="{ selectedItems: [], keepItemId: null }">
+    <div x-data="{
+        selectedItems: [],
+        keepItemId: null,
+        mergeTargetIds() {
+            return this.selectedItems.filter(id => String(id) !== String(this.keepItemId));
+        },
+        mergeSelected() {
+            if (!this.keepItemId) {
+                alert('Please select an item to keep (radio button)');
+                return;
+            }
+            if (this.mergeTargetIds().length === 0) {
+                alert('Select at least 1 other item (checkbox) to merge into the kept item');
+                return;
+            }
+            if (confirm('Merge ' + this.mergeTargetIds().length + ' item(s) into the kept item?')) {
+                fetch('/api/items/merge', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': document.querySelector('meta[name=csrf-token]')?.content || ''
+                    },
+                    body: JSON.stringify({
+                        keep_item_id: parseInt(this.keepItemId, 10),
+                        merge_item_ids: this.mergeTargetIds().map(id => parseInt(id, 10))
+                    })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    alert(data.message);
+                    this.selectedItems = [];
+                    this.keepItemId = null;
+                    location.reload();
+                })
+                .catch(err => alert('Error: ' + err));
+            }
+        },
+        undoLastMerge() {
+            if (confirm('Undo the last merge operation? This will recreate the source item and move its history back.')) {
+                fetch('/api/items/merge/undo', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-Token': document.querySelector('meta[name=csrf-token]')?.content || ''
+                    }
+                })
+                .then(r => r.json())
+                .then(data => {
+                    alert(data.message);
+                    location.reload();
+                })
+                .catch(err => alert('Error: ' + err));
+            }
+        }
+    }">
         <!-- Merge Controls -->
-        <div x-show="selectedItems.length > 0" class="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
-            <p class="text-sm font-medium text-blue-800 dark:text-blue-400 mb-2">
-                <span x-text="selectedItems.length"></span> item(s) selected
+        <div x-show="keepItemId || selectedItems.length > 0" class="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
+            <p class="text-sm font-medium text-blue-800 dark:text-blue-400 mb-1">
+                <span x-text="keepItemId ? '1 item selected to KEEP' : 'No KEEP item selected yet'"></span>
+                · <span x-text="mergeTargetIds().length"></span> item(s) checked to MERGE
             </p>
             <p class="text-xs text-blue-700 dark:text-blue-300 mb-2">
-                Select one to KEEP (radio button), then merge the rest
+                Select one item to <strong>Keep</strong> (left radio button) and check one or more items to <strong>Merge</strong> into it (right checkboxes).
             </p>
             <button
-                @click="
-                    if (!keepItemId) {
-                        alert('Please select an item to keep (radio button)');
-                        return;
-                    }
-                    if (selectedItems.length < 2) {
-                        alert('Select at least 2 items to merge');
-                        return;
-                    }
-                    const mergeIds = selectedItems.filter(id => id != keepItemId);
-                    if (mergeIds.length === 0) {
-                        alert('Select other items to merge into the kept item');
-                        return;
-                    }
-                    if (confirm('Merge ' + mergeIds.length + ' item(s)? This cannot be undone.')) {
-                        fetch('/api/items/merge', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-CSRF-Token': document.querySelector('meta[name=csrf-token]')?.content || ''
-                            },
-                            body: JSON.stringify({
-                                keep_item_id: parseInt(keepItemId),
-                                merge_item_ids: mergeIds.map(id => parseInt(id))
-                            })
-                        })
-                        .then(r => r.json())
-                        .then(data => {
-                            alert(data.message);
-                            selectedItems = [];
-                            keepItemId = null;
-                            location.reload();
-                        })
-                        .catch(err => alert('Error: ' + err));
-                    }
-                "
+                type="button"
+                @click="mergeSelected()"
                 class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">
                 Merge Selected Items
             </button>
             <button
-                @click="
-                    if (confirm('Undo the last merge operation? This will recreate the source item and move its history back.')) {
-                        fetch('/api/items/merge/undo', {
-                            method: 'POST',
-                            headers: {
-                                'X-CSRF-Token': document.querySelector('meta[name=csrf-token]')?.content || ''
-                            }
-                        })
-                        .then(r => r.json())
-                        .then(data => {
-                            alert(data.message);
-                            location.reload();
-                        })
-                        .catch(err => alert('Error: ' + err));
-                    }
-                "
+                type="button"
+                @click="undoLastMerge()"
                 class="ml-2 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 text-sm font-medium">
                 Undo Last Merge
             </button>
@@ -495,13 +501,16 @@ def search_items(q: str = "", db: Session = Depends(get_db)):
         category_name = item.category.name if item.category else "Uncategorized"
 
         html += f"""
-        <label class='flex items-center space-x-3 px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer'>
+        <div class='flex items-center space-x-3 px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded'>
             <!-- Radio for KEEP -->
-            <input type='radio'
-                   name='keep-item'
-                   value='{item.id}'
-                   x-model='keepItemId'
-                   class='w-4 h-4 text-blue-600'>
+            <label class='flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 cursor-pointer' title='Keep this item'>
+                <input type='radio'
+                       name='keep-item'
+                       value='{item.id}'
+                       x-model='keepItemId'
+                       class='w-4 h-4 text-blue-600'>
+                <span>Keep</span>
+            </label>
 
             <!-- Item Info -->
             <div class='flex-1'>
@@ -515,11 +524,15 @@ def search_items(q: str = "", db: Session = Depends(get_db)):
             </div>
 
             <!-- Checkbox for MERGE -->
-            <input type='checkbox'
-                   value='{item.id}'
-                   x-model='selectedItems'
-                   class='w-4 h-4 text-green-600'>
-        </label>
+            <label class='flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400 cursor-pointer' title='Merge this item into the kept item'>
+                <span>Merge</span>
+                <input type='checkbox'
+                       value='{item.id}'
+                       x-model='selectedItems'
+                       :disabled='String(keepItemId) === "{item.id}"'
+                       class='w-4 h-4 text-green-600 disabled:opacity-30'>
+            </label>
+        </div>
         """
 
     html += """
@@ -532,12 +545,21 @@ def search_items(q: str = "", db: Session = Depends(get_db)):
 
 @router.get("/duplicates", response_class=HTMLResponse)
 def list_duplicates(db: Session = Depends(get_db)):
-    """Find potential duplicate items based on similar names using rapidfuzz"""
+    """Find potential duplicate items based on similar names and canonical retail keys."""
     from rapidfuzz import fuzz
+
+    from app.services.item_matcher import canonical_item_key
 
     all_items = db.query(Item).all()
     if not all_items:
         return ""
+
+    # Pre-fetch purchase counts per item in a single query
+    purchase_counts = dict(
+        db.query(ReceiptItem.item_id, func.count(ReceiptItem.id))
+        .group_by(ReceiptItem.item_id)
+        .all()
+    )
 
     # Get ignored matches
     from app.models.item import ItemMatchIgnore
@@ -547,6 +569,8 @@ def list_duplicates(db: Session = Depends(get_db)):
     for record in ignored_records:
         ignored_pairs.add(tuple(sorted([record.item_id_1, record.item_id_2])))
 
+    canonical_keys = {item.id: canonical_item_key(item.name or "") for item in all_items}
+
     seen = set()
     duplicates = []
 
@@ -555,6 +579,7 @@ def list_duplicates(db: Session = Depends(get_db)):
             continue
 
         similar_items = [item1]
+        key1 = canonical_keys.get(item1.id, "")
         for item2 in all_items[i + 1 :]:
             if item2.id in seen:
                 continue
@@ -564,13 +589,18 @@ def list_duplicates(db: Session = Depends(get_db)):
             if pair in ignored_pairs:
                 continue
 
-            # Use rapidfuzz token_sort_ratio for better accuracy
-            score = fuzz.token_sort_ratio(item1.normalized_name, item2.normalized_name)
+            raw_score = fuzz.token_sort_ratio(item1.normalized_name, item2.normalized_name)
+            key2 = canonical_keys.get(item2.id, "")
+            canon_score = (
+                fuzz.token_sort_ratio(key1, key2) if len(key1) >= 4 and len(key2) >= 4 else 0.0
+            )
+            score = max(raw_score, canon_score if canon_score >= 90 else 0.0)
 
             if score >= 85:  # High confidence threshold
                 similar_items.append(item2)
 
         if len(similar_items) > 1:
+            similar_items.sort(key=lambda it: (purchase_counts.get(it.id, 0), -it.id), reverse=True)
             for it in similar_items:
                 seen.add(it.id)
             duplicates.append(similar_items)
@@ -587,12 +617,45 @@ def list_duplicates(db: Session = Depends(get_db)):
         card_id = f"dup-group-{group[0].id}"
         id1 = group[0].id
         id2 = group[1].id
+        default_keep = str(group[0].id)
+        default_merge = "[" + ",".join(f"'{it.id}'" for it in group[1:]) + "]"
 
-        html += f"<div id='{card_id}' class='p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg relative group'>"
+        html += f"""<div id='{card_id}' class='p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg relative group'
+            x-data="{{
+                keepId: '{default_keep}',
+                mergeIds: {default_merge},
+                activeMergeIds() {{
+                    return this.mergeIds.filter(id => String(id) !== String(this.keepId));
+                }},
+                mergeGroup() {{
+                    if (!this.keepId || this.activeMergeIds().length === 0) return;
+                    fetch('/api/items/merge', {{
+                        method: 'POST',
+                        headers: {{
+                            'Content-Type': 'application/json',
+                            'X-CSRF-Token': document.querySelector('meta[name=csrf-token]')?.content || ''
+                        }},
+                        body: JSON.stringify({{
+                            keep_item_id: parseInt(this.keepId, 10),
+                            merge_item_ids: this.activeMergeIds().map(id => parseInt(id, 10))
+                        }})
+                    }})
+                    .then(r => r.json())
+                    .then(data => {{
+                        if (data.success) {{
+                            document.getElementById('{card_id}')?.remove();
+                        }} else {{
+                            alert(data.message || 'Merge failed');
+                        }}
+                    }})
+                    .catch(err => alert('Error: ' + err));
+                }}
+            }}">"""
 
         # Dismiss Button
         html += f"""
         <button
+            type="button"
             hx-post="/api/items/duplicates/ignore"
             hx-vals='{{"item_id_1": {id1}, "item_id_2": {id2}}}'
             hx-target="closest div"
@@ -603,13 +666,29 @@ def list_duplicates(db: Session = Depends(get_db)):
         </button>
         """
 
-        html += "<p class='text-sm font-medium text-yellow-800 dark:text-yellow-400 mb-2'>Possible duplicates:</p>"
-        html += "<ul class='space-y-1'>"
+        html += "<div class='flex items-center justify-between pr-6 mb-2'>"
+        html += "<p class='text-sm font-medium text-yellow-800 dark:text-yellow-400'>Possible duplicates:</p>"
+        html += "<button type='button' @click='mergeGroup()' class='px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-md transition'>Merge Selected</button>"
+        html += "</div>"
+        html += "<ul class='space-y-1.5'>"
         for item in group:
-            html += (
-                f"<li class='text-sm text-gray-700 dark:text-gray-300'>"
-                f"• {html_mod.escape(item.name)}</li>"
-            )
+            cnt = purchase_counts.get(item.id, 0)
+            html += f"""
+            <li class='flex items-center justify-between gap-3 text-sm text-gray-700 dark:text-gray-300 py-1 px-2 rounded hover:bg-yellow-100/50 dark:hover:bg-yellow-900/30'>
+                <div class='flex items-center gap-3 min-w-0'>
+                    <label class='inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 cursor-pointer flex-shrink-0'>
+                        <input type='radio' name='keep-{card_id}' value='{item.id}' x-model='keepId' class='w-3.5 h-3.5 text-blue-600'>
+                        <span>Keep</span>
+                    </label>
+                    <span class='truncate font-medium'>{html_mod.escape(item.name)}</span>
+                    <span class='text-xs text-gray-500 dark:text-gray-400 flex-shrink-0'>({cnt} purchase{"s" if cnt != 1 else ""})</span>
+                </div>
+                <label class='inline-flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400 cursor-pointer flex-shrink-0'>
+                    <span>Merge</span>
+                    <input type='checkbox' value='{item.id}' x-model='mergeIds' :disabled='String(keepId) === "{item.id}"' class='w-3.5 h-3.5 text-green-600 disabled:opacity-30'>
+                </label>
+            </li>
+            """
         html += "</ul>"
         html += "</div>"
     html += "</div>"
@@ -758,6 +837,9 @@ def merge_items(request: MergeItemsRequest, db: Session = Depends(get_db)):
             merged_count += 1
 
         db.commit()
+        from app.services.predictions import invalidate_cadence_cache
+
+        invalidate_cadence_cache()
         return {
             "success": True,
             "message": f"Merged {merged_count} items into '{target_item.name}'",
@@ -805,6 +887,9 @@ def undo_merge(db: Session = Depends(get_db)):
         # 4. Delete the log
         db.delete(log)
         db.commit()
+        from app.services.predictions import invalidate_cadence_cache
+
+        invalidate_cadence_cache()
 
         return {
             "success": True,
