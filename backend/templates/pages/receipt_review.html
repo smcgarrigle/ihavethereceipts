@@ -1,6 +1,8 @@
 {% extends "layouts/base.html" %}
+{% set _review_store = ocr_data.get('store_name') or (receipt.store.name if receipt and receipt.store else 'Unknown Store') %}
+{% set _review_total = ocr_data.get('total_amount') if ocr_data.get('total_amount') is not none else (receipt.total_amount if receipt and receipt.total_amount is not none else 0) %}
 
-{% block title %}Review Receipt - The Receipts{% endblock %}
+{% block title %}Receipts > {{ _review_store }} · Receipt #{{ receipt_id }} · {{ currency_symbol() }}{{ "%.2f"|format(_review_total|float) }} — Review Receipt{% endblock %}
 
 {% block content %}
 
@@ -214,6 +216,7 @@
                 <label for="review-store-name" class="block text-sm font-medium text-textMuted mb-1">Store Name</label>
                 <div class="flex space-x-2">
                     <input id="review-store-name" type="text" x-model="storeName"
+                        @input="updateDocumentTitle()"
                         class="w-full h-10 rounded-md border-borderInput bg-bgInput text-textBase shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
                 </div>
             </div>
@@ -251,7 +254,8 @@
                             <span class="text-gray-500 text-lg font-bold">{{ currency_symbol() }}</span>
                         </div>
                         <input id="review-ocr-total" type="text" inputmode="decimal" x-model="ocrTotal"
-                            @blur="ocrTotal = parseFloat(ocrTotal).toFixed(2)"
+                            @input="updateDocumentTitle()"
+                            @blur="ocrTotal = (parseFloat(ocrTotal) || 0).toFixed(2); updateDocumentTitle()"
                             class="block w-full h-10 rounded-md border-borderInput bg-bgInput text-textBase pl-7 focus:border-blue-500 focus:ring-blue-500 text-lg font-bold">
                     </div>
                 </div>
