@@ -99,11 +99,39 @@ def test_receipt_review_integrity(client, dummy_receipt):
     assert "discountPctPreTax.toFixed(1)" in response.text
     assert discounts_el is not None
 
+    title_el = soup.find("title")
+    assert title_el is not None
+    title_text = title_el.get_text(strip=True)
+    assert "Test Store" in title_text
+    assert f"#{dummy_receipt.id}" in title_text
+    assert "$10.00" in title_text
+
     js_resp = client.get("/static/js/receipt_review.js")
     assert js_resp.status_code == 200
     assert "get totalDiscounts()" in js_resp.text
     assert "get preTaxSubtotal()" in js_resp.text
     assert "get discountPctPreTax()" in js_resp.text
+    assert "updateDocumentTitle()" in js_resp.text
+
+
+@pytest.mark.parametrize(
+    ("category_type", "expected_label"),
+    [
+        ("produce", "Trends > Best Value > Produce"),
+        ("meat", "Trends > Best Value > Meat"),
+        ("dairy", "Trends > Best Value > Dairy"),
+        ("pantry", "Trends > Best Value > Pantry"),
+        ("beverages", "Trends > Best Value > Beverages"),
+    ],
+)
+def test_best_value_page_titles(client, category_type, expected_label):
+    """Verify Best Value pages include specific category hierarchy in <title>."""
+    response = client.get(f"/best-value/{category_type}")
+    assert response.status_code == 200
+    soup = BeautifulSoup(response.text, "html.parser")
+    title_el = soup.find("title")
+    assert title_el is not None
+    assert expected_label in title_el.get_text(strip=True)
 
 
 def test_corrections_page_integrity(client):

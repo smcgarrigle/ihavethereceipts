@@ -215,7 +215,7 @@ def review_receipt(request: Request, receipt_id: int, db: Session = Depends(get_
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Processing Receipt — The Receipts</title>
+            <title>Receipts &gt; Processing Receipt #{receipt_id} — The Receipts</title>
             <link rel="stylesheet" href="/static/css/tailwind.css">
             <style>
                 @keyframes blink {{
@@ -466,6 +466,11 @@ def review_receipt(request: Request, receipt_id: int, db: Session = Depends(get_
             "purchase_date": date_str,
             "image_filename": receipt.image_path.split("/")[-1] if receipt.image_path else None,
         }
+    else:
+        if not ocr_data.get("store_name") and receipt.store:
+            ocr_data["store_name"] = receipt.store.name
+        if ocr_data.get("total_amount") is None and receipt.total_amount is not None:
+            ocr_data["total_amount"] = receipt.total_amount
 
     # OVERRIDE: If the DB has saved items, THEY are the source of truth.
     # This prevents corrupted or outdated ocr_data from messing up the Edit UI.
