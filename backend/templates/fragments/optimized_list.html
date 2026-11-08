@@ -28,6 +28,14 @@
                         <a href="/items/{{ item.item_id }}/insights" class="text-sm font-semibold text-textBase hover:text-blue-600 dark:hover:text-blue-400">
                             {{ item.item_name }}
                         </a>
+                        {% if item.variant_items %}
+                        <div class="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-textMuted">
+                            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-medium"
+                                  title="Combined with: {{ item.variant_items | map(attribute='item_name') | join(', ') }}">
+                                🔗 +{{ item.variant_items|length }} variant{% if item.variant_items|length != 1 %}s{% endif %}
+                            </span>
+                        </div>
+                        {% endif %}
                         <div class="text-xs text-textMuted mt-1 flex items-center gap-2">
                             <span>{{ item.category }}</span>
                             <span>&bull;</span>

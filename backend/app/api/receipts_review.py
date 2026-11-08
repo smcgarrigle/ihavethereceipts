@@ -377,6 +377,9 @@ def save_reviewed_items(
             relink = []
 
         db.commit()
+        from app.services.predictions import invalidate_cadence_cache
+
+        invalidate_cadence_cache()
 
         # Nutrition Catch-up Trigger
         try:

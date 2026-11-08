@@ -244,3 +244,98 @@ class TestMedianCadenceAndRegularity:
         assert by_name["Steady Milk"]["regularity"] == "regular"
         assert by_name["Jumpy Sauce"]["cv"] > 1.0
         assert by_name["Jumpy Sauce"]["regularity"] == "erratic"
+
+
+class TestCanonicalVariantHomogenization:
+    """Layer 1 + Layer 2: canonical retail-title grouping in predictions."""
+
+    def test_canonical_variants_pooled_in_cadences(self, db):
+        """Buying 'Amazon Grocery, Russet Potatoes,' resets 'Russet Potatoes, 5 Lb' cadence."""
+        from app.services.predictions import get_item_cadences
+
+        today = datetime.now()
+        # 3 purchases of "Russet Potatoes, 5 Lb" 84, 56, and 28 days ago (would be due today/overdue alone)
+        older_dates = [today - timedelta(days=d) for d in (84, 56, 28)]
+        item_main = _create_item_with_purchases(
+            db,
+            "Russet Potatoes, 5 Lb",
+            "Whole Foods Market",
+            older_dates,
+            price=3.42,
+            category_name="Produce",
+        )
+
+        # 1 recent purchase yesterday under "Amazon Grocery, Russet Potatoes,"
+        item_variant = _create_item_with_purchases(
+            db,
+            "Amazon Grocery, Russet Potatoes,",
+            "Amazon Fresh",
+            [today - timedelta(days=1)],
+            price=2.47,
+            category_name="Produce",
+        )
+
+        cadences = get_item_cadences(db)
+        assert len(cadences) == 1
+
+        c = cadences[0]
+        assert c["item_id"] == item_main.id
+        assert c["item_name"] == "Russet Potatoes, 5 Lb"
+        assert c["purchase_count"] == 4
+        assert c["urgency"] == "low"
+        assert len(c["variant_items"]) == 1
+        assert c["variant_items"][0]["item_id"] == item_variant.id
+        assert c["variant_items"][0]["item_name"] == "Amazon Grocery, Russet Potatoes,"
+
+    def test_ignored_duplicate_pairs_stay_separate_in_cadences(self, db):
+        """Pairs dismissed in ItemMatchIgnore must not be pooled in predictions."""
+        from app.models.item import ItemMatchIgnore
+        from app.services.predictions import get_item_cadences
+
+        today = datetime.now()
+        older_dates = [today - timedelta(days=d) for d in (42, 28, 14)]
+        item1 = _create_item_with_purchases(
+            db, "Russet Potatoes, 5 Lb", "Whole Foods Market", older_dates, category_name="Produce"
+        )
+        item2 = _create_item_with_purchases(
+            db,
+            "Amazon Grocery, Russet Potatoes,",
+            "Amazon Fresh",
+            [today - timedelta(days=1)],
+            category_name="Produce",
+        )
+
+        ids = sorted([item1.id, item2.id])
+        db.add(ItemMatchIgnore(item_id_1=ids[0], item_id_2=ids[1]))
+        db.commit()
+
+        cadences = get_item_cadences(db)
+        assert len(cadences) == 1
+        assert cadences[0]["purchase_count"] == 3
+        assert cadences[0]["variant_items"] == []
+
+    def test_restock_table_renders_variant_merge_badge(self, client, db):
+        """/api/predictions/restock-table renders the variant badge + Merge button when variants exist."""
+        today = datetime.now()
+        # 2 older purchases under main item + 1 purchase 20 days ago under variant -> 3 total, overdue on 10d cycle
+        _create_item_with_purchases(
+            db,
+            "2% Reduced Fat Milk, Half Gallon, 64 Fl Oz",
+            "Whole Foods Market",
+            [today - timedelta(days=40), today - timedelta(days=30)],
+            price=4.29,
+            category_name="Dairy",
+        )
+        _create_item_with_purchases(
+            db,
+            "Amazon Grocery, 2% Reduced Fat Milk, Half Gallon, 64 Fl Oz",
+            "Amazon Fresh",
+            [today - timedelta(days=20)],
+            price=1.94,
+            category_name="Dairy",
+        )
+
+        resp = client.get("/api/predictions/restock-table")
+        assert resp.status_code == 200
+        assert "+1 variant" in resp.text
+        assert "mergeVariants()" in resp.text

@@ -22,6 +22,48 @@
                    class="font-medium text-textBase hover:text-blue-600 dark:hover:text-blue-400 transition">
                     {{ item.item_name[:45] }}{% if item.item_name|length > 45 %}…{% endif %}
                 </a>
+                {% if item.variant_items %}
+                <div class="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-textMuted"
+                     data-keep-id="{{ item.item_id }}"
+                     data-merge-ids="{{ item.variant_items | map(attribute='item_id') | join(',') }}"
+                     x-data="{
+                         merged: false,
+                         mergeVariants() {
+                             const keepId = parseInt(this.$el.dataset.keepId, 10);
+                             const mergeIds = (this.$el.dataset.mergeIds || '').split(',').filter(Boolean).map(n => parseInt(n, 10));
+                             fetch('/api/items/merge', {
+                                 method: 'POST',
+                                 headers: {
+                                     'Content-Type': 'application/json',
+                                     'X-CSRF-Token': document.querySelector('meta[name=csrf-token]')?.content || ''
+                                 },
+                                 body: JSON.stringify({
+                                     keep_item_id: keepId,
+                                     merge_item_ids: mergeIds
+                                 })
+                             })
+                             .then(r => r.json())
+                             .then(d => {
+                                 if (d.success) {
+                                     this.merged = true;
+                                     htmx.ajax('GET', '/api/predictions/restock-table', '#restock-content');
+                                     htmx.ajax('GET', '/api/predictions/stats', '#prediction-stats');
+                                 }
+                             });
+                         }
+                     }">
+                    <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-medium"
+                          title="Combined with: {{ item.variant_items | map(attribute='item_name') | join(', ') }}">
+                        🔗 +{{ item.variant_items|length }} variant{% if item.variant_items|length != 1 %}s{% endif %}
+                    </span>
+                    <button type="button"
+                            x-show="!merged"
+                            @click="mergeVariants()"
+                            class="px-1.5 py-0.5 rounded border border-indigo-500/30 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 font-semibold transition">
+                        Merge
+                    </button>
+                </div>
+                {% endif %}
                 <!-- Mobile: show store prices stacked -->
                 <div class="md:hidden mt-1 space-y-0.5">
                     {% for sp in item.store_prices[:3] %}
