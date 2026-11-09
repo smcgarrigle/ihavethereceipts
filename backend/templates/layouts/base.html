@@ -1,7 +1,7 @@
 <!DOCTYPE html>
-<html lang="en"
+<html lang="en" class="dark"
     x-data="{
-        currentTheme: localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'),
+        currentTheme: localStorage.getItem('theme') || 'dark',
         cycleTheme() {
             if (this.currentTheme === 'light') {
                 this.currentTheme = 'dark';

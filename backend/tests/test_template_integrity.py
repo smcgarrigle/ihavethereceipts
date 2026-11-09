@@ -158,3 +158,15 @@ def test_produce_mode_integrity(client):
 
     # Produce mode relies heavily on x-data, but we check for the app root
     assert soup.find(attrs={"x-data": "produceEntryApp()"}) is not None
+
+
+def test_dark_mode_default_theme(client):
+    """Verify pages default to dark mode on initial load and for static demo builds."""
+    response = client.get("/")
+    assert response.status_code == 200
+    soup = BeautifulSoup(response.text, "html.parser")
+    html_el = soup.find("html")
+    assert html_el is not None
+    assert "dark" in (html_el.get("class") or [])
+    x_data = html_el.get("x-data") or ""
+    assert "localStorage.getItem('theme') || 'dark'" in x_data
