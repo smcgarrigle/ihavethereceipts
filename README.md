@@ -2,6 +2,20 @@
 
 A self-hosted, AI-powered receipt tracker that builds a personal price history database from your grocery receipts. Built with **FastAPI**, **SQLite**, **HTMX**, **Tailscale** and **Google Gemini**.
 
+## What I'm building and why
+
+I wanted to know what I was really spending my money on at the grocery store, and receipts, collected over time, are a surprisingly dense data source, once you interpret them.
+
+An applied-AI pipeline built end to end: from messy real-world input to data a person can trust, with every improvement measured rather than assumed. **[Try the live demo →](https://smcgarrigle.github.io/ihavethereceipts/)**
+
+- **Problem:** Grocery receipts are a hard extraction problem. Every store's register prints a different format, basket discounts float free of the items they apply to, and "2 for $5" lines break naive parsers.
+- **Approach:** Vision LLMs (Google Gemini, or local models via Ollama or LM Studio) read photos, PDFs and pasted text into structured line items. A person approves every receipt before it is saved, and each correction is kept and reused on later receipts from the same store.
+- **Built on APIs:** Model calls go out through the Gemini API, an OpenAI-compatible client pointed at Ollama, LM Studio or OpenRouter, and are swappable by configuration. Nutrition and product data come from the USDA FoodData Central and Open Food Facts APIs. The app itself is a REST API of about 130 endpoints, which the web UI and the browser extension both use.
+- **Measured, not assumed:** An evaluation harness scores extraction against reviewed receipts. In a replay of 50 receipts, remembering each store's printed item names raised correctly named lines from 70.6% to 80.0%, with no line made worse. A separate test found that adding past corrections to the prompt did not yet help, so that feature waits for more data before it is tested again.
+- **Results:** Price trends and store comparison on unit prices, USDA nutrition data, and a companion browser extension that shows price history on Amazon Fresh and Safeway.
+- **Quality bar:** 1,200+ automated tests, automated WCAG accessibility checks, typed code and versioned database migrations.
+- **Run like a delivery program:** Built by a technical program manager with 20+ years of shipping web platforms. Work is scoped into small, reviewed pull requests; a 22-finding self-audit was worked through to closure; and each evaluation has a data threshold set before it runs.
+
 ## 🧪 Quick Demo (No Receipts Needed)
 
 **Just want a look?** Try the [live demo](https://smcgarrigle.github.io/ihavethereceipts/) — the
