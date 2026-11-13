@@ -98,6 +98,7 @@ def test_no_enrichment_scheduled_when_the_user_pinned_an_fdc_match(client, db, r
     assert str(item.fdc_id) == "173410"
 
 
+@pytest.mark.real_background_work
 def test_task_wrapper_opens_and_closes_its_own_session():
     """enrich_db_item_task must not need a caller-supplied session."""
     from app.services import fdc_service as fdc_module
