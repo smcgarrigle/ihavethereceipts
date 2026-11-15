@@ -8,6 +8,7 @@ Also provides:
 import json
 import logging
 from typing import Any
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -161,26 +162,60 @@ def handle_nutrition_review_action(suggestion_id: int, action: str, db: Session 
 
 CORRECTION_SORTS = ("used", "recurred")
 
+# Which lessons the table lists: those the next prompt would carry, or all.
+CORRECTION_VIEWS = ("in_use", "all")
+
+# The table's sections, in the order a review produces them. Each says what
+# the person did, because the stored field names ("item_hallucinated") only
+# describe what the comparison found.
+_CORRECTION_GROUPS = (
+    ("name", "Names you fixed", "The model read a name one way and you saved it another way."),
+    (
+        "price",
+        "Prices and quantities you fixed",
+        "The model read the line but got a number on it wrong.",
+    ),
+    ("missed", "Lines the model missed", "You added a line the model did not read."),
+    ("made_up", "Lines the model made up", "The model read a line that you deleted."),
+)
+
+_SOURCE_LABELS = {"image": "Photo", "pdf": "PDF", "paste": "Pasted text"}
+
+
+def _corrections_query_string(**params: str) -> str:
+    """``?a=b`` for the non-empty values, or "" when there are none."""
+    kept = {name: value for name, value in params.items() if value}
+    return f"?{urlencode(kept)}" if kept else ""
+
 
 def _corrections_context(
     db: Session,
     store: str,
     input_type: str,
     sort: str = "",
+    show: str = "",
 ) -> dict[str, Any]:
     """Shared context for the corrections page and its action fragments."""
     from app.models import Store
-    from app.services.correction_service import INPUT_TYPES, list_corrections
+    from app.services.correction_service import (
+        DISTRIBUTION_BIN,
+        INPUT_TYPES,
+        correction_distribution,
+        list_corrections,
+    )
 
     chosen_type = input_type if input_type in INPUT_TYPES else ""
     chosen_store = store.strip()
     chosen_sort = sort if sort in CORRECTION_SORTS else "used"
+    chosen_show = show if show in CORRECTION_VIEWS else "in_use"
 
-    rows = list_corrections(
+    every_row = list_corrections(
         db,
         store_name=chosen_store or None,
         input_type=chosen_type or None,
     )
+    in_use_count = sum(1 for r in every_row if r["in_use"])
+    rows = every_row if chosen_show == "all" else [r for r in every_row if r["in_use"]]
     if chosen_sort == "recurred":
         # Deletion candidates first: a lesson that keeps being re-recorded
         # after it was sent is the one worth removing.
@@ -192,8 +227,44 @@ def _corrections_context(
             key=lambda r: (-r["used_this_week"], -r["seen"], (r["store"] or "").lower()),
         )
 
+    distribution = correction_distribution(
+        db,
+        store_name=chosen_store or None,
+        input_type=chosen_type or None,
+    )
+    for source in distribution["sources"]:
+        source["label"] = _SOURCE_LABELS[source["input_type"]]
+
+    # Everything but the view, so the two view links can each add their own.
+    filters = {
+        "store": chosen_store,
+        "input_type": chosen_type,
+        "sort": chosen_sort if chosen_sort != "used" else "",
+    }
     return {
         "rows": rows,
+        "groups": [
+            {
+                "kind": kind,
+                "title": title,
+                "blurb": blurb,
+                "rows": [r for r in rows if r["kind"] == kind],
+            }
+            for kind, title, blurb in _CORRECTION_GROUPS
+        ],
+        "distribution": distribution,
+        "source_labels": _SOURCE_LABELS,
+        "distribution_bin": DISTRIBUTION_BIN,
+        "chosen_show": chosen_show,
+        "in_use_count": in_use_count,
+        "all_count": len(every_row),
+        "in_use_href": "/settings/corrections" + _corrections_query_string(**filters),
+        "all_href": "/settings/corrections" + _corrections_query_string(**filters, show="all"),
+        # Row actions post back with the same filters and view, so the panel
+        # they swap in is the one the person was looking at.
+        "action_qs": _corrections_query_string(
+            **filters, show="all" if chosen_show == "all" else ""
+        ),
         "stores": [name for (name,) in db.query(Store.name).order_by(Store.name).all()],
         "input_types": INPUT_TYPES,
         "chosen_store": chosen_store,
@@ -212,6 +283,7 @@ def corrections_page(
     store: str = "",
     input_type: str = "",
     sort: str = "",
+    show: str = "",
 ):
     """Every lesson the OCR prompt can draw on, one row per distinct correction.
 
@@ -222,7 +294,7 @@ def corrections_page(
     return templates.TemplateResponse(
         request,
         "pages/corrections.html",
-        _corrections_context(db, store, input_type, sort),
+        _corrections_context(db, store, input_type, sort, show),
     )
 
 
@@ -247,6 +319,7 @@ def correction_action(
     store: str = "",
     input_type: str = "",
     sort: str = "",
+    show: str = "",
 ):
     """Remove, restore, pin or unpin one lesson, then re-render the panel.
 
@@ -275,7 +348,7 @@ def correction_action(
 
     logger.info("Correction %s: %s", action, content_key)
 
-    context = _corrections_context(db, store, input_type, sort)
+    context = _corrections_context(db, store, input_type, sort, show)
     # The undo bar is only offered straight after a removal. A restore says so
     # instead, so the two never appear together.
     summary = _correction_summary(correction)
