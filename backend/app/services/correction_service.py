@@ -313,6 +313,7 @@ def list_corrections(
                 "store": store,
                 "input_type": correction.input_type,
                 "field": correction.field,
+                "kind": _KIND_OF_FIELD.get(correction.field, "name"),
                 "ai_value": correction.ai_value,
                 "approved_value": correction.approved_value,
                 "item_context": correction.item_context,
@@ -379,11 +380,128 @@ def list_corrections(
             row["used_this_week"] = this_week.get(key, 0)
             row["recurred"] = _recurrences_after(row["recorded_at"], earliest.get(key))
 
-    for row in grouped.values():
+    in_use = lessons_in_use(db, {(row["store"], row["input_type"]) for row in grouped.values()})
+    for identity, row in grouped.items():
         row.setdefault("used_total", 0)
         row.pop("recorded_at", None)
+        row["in_use"] = identity in in_use
 
     return list(grouped.values())
+
+
+# The four things a person does on the review screen, which is how the
+# corrections page groups its rows. A quantity fix sits with prices: both are
+# a number on a line that was otherwise read correctly.
+CORRECTION_KINDS = ("name", "price", "missed", "made_up")
+_KIND_OF_FIELD = {
+    "name": "name",
+    "price": "price",
+    "quantity": "price",
+    "item_missed": "missed",
+    "item_hallucinated": "made_up",
+}
+
+# Receipt IDs per bar on the corrections page chart.
+DISTRIBUTION_BIN = 25
+
+
+def lessons_in_use(db: Session, scopes: Iterable[tuple[str | None, str | None]]) -> set[object]:
+    """The lessons the next receipt prompt would carry, for these scopes.
+
+    Lessons are named by ``_lesson_identity`` rather than content key, because
+    rows that predate the key are still sent.
+
+    A scope is a (store name, input type) pair. Each is asked of
+    ``select_corrections`` itself, so the page cannot disagree with what a
+    prompt is built from. The first pass over a new receipt does not know the
+    store yet and draws on every store, so that selection is included for each
+    input type as well. Empty on failure: the page then shows every lesson as
+    history rather than failing to render.
+    """
+    wanted = {(store, kind) for store, kind in scopes if kind in INPUT_TYPES}
+    wanted |= {(None, kind) for _, kind in wanted}
+    lessons: set[object] = set()
+    try:
+        for store, kind in wanted:
+            rows, _ = select_corrections(db, store, input_type=kind)
+            lessons.update(_lesson_identity(row) for row in rows)
+    except Exception:
+        logger.exception("Failed to work out which corrections are in use")
+        return set()
+    return lessons
+
+
+def correction_distribution(
+    db: Session,
+    store_name: str | None = None,
+    input_type: str | None = None,
+) -> dict:
+    """Where corrections fall: by receipt ID for the chart, by source for the table.
+
+    Counts stored correction rows, not distinct lessons: the chart is about how
+    often each kind of fix was needed, and a lesson recorded on forty receipts
+    was needed forty times. Deposit lines are left out, as everywhere else.
+
+    ``bins`` is contiguous from the first receipt with a correction to the
+    last, so a stretch of receipts that needed no fixes shows as a gap rather
+    than being closed up.
+    """
+    from app.models import Receipt, Store
+
+    if input_type is not None and input_type not in INPUT_TYPES:
+        raise ValueError(f"input_type must be one of {INPUT_TYPES}, not {input_type!r}")
+
+    query = (
+        db.query(OcrCorrection, Receipt.image_path)
+        .join(Receipt, Receipt.id == OcrCorrection.receipt_id)
+        .outerjoin(Store, Store.id == OcrCorrection.store_id)
+    )
+    if store_name:
+        query = query.filter(Store.name == store_name)
+
+    def empty() -> dict[str, int]:
+        return dict.fromkeys(CORRECTION_KINDS, 0)
+
+    totals = empty()
+    by_bin: dict[int, dict[str, int]] = {}
+    by_source = {kind: empty() for kind in INPUT_TYPES}
+    receipts: dict[str, set[int]] = {kind: set() for kind in INPUT_TYPES}
+
+    for correction, image_path in query.all():
+        source = input_type_of(image_path)
+        if input_type is not None and source != input_type:
+            continue
+        kind = _KIND_OF_FIELD.get(correction.field)
+        if kind is None or _about_deposit(correction):
+            continue
+        start = (correction.receipt_id // DISTRIBUTION_BIN) * DISTRIBUTION_BIN
+        by_bin.setdefault(start, empty())[kind] += 1
+        by_source[source][kind] += 1
+        receipts[source].add(correction.receipt_id)
+        totals[kind] += 1
+
+    bins = []
+    if by_bin:
+        for start in range(min(by_bin), max(by_bin) + 1, DISTRIBUTION_BIN):
+            bins.append(
+                {
+                    "label": f"{start}\u2013{start + DISTRIBUTION_BIN - 1}",
+                    **by_bin.get(start, empty()),
+                }
+            )
+
+    sources = [
+        {"input_type": kind, "receipts": len(receipts[kind]), **by_source[kind]}
+        for kind in INPUT_TYPES
+        if receipts[kind]
+    ]
+    return {
+        "totals": totals,
+        "total": sum(totals.values()),
+        "receipts": len(set().union(*receipts.values())),
+        "bins": bins,
+        "sources": sources,
+    }
 
 
 def pinned_keys(db: Session) -> set[str]:

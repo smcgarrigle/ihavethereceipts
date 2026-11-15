@@ -189,16 +189,18 @@ def test_the_helper_handles_naive_and_aware_together():
 
 def _cells(body):
     soup = BeautifulSoup(body, "html.parser")
-    return soup.find(id="corrections-table").find("tbody").find_all("tr")[0].find_all("td")
+    return soup.find(id="corrections-table").select("tr[data-lesson]")[0].find_all("td")
 
 
 def test_the_table_has_a_recurred_column(client, db):
     _lesson(db, _receipt(db, _store(db)))
 
     soup = BeautifulSoup(client.get(PAGE).text, "html.parser")
-    headers = [th.get_text(strip=True) for th in soup.find(id="corrections-table").find_all("th")]
+    # The head only: each section of the body starts with a heading cell of its own.
+    head = soup.find(id="corrections-table").find("thead")
+    headers = [th.get_text(strip=True) for th in head.find_all("th")]
 
-    assert "Recurred" in headers
+    assert "Came back" in headers
     assert len(headers) == 8
 
 
@@ -218,7 +220,7 @@ def test_one_recurrence_shows_a_bare_count(client, db):
     body = client.get(PAGE).text
 
     assert _cells(body)[6].get_text(strip=True) == "1"
-    assert "times after use" not in body
+    assert "came back" not in body
 
 
 def test_two_recurrences_are_flagged(client, db):
@@ -230,7 +232,7 @@ def test_two_recurrences_are_flagged(client, db):
 
     body = client.get(PAGE).text
 
-    assert "recurred 2 times after use" in body
+    assert "came back 2 times" in body
 
 
 def test_the_tally_counts_recurring_lessons(client, db):
