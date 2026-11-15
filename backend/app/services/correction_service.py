@@ -9,6 +9,7 @@ guidance — per store when the store is known, global otherwise.
 import json
 import logging
 import os
+import re
 from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 
@@ -82,6 +83,45 @@ REVIEW_SOURCE = "review"
 RENAME_SOURCE = "item_editor"
 # Above this the names are close enough that storing a correction adds noise
 _NOISE_THRESHOLD = 97
+
+# A container deposit line: California Redemption Value and what other stores
+# print for it ("CA REDEMP VA", "Bottle Deposit Fee"). It is a fee, not a
+# product, and it is printed on almost every receipt with a drink on it, so its
+# corrections repeat without teaching anything: 232 of the 1,362 stored rows on
+# 2026-11-14 were deposit lines, and photographed receipts still lost 85 of 150
+# of them after those corrections had been in the prompt. Checked against every
+# stored correction that day: no row that matches is anything else.
+_DEPOSIT_LINE = re.compile(r"\bcrv\b|redemp|deposit", re.IGNORECASE)
+
+
+def is_deposit_line(name: object) -> bool:
+    """True when a line name is a container deposit, not a product."""
+    return isinstance(name, str) and bool(_DEPOSIT_LINE.search(name))
+
+
+def is_deposit_correction(
+    field: str | None,
+    ai_value: object,
+    approved_value: object,
+    item_context: object,
+) -> bool:
+    """True when a correction is about a deposit line.
+
+    A price or quantity correction names its line in ``item_context``; the
+    other fields carry the name in the values themselves.
+    """
+    if field in ("price", "quantity"):
+        return is_deposit_line(item_context)
+    return is_deposit_line(ai_value) or is_deposit_line(approved_value)
+
+
+def _about_deposit(correction: OcrCorrection) -> bool:
+    return is_deposit_correction(
+        correction.field,
+        correction.ai_value,
+        correction.approved_value,
+        correction.item_context,
+    )
 
 
 def _pair_items(ai_items: list[dict], reviewed_items: list) -> tuple[list, list, list]:
@@ -262,6 +302,9 @@ def list_corrections(
 
     grouped: dict[object, dict] = {}
     for correction, store in query.all():
+        # Rows recorded before deposit lines were left out are still stored.
+        if _about_deposit(correction):
+            continue
         identity = _lesson_identity(correction)
         row = grouped.get(identity)
         if row is None:
@@ -509,6 +552,8 @@ def record_corrections(db: Session, receipt, reviewed_items: list) -> int:
         corrections: list[OcrCorrection] = []
 
         def add(field, ai_value, approved_value, item_context=None, quantity=None):
+            if is_deposit_correction(field, ai_value, approved_value, item_context):
+                return
             # The key is computed from the bounded values actually stored, so a
             # backfill reading the stored row produces the same key.
             ai_stored = _bounded(ai_value, MAX_STORED_VALUE)
@@ -889,11 +934,17 @@ def _lesson_identity(correction: OcrCorrection) -> object:
 
 
 def _newest_distinct(query, limit: int) -> list[OcrCorrection]:
-    """The newest ``limit`` distinct lessons from a newest-first query."""
+    """The newest ``limit`` distinct lessons from a newest-first query.
+
+    Deposit lines are skipped here as well as at recording, because rows stored
+    before they were left out would otherwise keep taking prompt slots.
+    """
     seen: set[object] = set()
     kept: list[OcrCorrection] = []
     fetch = max(limit * _DEDUPE_FETCH_MULTIPLIER, _DEDUPE_FETCH_FLOOR)
     for correction in query.limit(fetch).all():
+        if _about_deposit(correction):
+            continue
         identity = _lesson_identity(correction)
         if identity in seen:
             continue
