@@ -93,12 +93,16 @@ def test_the_model_text_matches_regardless_of_case(db):
 
 
 def test_two_answers_on_one_receipt_are_both_kept(db):
-    """Two deposit lines read as CRV are two lines, not a correction of a correction."""
+    """Two lines read as the same text are two lines, not a correction of a correction.
+
+    Deposit lines were the original case; they are no longer recorded at all
+    (test_correction_deposit_lines.py), so a product stands in.
+    """
     costco = _store(db)
     receipt = _review(
         db,
         costco,
-        [("CRV", "CRV Container Single Under 24OZ", 0.05), ("CRV", "CRV Alcohol 6PK", 0.30)],
+        [("WATER", "Sparkling Water Single", 1.05), ("WATER", "Sparkling Water 6 Pack", 5.30)],
     )
 
     assert not suppressed_keys(db)
