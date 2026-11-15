@@ -339,3 +339,216 @@ class TestCanonicalVariantHomogenization:
         assert resp.status_code == 200
         assert "+1 variant" in resp.text
         assert "mergeVariants()" in resp.text
+
+
+# ---------------------------------------------------------------------------
+# Dismissing an item from predictions
+# ---------------------------------------------------------------------------
+
+
+def _due_item(db, name="Egg Nog", store="TestMart"):
+    """An item bought every 14 days whose next purchase is overdue."""
+    last = datetime.now() - timedelta(days=20)
+    dates = [last - timedelta(days=14 * i) for i in range(4)]
+    return _create_item_with_purchases(db, name, store, dates)
+
+
+def _buy(db, item, when):
+    receipt = Receipt(
+        store_id=db.query(Store).first().id,
+        total_amount=5.99,
+        purchase_date=when,
+        status="completed",
+    )
+    db.add(receipt)
+    db.flush()
+    db.add(ReceiptItem(receipt_id=receipt.id, item_id=item.id, quantity=1, price=5.99))
+    db.commit()
+
+
+def _backdate(db, item, days):
+    """Move a dismissal's start into the past, as if it had been made then."""
+    from app.models import PredictionDismissal
+
+    row = db.query(PredictionDismissal).filter_by(item_id=item.id).one()
+    row.created_at -= timedelta(days=days)
+    if row.until is not None:
+        row.until -= timedelta(days=days)
+    db.commit()
+
+
+class TestPredictionDismissal:
+    def test_a_dismissed_item_leaves_every_prediction_surface(self, client, db):
+        from app.services.predictions import get_item_cadences, get_prediction_stats
+
+        item = _due_item(db)
+        assert "Egg Nog" in client.get("/api/predictions/optimized-list").text
+
+        response = client.post(f"/api/predictions/dismiss/{item.id}", data={"period": "week"})
+
+        assert response.status_code == 200
+        assert get_item_cadences(db) == []
+        assert get_prediction_stats(db)["total_tracked"] == 0
+        assert client.get("/api/predictions/shopping-list").json() == []
+        assert client.get("/api/predictions/cadences").json() == []
+        assert "Egg Nog" not in client.get("/api/predictions/optimized-list").text
+        assert "Egg Nog" not in client.get("/api/predictions/restock-table").text
+
+    def test_other_items_stay(self, client, db):
+        item = _due_item(db)
+        _due_item(db, "Whole Milk")
+
+        client.post(f"/api/predictions/dismiss/{item.id}", data={"period": "forever"})
+
+        names = [c["item_name"] for c in client.get("/api/predictions/cadences").json()]
+        assert names == ["Whole Milk"]
+
+    def test_the_response_offers_undo_and_asks_the_page_to_refresh(self, client, db):
+        item = _due_item(db)
+
+        response = client.post(f"/api/predictions/dismiss/{item.id}", data={"period": "month"})
+
+        assert response.headers["HX-Trigger"] == "restock-changed"
+        assert 'id="restock-notice"' in response.text
+        assert "for 1 month" in response.text
+        assert f"/api/predictions/dismiss/{item.id}/restore" in response.text
+
+    def test_restore_brings_the_item_back(self, client, db):
+        item = _due_item(db)
+        client.post(f"/api/predictions/dismiss/{item.id}", data={"period": "forever"})
+
+        response = client.post(f"/api/predictions/dismiss/{item.id}/restore")
+
+        assert "Restored" in response.text
+        assert response.headers["HX-Trigger"] == "restock-changed"
+        assert len(client.get("/api/predictions/cadences").json()) == 1
+
+    def test_the_dismissed_list_says_when_each_item_returns(self, client, db):
+        timed, permanent = _due_item(db), _due_item(db, "Cranberries")
+        client.post(f"/api/predictions/dismiss/{permanent.id}", data={"period": "forever"})
+        client.post(f"/api/predictions/dismiss/{timed.id}", data={"period": "week"})
+
+        body = client.get("/api/predictions/dismissed").text
+
+        back_on = (datetime.now() + timedelta(days=7)).strftime("%Y-%m")
+        assert f"Back on {back_on}" in body
+        assert "Dismissed for good" in body
+        # Soonest to return first, permanent ones last.
+        assert body.index("Egg Nog") < body.index("Cranberries")
+        assert "HX-Trigger" not in client.get("/api/predictions/dismissed").headers
+
+    def test_the_dismissed_list_is_empty_when_nothing_is_dismissed(self, client, db):
+        _due_item(db)
+
+        assert "Dismissed" not in client.get("/api/predictions/dismissed").text
+
+    def test_a_timed_dismissal_ends_when_its_time_is_up(self, client, db):
+        from app.services.predictions import get_item_cadences
+
+        item = _due_item(db)
+        client.post(f"/api/predictions/dismiss/{item.id}", data={"period": "week"})
+        _backdate(db, item, 8)
+
+        assert len(get_item_cadences(db)) == 1
+        assert "Egg Nog" not in client.get("/api/predictions/dismissed").text
+
+    def test_a_week_is_still_running_on_day_six(self, client, db):
+        from app.services.predictions import get_item_cadences
+
+        item = _due_item(db)
+        client.post(f"/api/predictions/dismiss/{item.id}", data={"period": "week"})
+        _backdate(db, item, 6)
+
+        assert get_item_cadences(db) == []
+
+    def test_buying_the_item_again_ends_a_timed_dismissal(self, client, db):
+        from app.services.predictions import get_item_cadences
+
+        item = _due_item(db)
+        client.post(f"/api/predictions/dismiss/{item.id}", data={"period": "month"})
+        _backdate(db, item, 3)
+        _buy(db, item, datetime.now() - timedelta(days=1))
+
+        assert len(get_item_cadences(db)) == 1
+
+    def test_buying_the_item_again_does_not_end_a_permanent_dismissal(self, client, db):
+        from app.services.predictions import get_item_cadences
+
+        item = _due_item(db)
+        client.post(f"/api/predictions/dismiss/{item.id}", data={"period": "forever"})
+        _backdate(db, item, 3)
+        _buy(db, item, datetime.now() - timedelta(days=1))
+
+        assert get_item_cadences(db) == []
+
+    def test_dismissing_again_replaces_the_earlier_decision(self, client, db):
+        from app.models import PredictionDismissal
+
+        item = _due_item(db)
+        client.post(f"/api/predictions/dismiss/{item.id}", data={"period": "week"})
+        client.post(f"/api/predictions/dismiss/{item.id}", data={"period": "forever"})
+
+        rows = db.query(PredictionDismissal).all()
+        assert len(rows) == 1
+        assert rows[0].until is None
+
+    def test_the_dismissal_is_not_tied_to_a_store(self, client, db):
+        item = _due_item(db)
+        _buy(db, item, datetime.now() - timedelta(days=90))
+        other = Store(name="OtherMart")
+        db.add(other)
+        db.commit()
+
+        client.post(f"/api/predictions/dismiss/{item.id}", data={"period": "week"})
+
+        assert "Egg Nog" not in client.get("/api/predictions/optimized-list").text
+
+    def test_an_unknown_period_is_rejected(self, client, db):
+        item = _due_item(db)
+
+        assert (
+            client.post(f"/api/predictions/dismiss/{item.id}", data={"period": "year"}).status_code
+            == 422
+        )
+        assert len(client.get("/api/predictions/cadences").json()) == 1
+
+    def test_an_unknown_item_is_a_404(self, client):
+        assert (
+            client.post("/api/predictions/dismiss/999", data={"period": "week"}).status_code == 404
+        )
+        assert client.post("/api/predictions/dismiss/999/restore").status_code == 404
+
+    def test_a_merge_carries_the_dismissal_to_the_kept_item(self, client, db):
+        from app.models import PredictionDismissal
+
+        dismissed, kept = _due_item(db), _due_item(db, "Egg Nog Quart")
+        client.post(f"/api/predictions/dismiss/{dismissed.id}", data={"period": "forever"})
+
+        client.post(
+            "/api/items/merge", json={"keep_item_id": kept.id, "merge_item_ids": [dismissed.id]}
+        )
+
+        assert [row.item_id for row in db.query(PredictionDismissal).all()] == [kept.id]
+
+    def test_each_row_carries_what_the_dialog_needs(self, client, db):
+        from bs4 import BeautifulSoup
+
+        item = _due_item(db)
+
+        for url in ("/api/predictions/optimized-list", "/api/predictions/restock-table"):
+            soup = BeautifulSoup(client.get(url).text, "html.parser")
+            row = soup.find(attrs={"data-dismiss-item": str(item.id)})
+            assert row is not None, url
+            assert row["data-dismiss-name"] == "Egg Nog"
+            assert row.find("button", attrs={"data-dismiss-button": True}) is not None
+
+    def test_the_page_has_the_dialog_with_three_periods(self, client):
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(client.get("/restock").text, "html.parser")
+
+        dialog = soup.find("dialog", id="dismiss-dialog")
+        periods = [
+            b["data-dismiss-period"] for b in dialog.find_all(attrs={"data-dismiss-period": True})
+        ]
+        assert periods == ["week", "month", "forever"]

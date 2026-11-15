@@ -15,7 +15,8 @@
     </thead>
     <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
         {% for item in items %}
-        <tr class="hover:bg-bgHover/50 transition-colors">
+        <tr class="hover:bg-bgHover/50 transition-colors cursor-pointer"
+            data-dismiss-item="{{ item.item_id }}" data-dismiss-name="{{ item.item_name }}">
             <!-- Item Name -->
             <td class="py-3 px-4">
                 <a href="/items/{{ item.item_id }}/insights"
@@ -117,6 +118,11 @@
                     ⚪ Low
                 </span>
                 {% endif %}
+                <button type="button" data-dismiss-button
+                    aria-label="Dismiss {{ item.item_name }} from predictions"
+                    class="block mx-auto mt-1.5 text-[11px] font-medium text-textMuted hover:text-textBase underline underline-offset-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded">
+                Dismiss
+            </button>
             </td>
 
             <!-- Per-Store Prices (Desktop) -->
