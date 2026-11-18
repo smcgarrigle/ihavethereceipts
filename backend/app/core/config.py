@@ -78,7 +78,7 @@ class Settings:
     OCR_BACKEND: str = os.getenv("OCR_BACKEND", "local").lower()
     OCR_MODEL: str = os.getenv("OCR_MODEL", "llava:7b")
     OCR_BACKEND_URL: str = os.getenv("OCR_BACKEND_URL", "http://localhost:11434/v1")
-    GEMINI_MODEL_NAME: str = os.getenv("GEMINI_MODEL_NAME", "gemini-flash")
+    GEMINI_MODEL_NAME: str = os.getenv("GEMINI_MODEL_NAME", "auto")
 
     # Runtime state and caches. These live in one place because two of them
     # used to be CWD-relative (`Path("data/...")`), and both `make run` and

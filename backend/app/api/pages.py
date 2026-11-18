@@ -197,13 +197,12 @@ def review_receipt(request: Request, receipt_id: int, db: Session = Depends(get_
         from app.core.config import settings
         from app.services.model_manager import model_manager
 
+        # Only models that can read a receipt, best first (the raw cache also
+        # lists tts, live, image and embedding models).
         cached = model_manager.get_cached_models()
-        models_list = (
-            cached.get("models", ["gemini-flash", "gemini-pro"])
-            if cached
-            else ["gemini-flash", "gemini-pro"]
-        )
-        models_json = json.dumps(models_list)
+        models_list = (model_manager.rank_models(cached.get("models", [])) if cached else []) or [
+            "gemini-flash-latest"
+        ]
         models_json = json.dumps(models_list)
         backend_type = settings.OCR_BACKEND
         backend_url = settings.OCR_BACKEND_URL

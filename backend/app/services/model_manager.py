@@ -3,6 +3,7 @@ import datetime
 import json
 import logging
 import os
+import re
 from typing import Any
 
 from dotenv import load_dotenv
@@ -14,6 +15,44 @@ from app.core.config import settings
 load_dotenv()
 
 logger = logging.getLogger(__name__)
+
+# General-purpose models, by name: gemini-<version>-flash|pro, optionally
+# -lite and/or -preview, plus Google's moving -latest aliases. An allowlist
+# rather than a denylist: Google keeps adding special-purpose suffixes (tts,
+# live, image, transcribe, native-audio, customtools, computer-use...) and
+# none of them can read a receipt, while the general names follow this shape.
+_OCR_MODEL_RE = re.compile(
+    r"^gemini-(?:\d+(?:\.\d+)?-(?:flash|pro)(?:-lite)?(?:-preview)?|(?:flash|flash-lite|pro)-latest)$"
+)
+_VERSION_RE = re.compile(r"^gemini-(\d+(?:\.\d+)?)-")
+
+
+def is_ocr_model(name: str) -> bool:
+    """True for a general Gemini model that can read a receipt image."""
+    return bool(_OCR_MODEL_RE.match(name.lower()))
+
+
+def pinned_gemini_model() -> str | None:
+    """GEMINI_MODEL_NAME when it names a model; None for unset, empty or "auto".
+
+    None means: use the best model from Google's live list (get_best_model).
+    """
+    value = (os.getenv("GEMINI_MODEL_NAME") or "").strip()
+    return None if value.lower() in ("", "auto") else value
+
+
+def _score_model(name: str) -> float:
+    """Newest version first; flash (free tier) ahead of pro; stable ahead of preview."""
+    name = name.lower()
+    match = _VERSION_RE.match(name)
+    score = float(match.group(1)) * 10 if match else 0.0
+    if "flash" in name:
+        score += 5
+    if name.endswith("-latest"):
+        score += 2
+    if name.endswith("-preview"):
+        score -= 1
+    return score
 
 
 class ModelManager:
@@ -101,44 +140,41 @@ class ModelManager:
             return []
 
     def rank_models(self, models: list[str]) -> list[str]:
-        """Sort models by preference."""
+        """Keep the models that can read a receipt, best first.
 
-        def score_model(name):
-            name = name.lower()
-            score = 0
+        Google's list mixes general models with speech, live-audio, image
+        generation, embedding and other special-purpose ones (``-tts``,
+        ``-live``, ``-image``, ``embedding``...). Ranking them all put
+        ``gemini-3.8-flash-tts`` second, i.e. first in line as a fallback.
+        """
+        candidates = [m for m in models if is_ocr_model(m)]
+        return sorted(candidates, key=_score_model, reverse=True)
 
-            # Penalties
-            if "vision" in name:
-                score -= 10  # Old 1.0 vision
+    def _cached_ranking(self) -> list[str] | None:
+        """The cached list, filtered and re-ranked; None when unreadable.
 
-            # Dynamic version scoring
-            import re
+        Re-ranked on read rather than trusting the stored ``best_model``, so a
+        cache written before the filter existed can't still pick a tts model.
+        """
+        try:
+            data = dict(json.loads(self.CACHE_FILE.read_text()))
+        except Exception:
+            return None
+        return self.rank_models(list(data.get("models", [])))
 
-            match = re.search(r"(\d+\.\d+)", name)
-            if match:
-                try:
-                    version = float(match.group(1))
-                    # Multiply version by 10 (e.g. 1.5 -> 15 points, 2.0 -> 20 points)
-                    score += int(version * 10)
-                except ValueError:
-                    pass
-
-            # Bonuses
-            if "flash" in name:
-                score += 5  # Ensures free-tier models bubble to top
-            if "latest" in name:
-                score += 2
-
-            return score
-
-        return sorted(models, key=score_model, reverse=True)
+    def peek_best_model(self) -> str | None:
+        """Best model from the cache, without calling Google; None if unknown."""
+        if not self.CACHE_FILE.exists():
+            return None
+        ranked = self._cached_ranking()
+        return ranked[0] if ranked else None
 
     def save_cache(self, models: list[str]):
         """Save discovered models to disk."""
         data = {
             "last_updated": datetime.datetime.now().isoformat(),
             "models": models,
-            "best_model": models[0] if models else "gemini-flash",
+            "best_model": models[0] if models else None,
         }
 
         # Ensure data dir exists
@@ -163,7 +199,7 @@ class ModelManager:
         else:
             logger.warning("No models found via API. Keeping existing cache if any.")
 
-    def get_best_model(self, fallback: str = "gemini-flash") -> str:
+    def get_best_model(self, fallback: str = "gemini-flash-latest") -> str:
         """Get the best available model. Updates cache synchronously if missing."""
         if not self.CACHE_FILE.exists():
             logger.info("Cache missing in get_best_model. Fetching dynamically...")
@@ -171,36 +207,25 @@ class ModelManager:
             if models:
                 ranked = self.rank_models(models)
                 self.save_cache(ranked)
-                return ranked[0]
+                if ranked:
+                    return ranked[0]
             return fallback
 
-        try:
-            data = dict(json.loads(self.CACHE_FILE.read_text()))
-            return str(data.get("best_model", fallback))
-        except Exception:
-            return fallback
+        cached = self._cached_ranking()
+        return cached[0] if cached else fallback
 
     def get_fallback_models(self) -> list[str]:
-        """Get list of fallback models from cache."""
+        """Up to five models to try after the best one."""
         if not self.CACHE_FILE.exists():
             models = self.fetch_available_models()
             if models:
                 ranked = self.rank_models(models)
                 self.save_cache(ranked)
-                return (
-                    [m for m in ranked if m != ranked[0]][:5] if len(ranked) > 1 else ["gemini-pro"]
-                )
-            return ["gemini-pro", "gemini-flash"]
+                return ranked[1:6]
+            return ["gemini-flash-latest"]
 
-        try:
-            data = json.loads(self.CACHE_FILE.read_text())
-            models = data.get("models", [])
-            best = data.get("best_model")
-
-            # Return top 5 excluding the best one
-            return [m for m in models if m != best][:5]
-        except Exception:
-            return ["gemini-pro"]
+        cached = self._cached_ranking()
+        return cached[1:6] if cached else ["gemini-flash-latest"]
 
 
 # Singleton instance

@@ -316,11 +316,11 @@ def _render_settings_page(request: Request, db: Session) -> HTMLResponse:
     # page header; it belongs here next to the OCR success rating.
     import os
 
-    from app.services.ocr import get_backend, get_daily_usage
+    from app.services.ocr import gemini_model_label, get_backend, get_daily_usage
 
     backend = get_backend()
     if backend == "gemini":
-        ocr_model_name = os.getenv("GEMINI_MODEL_NAME", "gemini-flash")
+        ocr_model_name = gemini_model_label()
     elif backend == "openrouter":
         # OpenRouter has no default model; an unset value is a real state the
         # user needs to see, not something to paper over with a placeholder.
