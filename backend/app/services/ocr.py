@@ -13,7 +13,7 @@ Local backend env vars:
 
 Gemini backend env vars:
   GEMINI_API_KEY=<your key>
-  GEMINI_MODEL_NAME=gemini-flash-latest        (optional override)
+  GEMINI_MODEL_NAME=auto                       (default: newest flash model; or pin one)
 
 OpenRouter backend env vars (see README.md):
   OPENROUTER_API_KEY=<your key>
@@ -887,7 +887,7 @@ def _init_gemini():
 
     from google import genai
 
-    from app.services.model_manager import model_manager
+    from app.services.model_manager import model_manager, pinned_gemini_model
 
     api_key = configured_key("GEMINI_API_KEY")
     if not api_key:
@@ -900,11 +900,27 @@ def _init_gemini():
         )
 
     _gemini_client = genai.Client(api_key=api_key)
-    _gemini_model = os.getenv("GEMINI_MODEL_NAME") or model_manager.get_best_model(
-        fallback="gemini-flash"
-    )
+    _gemini_model = pinned_gemini_model() or model_manager.get_best_model()
     _fallback_models = model_manager.get_fallback_models()
     logger.info(f"✓ Gemini OCR client initialized. Primary model: {_gemini_model}")
+
+
+def gemini_model_label() -> str:
+    """The Gemini model OCR will use, as a short label, without calling Google.
+
+    Same order as _init_gemini: the client's model once it exists, then
+    GEMINI_MODEL_NAME, then the automatic pick from the cached model list.
+    """
+    if _gemini_model:
+        return str(_gemini_model)
+    from app.services.model_manager import model_manager, pinned_gemini_model
+
+    pinned = pinned_gemini_model()
+    if pinned:
+        return pinned
+
+    best = model_manager.peek_best_model()
+    return f"{best} (auto)" if best else "auto (picked on first receipt)"
 
 
 def _make_gemini_generate(model, contents):
@@ -1244,7 +1260,7 @@ def process_receipt_task(receipt_id: int, image_path: str, claimed: bool = False
 
         if "ocr_model" not in ocr_result:
             if backend_type == "gemini":
-                ocr_result["ocr_model"] = os.getenv("GEMINI_MODEL_NAME", "gemini-1.5-flash")
+                ocr_result["ocr_model"] = gemini_model_label()
             else:
                 ocr_result["ocr_model"] = os.getenv("OCR_MODEL", "qwen/qwen2.5-vl-7b")
 

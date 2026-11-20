@@ -80,8 +80,17 @@ case "$CHOICE" in
     ;;
   3)
     NEW_BACKEND="gemini"
-    NEW_MODEL="gemini-2.0-flash"
     NEW_URL=""
+    # Gemini reads GEMINI_MODEL_NAME, not OCR_MODEL. "auto" (or unset) lets the
+    # app pick the newest flash model from Google's live list at startup, so
+    # nothing here goes stale when Google ships a new version.
+    CURRENT_GEMINI=$(grep -E '^GEMINI_MODEL_NAME=' ../.env 2>/dev/null | cut -d= -f2- | tr -d ' ')
+    echo ""
+    echo "  Gemini model — 'auto' picks the newest flash model at startup;"
+    echo "  or pin one, e.g. gemini-3.1-flash-lite. List: https://ai.google.dev/gemini-api/docs/models"
+    echo -n "  Model [current: ${CURRENT_GEMINI:-auto}] (press Enter to keep): "
+    read -r ENTERED_GEMINI
+    NEW_GEMINI="${ENTERED_GEMINI:-${CURRENT_GEMINI:-auto}}"
     ;;
   4)
     NEW_BACKEND="openrouter"
@@ -130,7 +139,12 @@ if [ -f "../.env" ]; then
   # Replace in place (macOS + Linux compatible)
   sed "s/^OCR_BACKEND=.*/OCR_BACKEND=$NEW_BACKEND/" ../.env > ../.env.tmp && mv ../.env.tmp ../.env
 
-  if grep -q "^OCR_MODEL=" ../.env; then
+  if [ "$NEW_BACKEND" = "gemini" ]; then
+    # Gemini ignores OCR_MODEL, so keep any local/OpenRouter model on file. Drop
+    # a bare gemini-* value: older versions of this script wrote one here, and
+    # it only ever made the active model look like something it wasn't.
+    grep -v '^OCR_MODEL=gemini-' ../.env > ../.env.tmp; mv ../.env.tmp ../.env
+  elif grep -q "^OCR_MODEL=" ../.env; then
     sed "s|^OCR_MODEL=.*|OCR_MODEL=$NEW_MODEL|" ../.env > ../.env.tmp && mv ../.env.tmp ../.env
   else
     echo "OCR_MODEL=$NEW_MODEL" >> ../.env
@@ -145,8 +159,17 @@ if [ -f "../.env" ]; then
   fi
 else
   echo "OCR_BACKEND=$NEW_BACKEND" >> ../.env
-  echo "OCR_MODEL=$NEW_MODEL" >> ../.env
+  if [ "$NEW_BACKEND" != "gemini" ]; then echo "OCR_MODEL=$NEW_MODEL" >> ../.env; fi
   if [ -n "$NEW_URL" ]; then echo "OCR_BACKEND_URL=$NEW_URL" >> ../.env; fi
+fi
+
+# Only written when option 3 was chosen.
+if [ -n "$NEW_GEMINI" ]; then
+  if grep -q "^GEMINI_MODEL_NAME=" ../.env 2>/dev/null; then
+    sed "s|^GEMINI_MODEL_NAME=.*|GEMINI_MODEL_NAME=$NEW_GEMINI|" ../.env > ../.env.tmp && mv ../.env.tmp ../.env
+  else
+    echo "GEMINI_MODEL_NAME=$NEW_GEMINI" >> ../.env
+  fi
 fi
 
 # Only written when option 4 was chosen with a model — pressing Enter to keep
@@ -157,6 +180,14 @@ if [ -n "$NEW_PAID" ]; then
   else
     echo "OPENROUTER_ALLOW_PAID=$NEW_PAID" >> ../.env
   fi
+fi
+
+if [ "$NEW_BACKEND" = "gemini" ]; then
+  # Report what Gemini will actually use, which is not OCR_MODEL.
+  NEW_MODEL=$(grep -E '^GEMINI_MODEL_NAME=' ../.env 2>/dev/null | cut -d= -f2- | tr -d ' ')
+  case "$NEW_MODEL" in
+    ""|auto|AUTO) NEW_MODEL="auto — newest flash model on Google's list" ;;
+  esac
 fi
 
 echo ""

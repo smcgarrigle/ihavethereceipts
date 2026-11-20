@@ -49,7 +49,7 @@ def categorize_item(item_name: str) -> str:
     Use Gemini to categorize a grocery item with retry and fallback logic.
     """
     from app.services.category_cache import category_cache
-    from app.services.model_manager import model_manager
+    from app.services.model_manager import model_manager, pinned_gemini_model
 
     try:
         normalized = item_name.strip().lower()
@@ -83,9 +83,7 @@ def categorize_item(item_name: str) -> str:
         """
 
         # Primary and Fallback model search
-        primary_model = os.getenv("GEMINI_MODEL_NAME") or model_manager.get_best_model(
-            fallback="gemini-flash"
-        )
+        primary_model = pinned_gemini_model() or model_manager.get_best_model()
         fallbacks = model_manager.get_fallback_models()
         models_to_try = list(
             dict.fromkeys([primary_model] + [m for m in fallbacks if m != primary_model])
@@ -142,7 +140,7 @@ def categorize_items_batch(item_names: list) -> dict:
     Categorize multiple items in one API call with retry and fallback.
     """
     from app.services.category_cache import category_cache
-    from app.services.model_manager import model_manager
+    from app.services.model_manager import model_manager, pinned_gemini_model
 
     try:
         if not client or not item_names:
@@ -193,9 +191,7 @@ def categorize_items_batch(item_names: list) -> dict:
         No markdown, no explanation, just the JSON object.
         """
 
-        primary_model = os.getenv("GEMINI_MODEL_NAME") or model_manager.get_best_model(
-            fallback="gemini-flash"
-        )
+        primary_model = pinned_gemini_model() or model_manager.get_best_model()
         fallbacks = model_manager.get_fallback_models()
         models_to_try = list(
             dict.fromkeys([primary_model] + [m for m in fallbacks if m != primary_model])

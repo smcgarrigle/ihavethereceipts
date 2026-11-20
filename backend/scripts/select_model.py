@@ -13,6 +13,8 @@ sys.path.append(str(root_dir / "backend"))
 ENV_PATH = str(root_dir / ".env")
 load_dotenv(ENV_PATH)
 
+from app.services.model_manager import model_manager  # noqa: E402
+
 
 def get_available_models():
     api_key = os.getenv("GEMINI_API_KEY")
@@ -38,11 +40,14 @@ def select_model():
     print("Fetching available Gemini models...")
     models = get_available_models()
 
-    if not models:
-        print("Could not fetch models. Using hardcoded defaults.")
-        models = ["gemini-flash-latest", "gemini-2.0-flash", "gemini-1.5-flash"]
+    # Only models that can read a receipt, best first; "auto" leaves the choice
+    # to the app (newest flash model on Google's list at startup).
+    models = ["auto"] + model_manager.rank_models(models)
+    if len(models) == 1:
+        print("Could not fetch models. Offering auto and Google's moving alias.")
+        models.append("gemini-flash-latest")
 
-    current_model = os.getenv("GEMINI_MODEL_NAME", "gemini-flash-latest")
+    current_model = os.getenv("GEMINI_MODEL_NAME") or "auto"
 
     questions = [
         inquirer.List(
