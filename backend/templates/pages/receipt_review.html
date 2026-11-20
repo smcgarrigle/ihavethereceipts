@@ -485,8 +485,7 @@
                 <!-- Fees Section -->
                 <div class="mb-3">
                     <div class="flex justify-between items-center mb-2">
-                        <label class="text-sm font-medium text-textMuted">Fees (CRV, Deposits,
-                            etc.)</label>
+                        <label class="text-sm font-medium text-textMuted">Fees (Deposits, etc.; CRV moves to the CRV section)</label>
                         <button @click="item.fees.push({amount: 0, description: '', type: 'other'})"
                             class="text-xs px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded hover:bg-orange-200 dark:hover:bg-orange-900/50">
                             + Add Fee
@@ -497,9 +496,9 @@
                             <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full">
                                 <div class="flex gap-2 w-full sm:w-auto flex-shrink-0">
                                     <input type="text" inputmode="decimal" x-model="fee.amount"
-                                        @input="updateBasePrice(item)" placeholder="Amount"
+                                        @input="updateBasePrice(item)" @change="moveCrvFee(item, fee)" placeholder="Amount"
                                         class="w-1/2 sm:w-24 px-3 py-1 text-sm border border-borderInput rounded-lg bg-bgInput text-textBase" />
-                                    <select x-model="fee.type" aria-label="Fee type"
+                                    <select x-model="fee.type" aria-label="Fee type" @change="moveCrvFee(item, fee)"
                                         class="w-1/2 sm:w-28 px-3 py-1 text-sm border border-borderInput rounded-lg bg-bgInput text-textBase">
                                         <option value="crv">CRV</option>
                                         <option value="deposit">Deposit</option>
@@ -508,7 +507,7 @@
                                     </select>
                                 </div>
                                 <div class="flex items-center gap-2 w-full sm:w-auto sm:flex-1">
-                                    <input type="text" x-model="fee.description" placeholder="Description"
+                                    <input type="text" x-model="fee.description" placeholder="Description" @change="moveCrvFee(item, fee)"
                                         class="flex-1 min-w-0 px-3 py-1 text-sm border border-borderInput rounded-lg bg-bgInput text-textBase" />
                                     <button @click="item.fees.splice(fIndex, 1); updateBasePrice(item)"
                                         aria-label="Remove fee"
@@ -557,6 +556,9 @@
                 Add Item
             </button>
         </div>
+
+        <!-- Announces a CRV fee moving out of an item (its inputs disappear). -->
+        <p class="sr-only" role="status" aria-live="polite" x-text="crvStatus"></p>
 
         <!-- CRV Grouping Section -->
         <div x-show="crv_items.length > 0" class="border-t border-borderDefault bg-bgHover">

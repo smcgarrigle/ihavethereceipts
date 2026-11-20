@@ -4,6 +4,33 @@
  * Extracted from receipt_review.html (Audit #20.110)
  */
 
+// CRV is its own line on a receipt, added on top of the item price, so the
+// review page keeps it in the CRV section rather than inside an item.
+function isCrvFee(fee) {
+    return fee.type === 'crv' || (fee.description || '').toUpperCase().includes('CRV');
+}
+
+function crvRowFromFee(fee) {
+    const amount = (parseFloat(fee.amount) || 0).toFixed(2);
+    return {
+        name: fee.description || 'CRV Fee',
+        base_price: amount,
+        quantity: 1,
+        discounts: [],
+        fees: [],
+        final_price: amount,
+        weight: null,
+        unit_type: 'each',
+        unit_price: amount,
+        is_bulk: false,
+        category: 'Other',
+        original_unit_price: null,
+        total_discount: 0,
+        fdc_match: null,
+        detailsExpanded: false
+    };
+}
+
 function receiptReview(config) {
     const ocrDataElement = document.getElementById('ocr-data');
     const ocrData = ocrDataElement ? JSON.parse(ocrDataElement.textContent) : {};
@@ -19,6 +46,7 @@ function receiptReview(config) {
         items: ocrData.items || [],
         crv_items: [],
         crvExpanded: false,
+        crvStatus: '',
         ocrTotal: parseFloat(ocrData.total_amount) || ocrData.items?.reduce((sum, item) => sum + (parseFloat(item.final_price) || parseFloat(item.base_price) || 0), 0) || 0,
         metadataSaved: false,
         categories: [],
@@ -72,28 +100,12 @@ function receiptReview(config) {
                 // Extract embedded CRV fees
                 const nonCrvFees = [];
                 processed.fees.forEach(fee => {
-                    const desc = (fee.description || '').toUpperCase();
-                    if (fee.type === 'crv' || desc.includes('CRV')) {
-                        const feeAmount = parseFloat(fee.amount) || 0;
-                        extractedCrvItems.push({
-                            name: fee.description || 'CRV Fee',
-                            base_price: feeAmount.toFixed(2),
-                            quantity: 1,
-                            discounts: [],
-                            fees: [],
-                            final_price: feeAmount.toFixed(2),
-                            weight: null,
-                            unit_type: 'each',
-                            unit_price: feeAmount.toFixed(2),
-                            is_bulk: false,
-                            category: 'Other',
-                            original_unit_price: null,
-                            total_discount: 0,
-                            fdc_match: null,
-                            detailsExpanded: false
-                        });
-                        // Deduct the CRV fee from the parent item's final price so it balances out
-                        processed.final_price -= feeAmount;
+                    if (isCrvFee(fee)) {
+                        const row = crvRowFromFee(fee);
+                        extractedCrvItems.push(row);
+                        // OCR's final_price already includes the CRV, so take it
+                        // back out of the parent item to keep the total balanced.
+                        processed.final_price -= parseFloat(row.final_price);
                     } else {
                         nonCrvFees.push(fee);
                     }
@@ -299,6 +311,23 @@ function receiptReview(config) {
 
         onUnitPriceChange(item) {
             this.onUnitChange(item);
+        },
+
+        // A CRV fee added during review moves to the CRV section as its own
+        // line, the same as CRV found by OCR. The item keeps the price that was
+        // typed, so the CRV adds to the receipt instead of being carved out of
+        // the item (which used to drop the item's price by the CRV amount).
+        moveCrvFee(item, fee) {
+            if (!isCrvFee(fee) || !((parseFloat(fee.amount) || 0) > 0)) return;
+            if (this.crv_items.includes(item)) return;  // already a CRV line
+            const index = item.fees.indexOf(fee);
+            if (index === -1) return;
+            item.fees.splice(index, 1);
+            const row = crvRowFromFee(fee);
+            this.crv_items.push(row);
+            this.crvExpanded = true;
+            this.updateBasePrice(item);
+            this.crvStatus = `Moved ${row.final_price} CRV to the CRV Fees section.`;
         },
 
         updateBasePrice(item) {
