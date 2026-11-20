@@ -69,7 +69,23 @@ def _is_prediction_excluded(
     return any(pat in cat_lower or (item_lower and pat in item_lower) for pat in excluded_patterns)
 
 
-def get_item_cadences(db: Session) -> list[dict[str, Any]]:
+def get_item_cadences(db: Session, include_dismissed: bool = False) -> list[dict[str, Any]]:
+    """Purchase cadences for items a person has not dismissed.
+
+    Every consumer of predictions reads this, so a dismissed item leaves the
+    restock page, the stats, and the JSON endpoints together. Dismissals are
+    applied after the cache, so one takes effect on the next call.
+    ``include_dismissed`` returns everything, which the dismissed list needs.
+    """
+    cadences = _compute_item_cadences(db)
+    if include_dismissed:
+        return cadences
+    from app.services.prediction_dismissals import without_dismissed
+
+    return without_dismissed(db, cadences)
+
+
+def _compute_item_cadences(db: Session) -> list[dict[str, Any]]:
     """Compute purchase cadences for all items with >= MIN_PURCHASES purchases.
 
     Results are cached for _CACHE_TTL_SECONDS to avoid redundant full-table

@@ -8,6 +8,7 @@ from app.models.item import Item
 from app.models.merge_log import MergeLog
 from app.models.nutrition_suggestion import NutritionSuggestion
 from app.models.ocr_correction import OcrCorrection
+from app.models.prediction_dismissal import PredictionDismissal
 from app.models.receipt import Receipt, ReceiptItem
 from app.models.store import Store
 from app.models.store_item_alias import StoreItemAlias
@@ -27,4 +28,5 @@ __all__ = [
     "CorrectionOverride",
     "StoreItemAlias",
     "NutritionSuggestion",
+    "PredictionDismissal",
 ]

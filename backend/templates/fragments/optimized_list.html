@@ -22,7 +22,8 @@
         </div>
         <ul class="divide-y divide-gray-200 dark:divide-gray-700">
             {% for item in items %}
-            <li class="p-4 hover:bg-bgHover transition-colors group">
+            <li class="p-4 hover:bg-bgHover transition-colors group cursor-pointer"
+                data-dismiss-item="{{ item.item_id }}" data-dismiss-name="{{ item.item_name }}">
                 <div class="flex justify-between items-start gap-4">
                     <div class="flex-1">
                         <a href="/items/{{ item.item_id }}/insights" class="text-sm font-semibold text-textBase hover:text-blue-600 dark:hover:text-blue-400">
@@ -72,6 +73,11 @@
                             </span>
                             {% endif %}
                         </div>
+                        <button type="button" data-dismiss-button
+                                    aria-label="Dismiss {{ item.item_name }} from predictions"
+                                    class="mt-2 text-[11px] font-medium text-textMuted hover:text-textBase underline underline-offset-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded">
+                                Dismiss
+                            </button>
                     </div>
                 </div>
             </li>
