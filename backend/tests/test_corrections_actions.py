@@ -194,7 +194,8 @@ def test_restoring_does_not_offer_an_undo(client, db):
 def test_a_removed_row_offers_restore_not_remove(client, db):
     row = _lesson(db, _receipt(db, _store(db)))
 
-    body = _act(client, row.content_key, "remove").text
+    # A removed lesson is no longer in use, so it is only listed under "All".
+    body = _act(client, row.content_key, "remove", show="all").text
 
     buttons = _buttons(body)
     assert "Restore" in buttons

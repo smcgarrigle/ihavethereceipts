@@ -16,7 +16,12 @@ from bs4 import BeautifulSoup
 
 from app.models import CorrectionUsage, OcrCorrection, Receipt, Store
 from app.services.correction_keys import content_key
-from app.services.correction_service import list_corrections, set_pinned, set_suppressed
+from app.services.correction_service import (
+    correction_distribution,
+    list_corrections,
+    set_pinned,
+    set_suppressed,
+)
 
 ATTR_BREAKOUT = '"><img src=x onerror=alert(1)>'
 JS_BREAKOUT = "');alert(1);//"
@@ -91,7 +96,8 @@ def _rows(body):
     soup = BeautifulSoup(body, "html.parser")
     table = soup.find(id="corrections-table")
     assert table is not None, "the page rendered without its corrections table"
-    return table.find("tbody").find_all("tr")
+    # Each section is its own tbody with a heading row; lessons carry the marker.
+    return table.select("tr[data-lesson]")
 
 
 # ---------------------------------------------------------------------------
@@ -127,7 +133,7 @@ def test_a_lesson_appears_with_its_values(client, db):
 def test_the_empty_state_says_so(client):
     body = client.get(PAGE).text
 
-    assert len(_rows(body)) == 1
+    assert not _rows(body)
     assert "No corrections recorded yet" in body
 
 
@@ -195,7 +201,7 @@ def test_a_filter_matching_nothing_says_so(client, db):
 
     body = client.get(PAGE, params={"store": "Costco", "input_type": "image"}).text
 
-    assert len(_rows(body)) == 1
+    assert not _rows(body)
     assert "No corrections match this filter" in body
 
 
@@ -287,9 +293,10 @@ def test_a_removed_lesson_is_marked(client, db):
     receipt = _receipt(db, _store(db))
     set_suppressed(db, _lesson(db, receipt))
 
-    body = client.get(PAGE).text
+    rows = _rows(client.get(PAGE, params={"show": "all"}).text)
 
-    assert "removed" in body
+    assert len(rows) == 1
+    assert "removed" in rows[0].get_text()
 
 
 def test_a_pinned_lesson_is_marked(client, db):
@@ -386,3 +393,231 @@ def test_list_corrections_reports_the_store_and_input_type(db):
     assert row["store"] == "Costco"
     assert row["input_type"] == "image"
     assert row["field"] == "name"
+
+
+# ---------------------------------------------------------------------------
+# Sections: what the person did, in plain words
+# ---------------------------------------------------------------------------
+
+
+def _sections(body):
+    table = BeautifulSoup(body, "html.parser").find(id="corrections-table")
+    return {
+        tbody["data-group"]: tbody for tbody in table.find_all("tbody") if tbody.get("data-group")
+    }
+
+
+def test_lessons_are_grouped_by_what_was_done(client, db):
+    receipt = _receipt(db, _store(db))
+    _lesson(db, receipt, "MLK WHL GAL", "Whole Milk")
+    _lesson(db, receipt, "4.34", "8.68", field="price", item_context="Whole Milk")
+    _lesson(db, receipt, "2", "3", field="quantity", item_context="Bananas")
+    _lesson(db, receipt, None, "Organic Spinach", field="item_missed")
+    _lesson(db, receipt, "SUBTOTAL", None, field="item_hallucinated")
+
+    sections = _sections(client.get(PAGE).text)
+
+    assert list(sections) == ["name", "price", "missed", "made_up"]
+    assert "Names you fixed" in sections["name"].get_text()
+    assert "Lines the model missed" in sections["missed"].get_text()
+    assert "Lines the model made up" in sections["made_up"].get_text()
+    # A quantity fix sits with prices: both are a number on a line.
+    assert len(sections["price"].select("tr[data-lesson]")) == 2
+
+
+def test_a_section_with_nothing_in_it_is_left_out(client, db):
+    _lesson(db, _receipt(db, _store(db)))
+
+    assert list(_sections(client.get(PAGE).text)) == ["name"]
+
+
+def test_a_missed_line_shows_only_what_was_added(client, db):
+    _lesson(db, _receipt(db, _store(db)), None, "Organic Spinach", field="item_missed")
+
+    text = _rows(client.get(PAGE).text)[0].get_text()
+
+    assert "Organic Spinach" in text
+    assert "(missing)" not in text
+
+
+def test_a_made_up_line_shows_only_what_was_deleted(client, db):
+    _lesson(db, _receipt(db, _store(db)), "SUBTOTAL", None, field="item_hallucinated")
+
+    text = _rows(client.get(PAGE).text)[0].get_text()
+
+    assert "SUBTOTAL" in text
+    assert "(removed)" not in text
+
+
+# ---------------------------------------------------------------------------
+# In use, or all
+# ---------------------------------------------------------------------------
+
+
+def _many(db, receipt, count):
+    """``count`` distinct lessons, the first the newest."""
+    return [_lesson(db, receipt, f"READ {i}", f"Saved {i}", minutes_ago=i) for i in range(count)]
+
+
+def test_only_lessons_the_next_prompt_would_carry_are_listed(client, db, monkeypatch):
+    monkeypatch.setenv("CORRECTION_PROMPT_LIMIT", "2")
+    _many(db, _receipt(db, _store(db)), 5)
+
+    text = " ".join(row.get_text() for row in _rows(client.get(PAGE).text))
+
+    assert "Saved 0" in text and "Saved 1" in text
+    assert "Saved 2" not in text
+
+
+def test_all_lists_the_older_lessons_and_marks_them(client, db, monkeypatch):
+    monkeypatch.setenv("CORRECTION_PROMPT_LIMIT", "2")
+    _many(db, _receipt(db, _store(db)), 5)
+
+    rows = _rows(client.get(PAGE, params={"show": "all"}).text)
+
+    assert len(rows) == 5
+    assert sum("no longer sent" in row.get_text() for row in rows) == 3
+
+
+def test_the_view_links_carry_both_counts(client, db, monkeypatch):
+    monkeypatch.setenv("CORRECTION_PROMPT_LIMIT", "2")
+    _many(db, _receipt(db, _store(db)), 5)
+
+    soup = BeautifulSoup(client.get(PAGE).text, "html.parser")
+
+    assert "(2)" in soup.find(id="view-in-use").get_text()
+    assert "(5)" in soup.find(id="view-all").get_text()
+    assert soup.find(id="view-in-use").get("aria-current") == "page"
+    assert "show=all" in soup.find(id="view-all")["href"]
+
+
+def test_the_view_links_keep_the_filter(client, db):
+    _lesson(db, _receipt(db, _store(db)))
+
+    soup = BeautifulSoup(
+        client.get(PAGE, params={"store": "Costco", "input_type": "image"}).text, "html.parser"
+    )
+
+    href = soup.find(id="view-all")["href"]
+    assert "store=Costco" in href and "input_type=image" in href
+
+
+def test_a_pinned_old_lesson_is_in_use(client, db, monkeypatch):
+    monkeypatch.setenv("CORRECTION_PROMPT_LIMIT", "2")
+    lessons = _many(db, _receipt(db, _store(db)), 5)
+    set_pinned(db, lessons[-1])
+
+    text = " ".join(row.get_text() for row in _rows(client.get(PAGE).text))
+
+    assert "Saved 4" in text
+
+
+def test_a_removed_lesson_is_not_in_use(client, db):
+    set_suppressed(db, _lesson(db, _receipt(db, _store(db))))
+
+    assert not _rows(client.get(PAGE).text)
+    assert "Show all 1" in client.get(PAGE).text
+
+
+def test_row_actions_post_back_with_the_view_and_filter(client, db):
+    _lesson(db, _receipt(db, _store(db)))
+
+    soup = BeautifulSoup(
+        client.get(PAGE, params={"show": "all", "store": "Costco"}).text, "html.parser"
+    )
+
+    targets = [b["hx-post"] for b in soup.find_all("button") if b.get("hx-post")]
+    assert targets
+    for target in targets:
+        assert "show=all" in target and "store=Costco" in target
+
+
+# ---------------------------------------------------------------------------
+# The chart and the table under it
+# ---------------------------------------------------------------------------
+
+
+def test_the_distribution_counts_rows_by_kind(db):
+    store = _store(db)
+    first, second = _receipt(db, store), _receipt(db, store, "/data/uploads/b.jpg")
+    _lesson(db, first, "MLK WHL GAL", "Whole Milk")
+    _lesson(db, second, "MLK WHL GAL", "Whole Milk")
+    _lesson(db, first, "4.34", "8.68", field="price", item_context="Whole Milk")
+    _lesson(db, first, None, "Organic Spinach", field="item_missed")
+    _lesson(db, first, "SUBTOTAL", None, field="item_hallucinated")
+
+    found = correction_distribution(db)
+
+    assert found["totals"] == {"name": 2, "price": 1, "missed": 1, "made_up": 1}
+    assert found["total"] == 5
+    assert found["receipts"] == 2
+
+
+def test_the_distribution_leaves_out_deposit_lines(db):
+    receipt = _receipt(db, _store(db))
+    _lesson(db, receipt, None, "CRV", field="item_missed")
+
+    assert correction_distribution(db)["total"] == 0
+
+
+def test_the_distribution_bins_are_contiguous(db):
+    store = _store(db)
+    first = _receipt(db, store)
+    far = Receipt(id=first.id + 60, status="completed", store_id=store.id, image_path="/x.jpg")
+    db.add(far)
+    db.commit()
+    _lesson(db, first)
+    _lesson(db, far, "ORG SPNCH", "Organic Spinach")
+
+    bins = correction_distribution(db)["bins"]
+
+    assert [b["name"] for b in bins] == [1, 0, 1]
+    assert bins[0]["label"] == "0\u201324"
+
+
+def test_the_distribution_splits_by_how_the_receipt_came_in(db):
+    store = _store(db)
+    _lesson(db, _receipt(db, store, "/data/uploads/a.jpg"))
+    _lesson(db, _receipt(db, store, "/data/uploads/a.pdf"), "ORG SPNCH", "Organic Spinach")
+    _lesson(db, _receipt(db, store, None), "PASTE LINE", "Paste Line")
+
+    sources = correction_distribution(db)["sources"]
+
+    assert [s["input_type"] for s in sources] == ["image", "pdf", "paste"]
+    assert all(s["receipts"] == 1 and s["name"] == 1 for s in sources)
+
+
+def test_the_distribution_follows_the_filters(db):
+    costco, safeway = _store(db), _store(db, "Safeway")
+    _lesson(db, _receipt(db, costco))
+    _lesson(db, _receipt(db, safeway, "/data/uploads/a.pdf"), "ORG SPNCH", "Organic Spinach")
+
+    assert correction_distribution(db, store_name="Costco")["total"] == 1
+    assert correction_distribution(db, input_type="pdf")["total"] == 1
+
+
+def test_the_distribution_rejects_an_unknown_input_type(db):
+    with pytest.raises(ValueError):
+        correction_distribution(db, input_type="fax")
+
+
+def test_the_page_shows_totals_chart_and_source_table(client, db):
+    receipt = _receipt(db, _store(db))
+    _lesson(db, receipt)
+    _lesson(db, receipt, None, "Organic Spinach", field="item_missed")
+
+    soup = BeautifulSoup(client.get(PAGE).text, "html.parser")
+
+    assert soup.select_one('[data-total="name"]').get_text(strip=True) == "1"
+    assert soup.select_one('[data-total="missed"]').get_text(strip=True) == "1"
+    assert soup.select_one('[data-total="made_up"]').get_text(strip=True) == "0"
+    assert soup.find("canvas", id="correctionsChart") is not None
+    source_rows = soup.find(id="corrections-by-source").find("tbody").find_all("tr")
+    assert [row.find("th").get_text(strip=True) for row in source_rows] == ["Photo"]
+
+
+def test_the_chart_is_left_out_when_there_is_nothing_to_draw(client):
+    soup = BeautifulSoup(client.get(PAGE).text, "html.parser")
+
+    assert soup.find("canvas", id="correctionsChart") is None
+    assert soup.find(id="corrections-by-source") is None
