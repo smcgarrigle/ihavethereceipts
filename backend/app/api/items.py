@@ -793,7 +793,7 @@ def merge_items(request: MergeItemsRequest, db: Session = Depends(get_db)):
     import json
 
     from app.models import MergeLog, ReceiptItem
-    from app.services import store_names
+    from app.services import prediction_dismissals, store_names
 
     try:
         target_item = db.query(Item).filter(Item.id == request.keep_item_id).first()
@@ -821,6 +821,9 @@ def merge_items(request: MergeItemsRequest, db: Session = Depends(get_db)):
 
             # What the stores print for the merged item now means the kept one
             alias_ids = store_names.repoint(db, source_id, request.keep_item_id)
+
+            # A dismissal from restock predictions follows the item it was about
+            prediction_dismissals.repoint(db, source_id, request.keep_item_id)
 
             # Log the merge
             log = MergeLog(

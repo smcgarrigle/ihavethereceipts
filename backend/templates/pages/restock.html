@@ -26,9 +26,9 @@
     </div>
 
     <!-- Stats Summary -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="prediction-stats"
-         hx-get="/api/predictions/stats" hx-trigger="load" hx-swap="innerHTML">
-        <!-- Loaded via stats endpoint, but provide skeleton -->
+    {# Filled by loadPredictionStats() below. The endpoint returns JSON, so an
+       hx-get here would race the script and could leave the raw JSON on screen. #}
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="prediction-stats">
         <div class="bg-bgCard rounded-xl p-4 border border-borderDefault animate-pulse">
             <div class="h-6 bg-bgSkeleton rounded w-12 mb-2"></div>
             <div class="h-4 bg-bgSkeleton rounded w-20"></div>
@@ -85,6 +85,9 @@
             </div>
         </div>
 
+        {# Filled out of band by a dismiss or restore: says what happened, offers Undo. #}
+        <div id="restock-notice" role="status" aria-live="polite"></div>
+
         <div class="overflow-x-auto"
              id="restock-content-container"
              hx-get="/api/predictions/optimized-list"
@@ -103,6 +106,12 @@
         </div>
     </div>
 
+    <!-- Items dismissed from predictions, with a way back -->
+    <div id="restock-dismissed"
+         hx-get="/api/predictions/dismissed"
+         hx-trigger="load"
+         hx-swap="innerHTML"></div>
+
     <!-- Info Note -->
     <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 flex items-start gap-3">
         <span class="text-blue-500 text-lg mt-0.5">ℹ️</span>
@@ -110,6 +119,8 @@
             <p class="font-semibold mb-1">How predictions work</p>
             <p>The engine analyzes your purchase history to calculate average buying intervals. Items need at least 3 purchases to generate a prediction.
                Prices shown are the most recent price paid at each store. Items not purchased in 6+ months are considered stale and hidden from this view.</p>
+            <p class="mt-2">Click an item, or its <strong>Dismiss</strong> link, to stop being reminded about it for 1 week, 1 month or for good.
+               This applies to the item at every store. Dismissed items are listed below the table and can be restored there.</p>
             <p class="mt-2">
                 <strong>API endpoints:</strong>
                 <code class="bg-blue-100 dark:bg-blue-900/40 px-1.5 py-0.5 rounded text-xs">/api/predictions/shopping-list</code> (JSON) &middot;
@@ -119,9 +130,90 @@
     </div>
 </div>
 
+<dialog id="dismiss-dialog" aria-labelledby="dismiss-dialog-title"
+        class="rounded-2xl border border-borderDefault bg-bgCard text-textBase p-0 w-full max-w-sm shadow-xl">
+    <div class="p-6 space-y-4">
+        <div>
+            <h2 id="dismiss-dialog-title" class="text-lg font-bold text-textBase">Dismiss from predictions</h2>
+            <p class="text-sm text-textMuted mt-1">
+                Stop reminding me about <span id="dismiss-dialog-item" class="font-semibold text-textBase"></span> for:
+            </p>
+        </div>
+        <div class="grid grid-cols-3 gap-2">
+            <button type="button" data-dismiss-period="week"
+                    class="px-3 py-2 rounded-lg bg-bgInput border border-borderInput text-sm font-medium text-textBase hover:bg-bgHover transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
+                1 week
+            </button>
+            <button type="button" data-dismiss-period="month"
+                    class="px-3 py-2 rounded-lg bg-bgInput border border-borderInput text-sm font-medium text-textBase hover:bg-bgHover transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
+                1 month
+            </button>
+            <button type="button" data-dismiss-period="forever"
+                    class="px-3 py-2 rounded-lg bg-bgInput border border-borderInput text-sm font-medium text-textBase hover:bg-bgHover transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
+                Forever
+            </button>
+        </div>
+        <p class="text-xs text-textMuted">
+            Applies at every store. A 1 week or 1 month dismissal also ends if the item is bought again.
+        </p>
+        <div class="text-right">
+            <button type="button" id="dismiss-dialog-cancel"
+                    class="text-sm text-textMuted hover:text-textBase transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded px-2 py-1">
+                Cancel
+            </button>
+        </div>
+    </div>
+</dialog>
+
 <script>
+    // Dismissing an item. One dialog for the page; the rows only say which item.
+    (function () {
+        const dialog = document.getElementById('dismiss-dialog');
+        const container = document.getElementById('restock-content-container');
+        let itemId = null;
+
+        container.addEventListener('click', (event) => {
+            const row = event.target.closest('[data-dismiss-item]');
+            if (!row) return;
+            // A click on the row opens the dialog; a link or another button in
+            // the row keeps doing its own job.
+            const control = event.target.closest('a, button');
+            if (control && !control.hasAttribute('data-dismiss-button')) return;
+            itemId = row.dataset.dismissItem;
+            document.getElementById('dismiss-dialog-item').textContent = row.dataset.dismissName;
+            dialog.showModal();
+        });
+
+        dialog.addEventListener('click', (event) => {
+            const choice = event.target.closest('[data-dismiss-period]');
+            if (choice && itemId) {
+                htmx.ajax('POST', '/api/predictions/dismiss/' + itemId, {
+                    target: '#restock-dismissed',
+                    swap: 'innerHTML',
+                    values: { period: choice.dataset.dismissPeriod },
+                });
+                dialog.close();
+            } else if (event.target === dialog || event.target.id === 'dismiss-dialog-cancel') {
+                // The backdrop belongs to the dialog element itself.
+                dialog.close();
+            }
+        });
+
+        // A dismiss or restore changes the list and the counts above it.
+        document.body.addEventListener('restock-changed', () => {
+            const table = document.getElementById('tab-restock-table').getAttribute('aria-selected') === 'true';
+            htmx.ajax('GET', table ? '/api/predictions/restock-table' : '/api/predictions/optimized-list', {
+                target: '#restock-content-container',
+                swap: 'innerHTML',
+            });
+            loadPredictionStats();
+        });
+    })();
+
     // Override the stats endpoint to render HTML instead of relying on HTMX JSON swap
-    document.addEventListener('DOMContentLoaded', async () => {
+    document.addEventListener('DOMContentLoaded', () => loadPredictionStats());
+
+    async function loadPredictionStats() {
         try {
             const response = await fetch('/api/predictions/stats');
             const stats = await response.json();
@@ -148,6 +240,6 @@
         } catch (error) {
             console.error('Error loading prediction stats:', error);
         }
-    });
+    }
 </script>
 {% endblock %}

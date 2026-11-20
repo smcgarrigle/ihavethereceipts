@@ -1,0 +1,56 @@
+{# The dismissed-items panel. Returned by every dismiss and restore, which also
+   send the notice out of band so the way back sits above the list just acted on. #}
+{% if notice %}
+<div id="restock-notice" hx-swap-oob="innerHTML">
+    <div class="px-6 py-2.5 bg-amber-500/10 border-b border-amber-500/30 flex flex-wrap items-center gap-3" data-notice="{{ notice.kind }}">
+        {% if notice.kind == 'dismissed' %}
+        <span class="text-sm text-textBase">
+            Dismissed <span class="font-semibold">{{ notice.item_name }}</span>
+            {% if notice.forever %}for good{% else %}for {{ notice.period }}{% endif %}.
+        </span>
+        <button type="button"
+                hx-post="/api/predictions/dismiss/{{ notice.item_id }}/restore"
+                hx-target="#restock-dismissed"
+                hx-swap="innerHTML"
+                class="text-sm font-medium text-amber-400 hover:text-amber-300 underline underline-offset-2 transition-colors">
+            Undo
+        </button>
+        {% else %}
+        <span class="text-sm text-textBase">
+            Restored <span class="font-semibold">{{ notice.item_name }}</span>.
+        </span>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+{% if dismissed %}
+<details class="bg-bgCard rounded-2xl border border-borderDefault overflow-hidden" {% if notice %}open{% endif %}>
+    <summary class="px-6 py-4 cursor-pointer text-sm font-semibold text-textBase focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500">
+        Dismissed <span class="font-mono text-textMuted">({{ dismissed | length }})</span>
+        <span class="block text-xs font-normal text-textMuted mt-0.5">
+            Hidden from predictions. A timed dismissal also ends when the item is bought again.
+        </span>
+    </summary>
+    <ul id="restock-dismissed-list" class="divide-y divide-borderLight border-t border-borderDefault">
+        {% for row in dismissed %}
+        <li class="px-6 py-3 flex flex-wrap items-center justify-between gap-3" data-dismissed-item="{{ row.item_id }}">
+            <div class="min-w-0">
+                <a href="/items/{{ row.item_id }}/insights" class="text-sm font-medium text-textBase hover:text-blue-400">{{ row.item_name }}</a>
+                <p class="text-xs text-textMuted">
+                    {% if row.forever %}Dismissed for good{% else %}Back on {{ row.until.strftime('%Y-%m-%d') }}{% endif %}
+                </p>
+            </div>
+            <button type="button"
+                    hx-post="/api/predictions/dismiss/{{ row.item_id }}/restore"
+                    hx-target="#restock-dismissed"
+                    hx-swap="innerHTML"
+                    aria-label="Restore {{ row.item_name }}"
+                    class="px-2 py-1 rounded-lg text-xs font-medium text-emerald-400 bg-emerald-500/15 hover:bg-emerald-500/25 transition-colors">
+                Restore
+            </button>
+        </li>
+        {% endfor %}
+    </ul>
+</details>
+{% endif %}
