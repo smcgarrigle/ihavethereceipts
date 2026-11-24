@@ -6,7 +6,11 @@ import requests
 from dotenv import load_dotenv
 from rapidfuzz import fuzz
 
-load_dotenv()
+# Skipped under TESTING so .env cannot override the test environment (see
+# app/core/config.py). A bare load_dotenv() also searches parent directories,
+# so from a git worktree it would load the main checkout's .env.
+if os.getenv("TESTING") != "1":
+    load_dotenv()
 
 logger = logging.getLogger(__name__)
 
