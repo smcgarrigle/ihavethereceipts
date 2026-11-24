@@ -16,7 +16,10 @@ from tenacity import (
 
 # Ensure env vars are loaded
 env_path = Path(__file__).parent.parent.parent / ".env"
-load_dotenv(dotenv_path=env_path)
+# Skipped under TESTING so .env cannot override the test environment (see
+# app/core/config.py).
+if os.getenv("TESTING") != "1":
+    load_dotenv(dotenv_path=env_path)
 
 logger = logging.getLogger(__name__)
 
