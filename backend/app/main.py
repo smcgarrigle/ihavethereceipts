@@ -16,8 +16,14 @@ from app.utils.upload_validation import media_type_for
 
 # Load environment variables. Skipped under TESTING so .env cannot override
 # the test environment (see app/core/config.py for the full rationale).
+#
+# override=False: variables already exported win over .env, the same rule as
+# config.py. load_dotenv() without a path searches upward, so from a git
+# worktree it finds the main checkout's .env; overriding there replaced an
+# exported DATABASE_URL (the static-demo builder's temp DB, a preview server's
+# DB copy) with the live database.
 if os.getenv("TESTING") != "1":
-    load_dotenv(override=True)
+    load_dotenv(override=False)
 
 from contextlib import asynccontextmanager
 
