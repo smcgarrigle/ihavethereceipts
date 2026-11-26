@@ -15,12 +15,28 @@
         }
     }"
     x-init="$watch('currentTheme', val => localStorage.setItem('theme', val))"
-    :class="[currentTheme, (currentTheme !== 'light') ? 'dark' : '']">
+    x-effect="applyTheme(currentTheme)">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}The Receipts{% endblock %}</title>
+
+    <!-- Theme: runs before the stylesheets load, so a stored theme paints on
+         the first frame. With nothing stored the static class="dark" stays.
+         applyTheme() replaces the whole class list; Alpine's :class would only
+         add to the static "dark", leaving it on for the light theme. -->
+    <script>
+        window.applyTheme = function (theme) {
+            document.documentElement.className =
+                theme === 'light' ? 'light' : theme === 'dark' ? 'dark' : theme + ' dark';
+        };
+        (function () {
+            var stored = null;
+            try { stored = localStorage.getItem('theme'); } catch (e) {}
+            if (stored) window.applyTheme(stored);
+        })();
+    </script>
 
     <!-- Open Graph / Social Sharing Meta Tags -->
     <meta property="og:title" content="IHaveTheReceipts">
