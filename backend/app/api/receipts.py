@@ -30,6 +30,7 @@ from sqlalchemy.orm import Session
 from app.api.receipts_fragments import get_receipt_card
 from app.database import get_db
 from app.models import Receipt, ReceiptItem, Store
+from app.services import processing_log
 from app.services.ocr import process_receipt_task, process_text_receipt_task
 from app.services.spend import line_total
 from app.utils.upload_validation import (
@@ -498,6 +499,8 @@ def get_receipt_status(receipt_id: int, db: Session = Depends(get_db)):
         "id": receipt.id,
         "status": receipt.status,
         "error_message": receipt.error_message if receipt.status == "failed" else None,
+        # Model fallbacks during this run, shown on the processing screen
+        "warnings": processing_log.warnings_for(receipt_id),
     }
 
 

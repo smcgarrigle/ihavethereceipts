@@ -41,6 +41,7 @@ import httpx
 from pydantic import BaseModel as _SchemaBase
 
 from app.core.config import settings
+from app.services import processing_log
 from app.services.pdf_parser import parse_pdf_receipt
 from app.utils.api_keys import configured_key
 from app.utils.item_parsing import is_weight_priced, weighted_unit_price
@@ -995,7 +996,7 @@ def _process_gemini(image_paths: list[str], prompt_extra: str = "") -> dict:
 
     response = None
     last_error = None
-    for model in models_to_try:
+    for i, model in enumerate(models_to_try):
         logger.info(f"Attempting Gemini OCR with model: {model}")
         try:
             response = _generate_with_retry(model, [RECEIPT_PROMPT + prompt_extra] + image_files)
@@ -1003,6 +1004,7 @@ def _process_gemini(image_paths: list[str], prompt_extra: str = "") -> dict:
             break
         except Exception as e:
             logger.warning(f"✗ Gemini model {model} failed: {e}")
+            processing_log.model_failed(model, e, "extraction", models_to_try[i + 1 :])
             last_error = e
 
     if response is None:
@@ -1189,6 +1191,7 @@ def process_receipt_task(receipt_id: int, image_path: str, claimed: bool = False
 
     backend = get_backend()
     logger.info(f"Background OCR task started for receipt {receipt_id} (backend={backend})")
+    log_token = processing_log.begin(receipt_id)
     db = SessionLocal()
     receipt = None
     try:
@@ -1203,6 +1206,7 @@ def process_receipt_task(receipt_id: int, image_path: str, claimed: bool = False
             logger.error(f"Receipt {receipt_id} not found in background task")
             return
 
+        processing_log.clear(receipt_id)
         file_ext = Path(image_path).suffix.lower()
         start_time = time.time()
 
@@ -1481,6 +1485,7 @@ def process_receipt_task(receipt_id: int, image_path: str, claimed: bool = False
                 pass
     finally:
         db.close()
+        processing_log.end(log_token)
 
 
 # ===========================================================================
@@ -1565,7 +1570,7 @@ def _process_text_gemini(text: str, prompt_extra: str = "") -> dict:
     response = None
     last_error: Exception | None = None
     used_model = _gemini_model
-    for model in models_to_try:
+    for i, model in enumerate(models_to_try):
         logger.info(f"[TEXT] Attempting Gemini text parse with model: {model}")
         try:
             response = _make_gemini_generate(model, [full_prompt])
@@ -1574,6 +1579,7 @@ def _process_text_gemini(text: str, prompt_extra: str = "") -> dict:
             break
         except Exception as e:
             logger.warning(f"✗ Gemini model {model} failed: {e}")
+            processing_log.model_failed(model, e, "extraction", models_to_try[i + 1 :])
             last_error = e
 
     if response is None:
@@ -1614,6 +1620,8 @@ def process_text_receipt_task(receipt_id: int, raw_text: str) -> None:
 
     backend = get_backend()
     logger.info(f"Background text-parse task started for receipt {receipt_id} (backend={backend})")
+    log_token = processing_log.begin(receipt_id)
+    processing_log.clear(receipt_id)
     db = SessionLocal()
     receipt: Receipt | None = None
     try:
@@ -1859,3 +1867,4 @@ def process_text_receipt_task(receipt_id: int, raw_text: str) -> None:
                 pass
     finally:
         db.close()
+        processing_log.end(log_token)

@@ -14,6 +14,8 @@ from tenacity import (
     wait_exponential,
 )
 
+from app.services import processing_log
+
 # Ensure env vars are loaded
 env_path = Path(__file__).parent.parent.parent / ".env"
 # Skipped under TESTING so .env cannot override the test environment (see
@@ -203,12 +205,13 @@ def categorize_items_batch(item_names: list) -> dict:
         response = None
         last_error = None
 
-        for model in models_to_try:
+        for i, model in enumerate(models_to_try):
             try:
                 response = _generate_with_retry(model=model, contents=prompt)
                 break
             except Exception as e:
                 logger.warning(f"Batch categorization failed for model {model}: {e}")
+                processing_log.model_failed(model, e, "categorization", models_to_try[i + 1 :])
                 last_error = e
 
         if not response:

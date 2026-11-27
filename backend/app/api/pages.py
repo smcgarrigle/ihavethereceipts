@@ -355,23 +355,41 @@ def review_receipt(request: Request, receipt_id: int, db: Session = Depends(get_
                 let lineIdx = 0;
                 let eventIdx = 0;
 
-                function writeLine(text) {{
-                    const el = document.createElement('div');
-                    el.innerHTML = text.replace(/ /g, '&nbsp;');
-
-                    // Old blinker removal
+                // Add a node before the blinking cursor and keep the newest line
+                // in view: the box is overflow-hidden, so without the scroll
+                // every line past the first screenful was cut off.
+                function append(node) {{
                     const old = document.getElementById('blinker');
-                    if(old) old.remove();
-
-                    // Add text
-                    term.appendChild(el);
-
-                    // Add new blinker
+                    if (old) old.remove();
+                    term.appendChild(node);
                     const blinker = document.createElement('span');
                     blinker.className = 'cursor-blink';
                     blinker.innerText = '█';
                     blinker.id = 'blinker';
                     term.appendChild(blinker);
+                    term.scrollTop = term.scrollHeight;
+                }}
+
+                function writeLine(text) {{
+                    const el = document.createElement('div');
+                    el.innerHTML = text.replace(/ /g, '&nbsp;');
+                    append(el);
+                }}
+
+                // Real warnings from this run (model fallbacks), in orange.
+                // textContent, not innerHTML: the text comes from the server.
+                let warningsShown = 0;
+                function writeWarning(text) {{
+                    const el = document.createElement('div');
+                    el.className = 'text-orange-400 whitespace-pre-wrap';
+                    el.textContent = '[WARN] ' + text;
+                    append(el);
+                }}
+                function showNewWarnings(data) {{
+                    const list = data.warnings || [];
+                    for (; warningsShown < list.length; warningsShown++) {{
+                        writeWarning(list[warningsShown]);
+                    }}
                 }}
 
                 function streamSequence() {{
@@ -402,6 +420,7 @@ def review_receipt(request: Request, receipt_id: int, db: Session = Depends(get_
                         fetch('/api/receipts/' + receiptId + '/status')
                             .then(res => res.json())
                             .then(data => {{
+                                showNewWarnings(data);
                                 if (data.status === 'completed' || data.status === 'failed') {{
                                     clearInterval(pollInterval);
                                     writeLine(" ");
@@ -418,16 +437,8 @@ def review_receipt(request: Request, receipt_id: int, db: Session = Depends(get_
                                     }}, 1500);
                                 }} else {{
                                     // Add gibberish processing hex
-                                    const oldBlinker = document.getElementById('blinker');
-                                    if(oldBlinker) oldBlinker.remove();
                                     const gibberish = Array.from({{length: 4}}, () => Math.floor(Math.random()*16).toString(16)).join('');
-                                    term.appendChild(document.createTextNode(' 0x'+gibberish));
-
-                                    const newBlinker = document.createElement('span');
-                                    newBlinker.className = 'cursor-blink';
-                                    newBlinker.innerText = '█';
-                                    newBlinker.id = 'blinker';
-                                    term.appendChild(newBlinker);
+                                    append(document.createTextNode(' 0x'+gibberish));
                                 }}
                             }})
                             .catch(e => console.error(e));
