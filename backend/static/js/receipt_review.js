@@ -54,6 +54,9 @@ function receiptReview(config) {
         // Store names this save pointed at a different item, with past lines to offer moving
         relink: [],
         relinkOpen: false,
+        // A save is in flight. A second save of the same receipt races the
+        // first for SQLite's write lock and fails with "database is locked".
+        saving: false,
 
         init() {
             const categoriesElement = document.getElementById('categories-data');
@@ -343,6 +346,7 @@ function receiptReview(config) {
         },
 
         async saveItems() {
+            if (this.saving) return;
             const allItemsToSave = [...this.items, ...this.crv_items];
 
             if (allItemsToSave.length === 0) {
@@ -369,6 +373,9 @@ function receiptReview(config) {
 
             }
 
+            this.saving = true;
+            // Stays true while the page redirects after a successful save.
+            let leaving = false;
             try {
                 window.dispatchEvent(new CustomEvent('process-start', { detail: { message: 'Saving Items...' } }));
                 const response = await fetch(`/api/receipts/${this.receiptId}/save-reviewed-items`, {
@@ -397,6 +404,7 @@ function receiptReview(config) {
                     window.dispatchEvent(new CustomEvent('process-start', {
                         detail: { message: `Successfully saved ${data.items_saved} items!` }
                     }));
+                    leaving = true;
                     await new Promise(resolve => setTimeout(resolve, 2000));
                     window.location.href = '/receipts';
                 } else {
@@ -407,6 +415,7 @@ function receiptReview(config) {
                 alert('Error saving items. Please try again.');
             } finally {
                 window.dispatchEvent(new CustomEvent('process-end'));
+                if (!leaving) this.saving = false;
             }
         },
 
