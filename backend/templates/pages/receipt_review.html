@@ -198,8 +198,8 @@
                 class="flex-1 md:flex-none justify-center px-2 sm:px-4 py-2 bg-bgHover text-textMuted rounded-lg hover:bg-bgHover text-xs sm:text-base font-medium flex items-center">
                 Cancel
             </button>
-            <button @click="saveItems()"
-                class="flex-[1.5] md:flex-none justify-center px-2 sm:px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center space-x-1 sm:space-x-2">
+            <button @click="saveItems()" :disabled="saving" :aria-busy="saving"
+                class="flex-[1.5] md:flex-none justify-center px-2 sm:px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1 sm:space-x-2">
                 <span class="text-xs sm:text-base font-medium whitespace-nowrap">Save Items</span>
                 <svg class="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
@@ -592,8 +592,8 @@
         class="flex-1 md:flex-none justify-center px-4 py-2 bg-bgHover text-textMuted rounded-lg hover:bg-bgHover">
         Cancel
     </button>
-    <button @click="saveItems()"
-        class="flex-[1.5] md:flex-none justify-center px-4 md:px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center space-x-2">
+    <button @click="saveItems()" :disabled="saving" :aria-busy="saving"
+        class="flex-[1.5] md:flex-none justify-center px-4 md:px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2">
         <span class="whitespace-nowrap">Save All Items</span>
         <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
